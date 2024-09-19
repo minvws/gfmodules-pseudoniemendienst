@@ -1,0 +1,42 @@
+version: "3.5"
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEW_UID: ${NEW_UID:-1000}
+        NEW_GID: ${NEW_GID:-1000}
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ./:/src
+      - ./secrets:/src/secrets
+    ports:
+      - 8501:8501
+    depends_on:
+      - softhsm
+      - redis
+    networks:
+      bpg:
+        aliases:
+          - bpg-app
+
+  redis:
+    image: redis:6.2
+    ports:
+      - 6379:6379
+#    networks:
+#      - bpg
+
+  softhsm:
+    image: cremuzzi/softhsm2
+    volumes:
+      - ./softhsm.conf:/etc/softhsm2/softhsm2.conf
+      - ./tokens:/var/lib/softhsm/tokens
+#    networks:
+#      - bpg
+
+networks:
+  bpg:
+    driver: bridge
+    name: bpg
