@@ -1,0 +1,31 @@
+[ req ]
+default_bits       = 2048
+default_md         = sha256
+prompt             = no
+distinguished_name = dn
+req_extensions     = req_ext
+
+[ dn ]
+C  = NL
+ST = Zuid-Holland
+L  = Den Haag
+O  = iRealisatie
+CN = ov.irealisatie.nl
+emailAddress = admin@example.org
+
+[ req_ext ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = ov.irealisatie.nl
+
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical, CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+certificatePolicies = @policy_section
+
+[ policy_section ]
+policyIdentifier = 2.23.140.1.2.2
