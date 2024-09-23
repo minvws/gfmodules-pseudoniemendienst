@@ -21,7 +21,6 @@ ssl_key_file = server.key
 key_name = REK
 key_version = 1
 alg = AES-256-GCM
-max_encryptions = 9223372036854775807
 key_renewal_at = 1000
 iv_prefix = RIVF
 ; How old may a RID be before it is considered invalid for exchanging to a PDN/BSN via VAD?
@@ -39,6 +38,14 @@ bp-gen-key-bpgk-1-alg=HS256
 host = localhost
 port = 6379
 db = 0
+
+[iv]
+; Path to IV counter
+path = secrets/iv.json
+; Block size to reserve. If the IV counter is below this value, a new block will be reserved and written to disks
+block_size = 100
+; Start value for the IV counter
+start_value = 9223372036854775807
 
 [hsm_keystore]
 library = /usr/local/lib/softhsm/libsofthsm2.so

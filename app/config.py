@@ -26,7 +26,6 @@ class ConfigRid(BaseModel):
     key_name : str= Field(default="REK")
     key_version : str= Field(default=1)
     alg : str= Field(default="AES-256-GCM")
-    max_encryptions : str= Field(default=2**63 - 1)
     key_renewal_at : str= Field(default=1000)
     iv_prefix : str = Field(default="RIVF")
     max_age_for_pdn_exchange_via_vad : int = Field(default=10)
@@ -41,6 +40,10 @@ class ConfigBpg(BaseModel):
     class Config:
         extra = "allow"
 
+class ConfigIv(BaseModel):
+    path: str = Field(default="iv.json")
+    block_size: int = Field(default=100)
+    start: int = Field(default=9223372036854775807) # 2^63 - 1
 
 class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
@@ -79,6 +82,7 @@ class Config(BaseModel):
     rid: ConfigRid
     bpg: ConfigBpg
     redis: ConfigRedis
+    iv: ConfigIv
     json_keystore: ConfigJsonKeystore
     hsm_keystore: ConfigHsmKeystore
 
