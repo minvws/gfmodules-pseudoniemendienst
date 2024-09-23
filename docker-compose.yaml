@@ -12,31 +12,35 @@ services:
       - ./:/src
       - ./secrets:/src/secrets
     ports:
-      - 8501:8501
+      - 6502:6502
     depends_on:
       - softhsm
       - redis
     networks:
-      bpg:
+      zmodules:
         aliases:
-          - bpg-app
+          - prs-app
 
   redis:
     image: redis:6.2
     ports:
       - 6379:6379
-#    networks:
-#      - bpg
+    networks:
+      - zmodules
 
   softhsm:
     image: cremuzzi/softhsm2
     volumes:
       - ./softhsm.conf:/etc/softhsm2/softhsm2.conf
       - ./tokens:/var/lib/softhsm/tokens
-#    networks:
-#      - bpg
+    networks:
+      - zmodules
 
 networks:
-  bpg:
+  zmodules:
     driver: bridge
-    name: bpg
+    name: zmodules
+
+volumes:
+  secrets:
+    name: secrets
