@@ -17,6 +17,8 @@ from app.services.rid_service import RidService
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
 
+    crypto_service: CryptoService|None = None
+
     if config.app.keystore == "json":
         store = JsonKeyStorage(config.json_keystore.path)
         crypto_service = MemoryCryptoService(store)

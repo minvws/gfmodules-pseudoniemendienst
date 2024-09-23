@@ -1,17 +1,19 @@
 from functools import wraps
+from typing import Callable, Any, TypeVar
 
 from starlette.requests import Request
 
 from app.services.tls_service import CertAuthentication, CertAuthentications, CertAuthenticationException, TLSService
 
+T = TypeVar("T", bound=Callable[..., Any])
 
-def auth_required(certs: list[CertAuthentication]):
+def auth_required(certs: list[CertAuthentication]) ->  Callable[[T], T]:
     """
     Decorator to check if the client certificate is valid.
     """
-    def decorator(func):
+    def decorator(func) -> Any:    # type: ignore
         @wraps(func)
-        async def wrapper(request: Request, *args, **kwargs):
+        async def wrapper(request: Request, *args, **kwargs) -> Any: # type: ignore
             try:
                 tls_service = TLSService()
                 cert_type = tls_service.get_certificate_type(request)

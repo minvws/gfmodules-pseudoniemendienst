@@ -3,22 +3,30 @@ import base64
 
 from app.services.crypto.crypto_service import CryptoService
 
-class Algorithms:
-    A256GCM = "A256GCM"
-    DIR = "dir"
+class JweAlgorithm(str):
+    pass
 
-ALGORITHMS = Algorithms()
+class JweAlgorithms:
+    A256GCM = JweAlgorithm("A256GCM")
+    DIR = JweAlgorithm("DIR")
 
 class JWEVerifyException(Exception):
     pass
 
-def encrypt(crypto_service: CryptoService, key_id: str, plaintext: bytes, iv: bytes, encryption=ALGORITHMS.A256GCM, algorithm=ALGORITHMS.DIR) -> str:
+def encrypt(
+    crypto_service: CryptoService,
+    key_id: str,
+    plaintext: bytes,
+    iv: bytes,
+    encryption: JweAlgorithm = JweAlgorithms.A256GCM,
+    algorithm: JweAlgorithm = JweAlgorithms.DIR
+) -> str:
     """
     Encrypt a plaintext using JWE
     """
-    if encryption != ALGORITHMS.A256GCM:
+    if encryption != JweAlgorithms.A256GCM:
         raise ValueError("Unsupported encryption algorithm")
-    if algorithm != ALGORITHMS.DIR:
+    if algorithm != JweAlgorithms.DIR:
         raise ValueError("Unsupported algorithm")
     if len(iv) != 12:
         raise ValueError("IV length is not 12")
@@ -40,7 +48,7 @@ def encrypt(crypto_service: CryptoService, key_id: str, plaintext: bytes, iv: by
     return jwe_compact
 
 
-def verify(jwe_token: str):
+def verify(jwe_token: str) -> tuple[dict[str, str], bytes, bytes, bytes, bytes]:
     header, key, iv, ciphertext, tag = split_jwe(jwe_token)
 
     # key must not be present
@@ -48,9 +56,9 @@ def verify(jwe_token: str):
         raise JWEVerifyException("Key must not be present")
 
     # Check if the header is valid
-    if header['alg'] != ALGORITHMS.DIR:
+    if header['alg'] != JweAlgorithms.DIR:
         raise JWEVerifyException("Unsupported algorithm")
-    if header['enc'] != ALGORITHMS.A256GCM:
+    if header['enc'] != JweAlgorithms.A256GCM:
         raise JWEVerifyException("Unsupported encryption algorithm")
     if header['kid'] == "":
         raise JWEVerifyException("Missing key ID")
@@ -84,7 +92,7 @@ def decrypt(crypto_service: CryptoService, jwe_token: str) -> bytes:
     return crypto_service.decrypt_and_verify(ciphertext, tag, header['kid'], iv)
 
 
-def split_jwe(jwe_compact: str) -> (dict, bytes, bytes, bytes, bytes):
+def split_jwe(jwe_compact: str) -> tuple[dict[str, str], bytes, bytes, bytes, bytes]:
     """
     Split a JWE compact serialization into its components
     """

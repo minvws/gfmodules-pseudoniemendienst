@@ -4,8 +4,8 @@ import redis
 
 
 from app.config import ConfigBpg
-from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithm
-from app.types import BasePseudonym, OrganisationId, PDN
+from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithms
+from app.prs_types import BasePseudonym, OrganisationId, PDN
 
 SALT = b"iRealisatie"       # Fixed salt?
 
@@ -18,7 +18,7 @@ class PdnService:
         self.bpg_env_key_id = self.config.key_name + "-" + str(self.config.key_version)
 
         self.key_len = 32
-        self.hmac_algo = CryptoAlgorithm.SHA256
+        self.hmac_algo = CryptoAlgorithms.SHA256
 
     def exchange(self, bp: BasePseudonym, org_id: OrganisationId) -> PDN:
         """
@@ -41,7 +41,7 @@ class PdnService:
         p_gen_key_version = f"p-gen-key-{str(org_id)}"
         org_key_version = "1"
 
-        res: bytes = self.redis.get(p_gen_key_version)
+        res: bytes = self.redis.get(p_gen_key_version) # type: ignore
         if res is None:
             self.redis.set(p_gen_key_version, org_key_version)
         else:

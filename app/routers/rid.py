@@ -11,9 +11,9 @@ from app.middleware.auth_required import auth_required
 from app.services.bpg_service import BpgService
 from app.services.pdn_service import PdnService
 from app.services.rid_cache import RidCache
-from app.services.rid_service import RidService, NoExchangeAllowedException, VerificationException, RidException
+from app.services.rid_service import RidService, NoExchangeAllowedException, RidException
 from app.services.tls_service import CertAuthentications, TLSService
-from app.types import BasePseudonym, Rid, OrganisationId
+from app.prs_types import BasePseudonym, Rid, OrganisationId
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,13 +27,13 @@ def exchange_to_pdn(
     rid_service: RidService = Depends(container.get_rid_service),
     rid_cache: RidCache = Depends(container.get_rid_cache),
     pdn_service: PdnService = Depends(container.get_pdn_service),
-):
+) -> JSONResponse:
     """
     Converts a RID into a PDN for the specific organisation
     """
     result = verify_rid(rid_service, rid_cache, Rid(rid))
     if isinstance(result, JSONResponse):
-        logger.error(f"Error verifying RID: {result.body}")
+        logger.error("Error verifying RID")
         return result
 
     bp = rid_service.extract_bp(Rid(rid))
@@ -55,7 +55,7 @@ def exchange_bp_to_rid(
     bp: str = Query(str, description="The BP to generate a RID for"),
     rid_service: RidService = Depends(container.get_rid_service),
     bpg_service: BpgService = Depends(container.get_bpg_service),
-):
+) -> JSONResponse:
     if not bpg_service.is_valid(BasePseudonym(bp)):
         logger.error(f"Invalid BP: {bp}")
         return JSONResponse({"error": "Invalid BP"}, status_code=400)
@@ -78,7 +78,7 @@ def exchange_to_rids(
     rid: str = Query(str, description="The RID to exchange"),
     count: int = Query(1, description="The number of RIDs to exchange"),
     rid_service: RidService = Depends(container.get_rid_service),
-):
+) -> JSONResponse:
     """
     Exchange a RID for a set of new RIDs
     """
@@ -120,12 +120,12 @@ def verify_rid(rid_service: RidService, rid_cache: RidCache, rid: Rid) -> JSONRe
 
     # Only VAD issued RIDs can be exchanged for PDNs
     if parts["iss"] == "VAD":
-        if parts['iat'] + get_config().rid.max_age_for_pdn_exchange_via_vad < datetime.now(
+        if int(parts['iat']) + get_config().rid.max_age_for_pdn_exchange_via_vad < datetime.now(
                 tz=timezone.utc).timestamp():
             logger.warning(f"RID expired for VAD: {rid}")
             return JSONResponse({"error": "RID expired"}, status_code=400)
     elif parts["iss"] == "PRS":
-        if parts['iat'] + get_config().rid.max_age_for_pdn_exchange_via_healthcare_provider < datetime.now(
+        if int(parts['iat']) + get_config().rid.max_age_for_pdn_exchange_via_healthcare_provider < datetime.now(
                 tz=timezone.utc).timestamp():
             logger.warning(f"RID expired for PRS: {rid}")
             return JSONResponse({"error": "RID expired"}, status_code=400)
@@ -139,7 +139,7 @@ def verify_rid(rid_service: RidService, rid_cache: RidCache, rid: Rid) -> JSONRe
 
 def get_issuer(request: Request) -> str:
     """
-    The issuser depends on the certificate that is used to authenticate the request
+    The issuer depends on the certificate that is used to authenticate the request
     :return:
     """
     tls_service = TLSService()
