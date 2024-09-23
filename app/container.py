@@ -8,6 +8,7 @@ from app.services.crypto.crypto_service import CryptoService
 from app.services.crypto.hsm_crypto_service import HsmCryptoService
 from app.services.crypto.json_keystore import JsonKeyStorage
 from app.services.crypto.memory_crypto_service import MemoryCryptoService
+from app.services.iv_service import IvService
 from app.services.pdn_service import PdnService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService
@@ -26,13 +27,18 @@ def container_config(binder: inject.Binder) -> None:
     else:
         raise ValueError(f"Unknown keystore type {config.app.keystore}")
 
+
+    iv_service = IvService(config.iv.path, config.iv.block_size)
+    iv_service.set_iv_counter(config.iv.start, if_not_exists=True)
+    binder.bind(IvService, iv_service)
+
     redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db)
     binder.bind(redis.Redis, redis_service)
 
     rid_cache = RidCache(redis_service)
     binder.bind(RidCache, rid_cache)
 
-    rid_service = RidService(config.rid, crypto_service, rid_cache)
+    rid_service = RidService(config.rid, crypto_service, rid_cache, iv_service)
     binder.bind(RidService, rid_service)
 
     bpg_service = BpgService(config.bpg, crypto_service)

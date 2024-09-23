@@ -8,6 +8,7 @@ from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
 from app.services.jwe import ALGORITHMS, JWEVerifyException
 from app.services.rid_cache import RidCache
+from app.services.iv_service import IvService
 from app.types import BasePseudonym, Rid
 
 class RidException(Exception):
@@ -43,10 +44,11 @@ class VerificationException(RidException):
 
 
 class RidService:
-    def __init__(self, config: ConfigRid, crypto_service: CryptoService, rid_cache: RidCache) -> None:
+    def __init__(self, config: ConfigRid, crypto_service: CryptoService, rid_cache: RidCache, iv_service: IvService) -> None:
         self.crypto_service = crypto_service
         self.config = config
         self.rid_cache = rid_cache
+        self.iv_service = iv_service
 
         if self.config.alg == "AES-256-GCM":
             self.jwe_alg = ALGORITHMS.A256GCM
@@ -54,7 +56,7 @@ class RidService:
             raise ValueError("Unsupported algorithm")
 
         self.rid_env_key_id = self.config.key_name + "-" + str(self.config.key_version)
-        self.rid_enc_remaining = int(self.config.max_encryptions)
+        self.rid_enc_remaining = self.iv_service.get_iv_counter()
 
     def is_healthy(self) -> bool:
         """
@@ -67,7 +69,7 @@ class RidService:
         Generate an IV for the encryption
         :return: IV bytes
         """
-        self.rid_enc_remaining -= 1
+        self.rid_enc_remaining = self.iv_service.get_iv_counter()
         if self.rid_enc_remaining == 0:
             raise EncryptionExhaustedException("No more encryption attempts left for key")
 
