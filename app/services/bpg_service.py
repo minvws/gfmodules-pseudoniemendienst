@@ -1,8 +1,8 @@
 import base64
 
 from app.config import ConfigBpg
-from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithm
-from app.types import BasePseudonym
+from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithms
+from app.prs_types import BasePseudonym
 
 
 class BpgService:
@@ -22,7 +22,7 @@ class BpgService:
             self.bpg_env_key_alg = self.config.default_alg
 
         if self.bpg_env_key_alg == "HS256":
-            self.hash_alg = CryptoAlgorithm.SHA256
+            self.hash_alg = CryptoAlgorithms.SHA256
         else:
             raise ValueError(f"Unsupported algorithm {self.bpg_env_key_alg}")
 

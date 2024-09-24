@@ -1,4 +1,5 @@
 __pycache__
 .venv
-ssl/*
+secrets/ssl/*
 secrets/*
+app.conf

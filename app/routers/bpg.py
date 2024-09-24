@@ -10,7 +10,7 @@ from app.middleware.auth_required import auth_required
 from app.services.bpg_service import BpgService
 from app.services.pdn_service import PdnService
 from app.services.tls_service import CertAuthentications
-from app.types import OrganisationId
+from app.prs_types import OrganisationId
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -21,7 +21,7 @@ def get_base_pseudonym(
     request: Request,
     bsn: str = Query(str, description="The BSN to generate a Base Pseudonym for"),
     bpg_service: BpgService = Depends(container.get_bpg_service),
-):
+) -> JSONResponse:
     """
     Converts a BSN into a Base Pseudonym (BP)
     """
@@ -38,13 +38,13 @@ def get_base_pseudonym(
 
 @router.post("/org_pseudonym")
 @auth_required([CertAuthentications.AUTH_UZI_CERT])
-def get_base_pseudonym(
+def get_org_pseudonym(
         request: Request,
         bsn: str = Query(str, description="The BSN to generate the PDN for"),
         org_id: str = Query(str, description="The organisation ID for this PDN"),
         bpg_service: BpgService = Depends(container.get_bpg_service),
         pdn_service: PdnService = Depends(container.get_pdn_service),
-):
+) -> JSONResponse:
     """
     Converts a BSN into a Pseudonym (PDN) for a specific organisation
     """

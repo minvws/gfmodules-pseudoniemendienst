@@ -47,7 +47,7 @@ class TLSService:
 
         try:
             cert_policies = cert.extensions.get_extension_for_oid(ExtensionOID.CERTIFICATE_POLICIES)
-            for info in cert_policies.value:
+            for info in cert_policies.value: # type: ignore
                 if info.policy_identifier == x509.ObjectIdentifier("2.23.140.1.2.2"):
                     return CertAuthentications.AUTH_OV_CERT
                 if info.policy_identifier == x509.ObjectIdentifier("2.23.140.1.1"):

@@ -1,10 +1,7 @@
 [app]
 loglevel=debug
-keystore=hsm
-#keystore=json
-#auth_override_cert = ./ssl/ov-cert.pem
-#auth_override_cert = ./ssl/ev-cert.pem
-auth_override_cert = ./ssl/uzi-cert.pem
+keystore=json
+auth_override_cert = ./secrets/ssl/prs-uzi.crt
 
 [uvicorn]
 swagger_enabled = True
@@ -23,7 +20,6 @@ ssl_key_file = server.key
 key_name = REK
 key_version = 1
 alg = AES-256-GCM
-max_encryptions = 9223372036854775807
 key_renewal_at = 1000
 iv_prefix = RIVF
 max_age_for_pdn_exchange_via_vad = 1000

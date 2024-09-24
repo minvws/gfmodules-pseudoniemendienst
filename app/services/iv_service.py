@@ -21,7 +21,7 @@ Counter     Low Water Mark
   96          95
 
  Here we hit the low water mark, so we reserve a new block and store the LWM to disk
- 
+
   95          90
   94          90
   ...
@@ -31,7 +31,7 @@ class IvError(Exception):
     pass
 
 class IvService:
-    def __init__(self, filename="iv.json", block_size = 100) -> None:
+    def __init__(self, filename: str ="iv.json", block_size: int = 100) -> None:
         self.filename = filename
         self.block_size = block_size
 
@@ -69,7 +69,7 @@ class IvService:
             with lock:
                 with open(self.filename, 'r') as f:
                     data = json.load(f)
-                    return data['remaining']
+                    return int(data['remaining'])
         except Exception as e:
             raise IvError(e)
 

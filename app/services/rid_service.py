@@ -6,10 +6,10 @@ from app.config import ConfigRid
 from app.services import jwe
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
-from app.services.jwe import ALGORITHMS, JWEVerifyException
+from app.services.jwe import JWEVerifyException, JweAlgorithms
 from app.services.rid_cache import RidCache
 from app.services.iv_service import IvService
-from app.types import BasePseudonym, Rid
+from app.prs_types import BasePseudonym, Rid
 
 class RidException(Exception):
     """
@@ -51,7 +51,7 @@ class RidService:
         self.iv_service = iv_service
 
         if self.config.alg == "AES-256-GCM":
-            self.jwe_alg = ALGORITHMS.A256GCM
+            self.jwe_alg = JweAlgorithms.A256GCM
         else:
             raise ValueError("Unsupported algorithm")
 
@@ -109,7 +109,7 @@ class RidService:
             plaintext = payload.encode('utf-8'),
             iv=self.generate_iv(),
             encryption=self.jwe_alg,
-            algorithm=ALGORITHMS.DIR,
+            algorithm=JweAlgorithms.DIR,
         )
         rid = Rid(rid_data)
 
@@ -118,7 +118,7 @@ class RidService:
 
         return rid
 
-    def exchange_rid(self, rid: Rid, count=1, issuer="PRS") -> List[Rid]:
+    def exchange_rid(self, rid: Rid, count: int = 1, issuer: str = "PRS") -> List[Rid]:
         """
         Exchange a RID for one or more RIDs. This is done by extracting the BP from the RID and generating a new RIDs for it
         """
@@ -132,7 +132,7 @@ class RidService:
         return self.get_subject_from_rid(rid) is not None
 
 
-    def verify_and_decode_rid(self, rid: Rid) -> dict:
+    def verify_and_decode_rid(self, rid: Rid) -> dict[str, str]:
         """
         Decode a RID into its parts
         """
@@ -150,11 +150,11 @@ class RidService:
             if parts['iat'] > datetime.now(tz=timezone.utc).timestamp():
                 raise DecodeException("Invalid iat")
 
-            return parts
+            return parts # type: ignore
         except ValueError:
             raise DecodeException("Invalid JWE token")
         except JWEVerifyException as e:
-            raise VerificationException("Invalid JWE token: {e}")
+            raise VerificationException(f"Invalid JWE token: {e}")
 
 
     def get_subject_from_rid(self, rid: Rid) -> BasePseudonym|None:

@@ -4,7 +4,7 @@ import hmac
 
 from Crypto.Cipher import AES
 
-from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithm
+from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithm, CryptoAlgorithms
 from app.services.crypto.json_keystore import JsonKeyStorage
 
 
@@ -19,7 +19,7 @@ class MemoryCryptoService(CryptoService):
         self.bs = AES.block_size
         self.keystore = keystore
 
-    def encrypt_and_digest(self, plaintext: bytes, key_id: str, iv: bytes) -> (bytes, bytes):
+    def encrypt_and_digest(self, plaintext: bytes, key_id: str, iv: bytes) -> tuple[bytes, bytes]:
         key = self._get_key(key_id)
 
         cipher = AES.new(key, AES.MODE_GCM, iv)
@@ -35,13 +35,13 @@ class MemoryCryptoService(CryptoService):
     def encrypt(self, plaintext: bytes, key_id: str, iv: bytes) -> bytes:
         key = self._get_key(key_id)
 
-        cipher = AES.new(base64.b64decode(key), AES.MODE_GCM, iv=iv)
+        cipher = AES.new(base64.b64decode(key), AES.MODE_GCM, iv)
         return cipher.encrypt(plaintext)
 
     def decrypt(self, ciphertext: bytes, key_id: str, iv: bytes) -> bytes:
         key = self._get_key(key_id)
 
-        cipher = AES.new(base64.b64decode(key), AES.MODE_GCM, iv=iv)
+        cipher = AES.new(base64.b64decode(key), AES.MODE_GCM, iv)
         return cipher.decrypt(ciphertext)
 
     def sign(self, alg: CryptoAlgorithm, data: bytes, key_id: str) -> bytes:
@@ -61,8 +61,8 @@ class MemoryCryptoService(CryptoService):
             raise Exception(f"Key with id {key_id} not found")
         return key
 
-    def _get_digest_mod(self, alg: CryptoAlgorithm) -> hashlib:
-        if alg == CryptoAlgorithm.SHA256:
+    def _get_digest_mod(self, alg: CryptoAlgorithm) -> any: # type: ignore
+        if alg == CryptoAlgorithms.SHA256:
             return hashlib.sha256
 
         raise Exception(f"Unsupported algorithm {alg}")
