@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 from app import container
 from app.config import get_config
-from app.middleware.auth_required import auth_required
+from app.middleware.auth_required import auth_required, get_cert_from_request
 from app.services.bpg_service import BpgService
 from app.services.pdn_service import PdnService
 from app.services.rid_cache import RidCache
@@ -142,8 +142,9 @@ def get_issuer(request: Request) -> str:
     The issuer depends on the certificate that is used to authenticate the request
     :return:
     """
-    tls_service = TLSService()
-    cert_type = tls_service.get_certificate_type(request)
+    pem = get_cert_from_request(request)
+    tls_service = TLSService(get_config().auth.allowed_curves, get_config().auth.min_rsa_bitsize)
+    cert_type = tls_service.get_certificate_type(pem)
 
     if cert_type == CertAuthentications.AUTH_UZI_CERT:
         return "VAD"
