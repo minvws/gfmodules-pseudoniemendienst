@@ -6,6 +6,7 @@ echo "➡️ Generating TLS certificates"
 if [ -e secrets/ssl/server.key ] && [ -e secrets/ssl/server.cert ]; then
     echo "⚠️ TLS certificates already exist. Skipping."
 else
+    ./tools/download_certs.sh
     ./tools/generate_certs.sh
 fi
 

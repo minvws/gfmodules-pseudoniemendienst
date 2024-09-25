@@ -10,29 +10,36 @@ services:
       dockerfile: docker/Dockerfile
     volumes:
       - ./:/src
-      - ./secrets:/src/secrets
+      - ./secrets:/usr/local/secrets
     ports:
       - 6502:6502
     depends_on:
-      - softhsm
       - redis
     networks:
       zmodules:
         aliases:
           - prs-app
 
+  app-ssl:
+    image: httpd
+    restart: no
+    ports:
+      - 6503:443
+    volumes:
+      - ./secrets:/usr/local/secrets
+      - ./docker/httpd.conf:/usr/local/apache2/conf/httpd.conf
+      - ./docker/httpd-ssl.conf:/usr/local/apache2/conf/extra/httpd-ssl.conf
+    depends_on:
+      - app
+    networks:
+      zmodules:
+          aliases:
+          - prs-app-ssl
+
   redis:
     image: redis:6.2
     ports:
       - 6379:6379
-    networks:
-      - zmodules
-
-  softhsm:
-    image: cremuzzi/softhsm2
-    volumes:
-      - ./softhsm.conf:/etc/softhsm2/softhsm2.conf
-      - ./tokens:/var/lib/softhsm/tokens
     networks:
       - zmodules
 
