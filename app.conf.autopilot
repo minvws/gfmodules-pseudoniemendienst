@@ -1,7 +1,11 @@
 [app]
 loglevel=debug
 keystore=json
-auth_override_cert = ./secrets/ssl/prs-uzi.crt
+
+[auth]
+override_cert = ./secrets/prs-uzi.crt
+allowed_curves = "curve25519 curve448 secp521r1 secp384r1 secp256r1"
+min_rsa_bitsize = 2048
 
 [uvicorn]
 swagger_enabled = True

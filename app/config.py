@@ -20,7 +20,13 @@ class LogLevel(str, Enum):
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
     keystore: str = Field(default="json")
-    auth_override_cert: str | None
+
+
+class ConfigAuth(BaseModel):
+    override_cert: str | None
+    allowed_curves: str = Field(default="")
+    min_rsa_bitsize: int = Field(default=2048)
+
 
 class ConfigRid(BaseModel):
     key_name : str= Field(default="REK")
@@ -78,6 +84,7 @@ class ConfigHsmKeystore(BaseModel):
 
 class Config(BaseModel):
     app: ConfigApp
+    auth: ConfigAuth
     uvicorn: ConfigUvicorn
     rid: ConfigRid
     bpg: ConfigBpg

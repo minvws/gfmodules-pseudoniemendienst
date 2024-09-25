@@ -2,7 +2,14 @@
 loglevel=debug
 keystore=json
 # keystore=hsm
-auth_override_cert=
+
+[auth]
+; When set, the server will use this certificate to authenticate itself to the client
+override_cert = ./secrets/prs-uzi.crt
+; Allowed curves for certificaets with EC keys
+allowed_curves = "curve25519 curve448 secp521r1 secp384r1 secp256r1"
+; Minimum RSA key size for certificates with RSA keys
+min_rsa_bitsize = 2048
 
 [uvicorn]
 swagger_enabled = True
