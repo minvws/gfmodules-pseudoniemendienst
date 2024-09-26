@@ -21,6 +21,11 @@ def container_config(binder: inject.Binder) -> None:
 
     if config.app.keystore == "json":
         store = JsonKeyStorage(config.json_keystore.path)
+        if not store.has_key('BPGK-1'):
+            store.generate_key('BPGK-1')
+        if not store.has_key('REK-1'):
+            store.generate_key('REK-1')
+
         crypto_service = MemoryCryptoService(store)
         binder.bind(CryptoService, crypto_service)
     elif config.app.keystore == "hsm":
