@@ -39,7 +39,11 @@ def container_config(binder: inject.Binder) -> None:
     iv_service.set_iv_counter(config.iv.start, if_not_exists=True)
     binder.bind(IvService, iv_service)
 
-    redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db)
+    if config.redis.cert_path is not None:
+        redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db, ssl=True, ssl_cert_reqs='required', ssl_ca_certs=config.redis.ca_path, ssl_certfile=config.redis.cert_path, ssl_keyfile=config.redis.key_path)
+    else:
+        redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db)
+
     binder.bind(redis.Redis, redis_service)
 
     rid_cache = RidCache(redis_service)
