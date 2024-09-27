@@ -14,6 +14,7 @@ packages = [
 python = "^3.11"
 uvicorn = "^0.26.0"
 fastapi = "^0.109.1"
+async-timeout = "4.0.3"
 mypy = "^1.8.0"
 pydantic-settings = "^2.1.0"
 inject = "^5.2.0"
