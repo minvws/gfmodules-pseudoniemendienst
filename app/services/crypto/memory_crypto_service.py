@@ -35,22 +35,22 @@ class MemoryCryptoService(CryptoService):
     def encrypt(self, plaintext: bytes, key_id: str, iv: bytes) -> bytes:
         key = self._get_key(key_id)
 
-        cipher = AES.new(base64.b64decode(key), AES.MODE_GCM, iv)
+        cipher = AES.new(key, AES.MODE_GCM, iv)
         return cipher.encrypt(plaintext)
 
     def decrypt(self, ciphertext: bytes, key_id: str, iv: bytes) -> bytes:
         key = self._get_key(key_id)
 
-        cipher = AES.new(base64.b64decode(key), AES.MODE_GCM, iv)
+        cipher = AES.new(key, AES.MODE_GCM, iv)
         return cipher.decrypt(ciphertext)
 
     def sign(self, alg: CryptoAlgorithm, data: bytes, key_id: str) -> bytes:
         key = self._get_key(key_id)
-        return hmac.new(base64.b64decode(key), data, self._get_digest_mod(alg)).digest()
+        return hmac.new(key, data, self._get_digest_mod(alg)).digest()
 
     def verify(self, alg: CryptoAlgorithm, data: bytes, signature: bytes, key_id: str) -> bool:
         key = self._get_key(key_id)
-        return hmac.compare_digest(signature, hmac.new(base64.b64decode(key), data, self._get_digest_mod(alg)).digest())
+        return hmac.compare_digest(signature, hmac.new(key, data, self._get_digest_mod(alg)).digest())
 
     def generate_key(self, key_id: str) -> None:
         self.keystore.generate_key(key_id)

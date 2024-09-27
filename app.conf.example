@@ -45,6 +45,11 @@ bp-gen-key-bpgk-1-alg=HS256
 host = localhost
 port = 6379
 db = 0
+; Set these values to enable tls for redis connections
+ca_path =
+key_path =
+cert_path =
+
 
 [iv]
 ; Path to IV counter
