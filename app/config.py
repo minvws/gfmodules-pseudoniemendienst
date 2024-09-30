@@ -78,6 +78,12 @@ class ConfigJsonKeystore(BaseModel):
     path: str = Field(default="keystore.json")
 
 
+class ConfigHsmApiKeystore(BaseModel):
+    url: str
+    module: str
+    slot: str
+    cert_path: str
+
 class ConfigHsmKeystore(BaseModel):
     slot: int = Field(default=0)
     slot_pin: str = Field(default="1234")
@@ -94,6 +100,7 @@ class Config(BaseModel):
     iv: ConfigIv
     json_keystore: ConfigJsonKeystore
     hsm_keystore: ConfigHsmKeystore
+    hsm_api_keystore: ConfigHsmApiKeystore
 
 
 def read_ini_file(path: str) -> Any:

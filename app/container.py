@@ -4,6 +4,7 @@ import redis
 from app.config import get_config
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
+from app.services.crypto.hsm_api_crypto_service import HsmApiCryptoService
 
 from app.services.crypto.hsm_crypto_service import HsmCryptoService
 from app.services.crypto.json_keystore import JsonKeyStorage
@@ -31,6 +32,9 @@ def container_config(binder: inject.Binder) -> None:
     elif config.app.keystore == "hsm":
         crypto_service = HsmCryptoService(config.hsm_keystore.library, config.hsm_keystore.slot, config.hsm_keystore.slot_pin)
         binder.bind(CryptoService, crypto_service)
+    elif config.app.keystore == "hsm_api":
+        crypto_service = HsmApiCryptoService(config.hsm_api_keystore.url, config.hsm_api_keystore.module, config.hsm_api_keystore.slot, config.hsm_api_keystore.cert_path)
+        binder.bind(CryptoService, crypto_service)
     else:
         raise ValueError(f"Unknown keystore type {config.app.keystore}")
 
@@ -39,10 +43,10 @@ def container_config(binder: inject.Binder) -> None:
     iv_service.set_iv_counter(config.iv.start, if_not_exists=True)
     binder.bind(IvService, iv_service)
 
-    if config.redis.cert_path is not None:
-        redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db, ssl=True, ssl_cert_reqs='required', ssl_ca_certs=config.redis.ca_path, ssl_certfile=config.redis.cert_path, ssl_keyfile=config.redis.key_path)
-    else:
+    if config.redis.cert_path is None or config.redis.cert_path == "":
         redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db)
+    else:
+        redis_service = redis.Redis(config.redis.host, config.redis.port, config.redis.db, ssl=True, ssl_cert_reqs='required', ssl_ca_certs=config.redis.ca_path, ssl_certfile=config.redis.cert_path, ssl_keyfile=config.redis.key_path)
 
     binder.bind(redis.Redis, redis_service)
 

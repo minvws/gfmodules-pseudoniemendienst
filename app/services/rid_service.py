@@ -76,9 +76,12 @@ class RidService:
         if self.rid_enc_remaining < int(self.config.key_renewal_at):
             print("Warning: key needs to be renewed")
 
-        iv = self.config.iv_prefix.encode('utf-8') + self.rid_enc_remaining.to_bytes(8, byteorder='big')
-        if len(iv) != 12:
-            raise ValueError("IV length is not 12")
+        if len(self.config.iv_prefix.encode('utf-8')) != 4:
+            raise ValueError("IV prefix length is not 4")
+
+        iv = self.config.iv_prefix.encode('utf-8') + self.rid_enc_remaining.to_bytes(12, byteorder='big')
+        if len(iv) != 16:
+            raise ValueError("IV length is not 16")
 
         return iv
 
