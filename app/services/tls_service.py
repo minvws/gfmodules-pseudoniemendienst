@@ -80,7 +80,7 @@ class TLSService:
             # Check that the CN is inside the SAN as well
             if len(cn) == 1:
                 dns_entries = san_extension.value.get_values_for_type(x509.DNSName) # type: ignore
-                if cn[0].value not in dns_entries:
+                if cn[0].value not in dns_entries:  # type: ignore
                     raise CertValidationException("CN is not in SAN")
                 if not validators.domain(cn[0].value):
                     raise CertValidationException("SAN is not a valid domain")
