@@ -41,7 +41,7 @@ class HsmApiCryptoService(CryptoService):
             "iv": base64.b64encode(iv).decode('utf-8'),
         }
 
-        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/encrypt", json=hsm_data, cert=self.cert_path, verify=False)
+        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/encrypt", json=hsm_data, cert=self.cert_path)
         if r.status_code != 200:
             raise Exception(f"Failed to encrypt data: {r.text}")
 
@@ -61,7 +61,7 @@ class HsmApiCryptoService(CryptoService):
             "iv": base64.b64encode(iv).decode('utf-8'),
         }
 
-        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/decrypt", json=hsm_data, cert=self.cert_path, verify=False)
+        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/decrypt", json=hsm_data, cert=self.cert_path)
         if r.status_code != 200:
             raise Exception(f"Failed to decrypt data: {r.text}")
 
@@ -79,7 +79,7 @@ class HsmApiCryptoService(CryptoService):
             "mechanism": "AES_CMAC",
             "hashmethod": "sha256",
         }
-        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/sign", json=hsm_data, cert=self.cert_path, verify=False)
+        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/sign", json=hsm_data, cert=self.cert_path)
         if r.status_code != 200:
             raise Exception(f"Failed to sign data: {r.text}")
 
@@ -98,5 +98,5 @@ class HsmApiCryptoService(CryptoService):
             "signature": base64.b64encode(signature).decode('utf-8'),
             "hashmethod": "sha256",
         }
-        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/verify", json=hsm_data, cert=self.cert_path, verify=False)
+        r = requests.post(f"{self.url}/hsm/{self.module}/{self.slot}/verify", json=hsm_data, cert=self.cert_path)
         return r.status_code == 200
