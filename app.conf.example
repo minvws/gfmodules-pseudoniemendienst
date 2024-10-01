@@ -1,6 +1,6 @@
 [app]
 loglevel=debug
-keystore=json
+keystore=hsm_api
 # keystore=hsm
 
 [auth]
@@ -63,6 +63,13 @@ start_value = 9223372036854775807
 library = /usr/local/lib/softhsm/libsofthsm2.so
 slot = 0
 slot_pin = 1234
+
+[hsm_api_keystore]
+; Url to the HSM api
+url = http://localhost:8000
+module = softhsm
+slot = SoftHSMLabel
+cert_path = secrets/hsm-api.crt
 
 [json_keystore]
 path=secrets/keystore.json

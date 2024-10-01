@@ -52,6 +52,12 @@ library = /usr/lib/softhsm/libsofthsm2.so
 slot = 1588871416
 slot_pin = 1234
 
+[hsm_api_keystore]
+url = http://localhost:8000
+module = softhsm
+slot = SoftHSMLabel
+cert_path = secrets/hsm-api.crt
+
 [iv]
 path = secrets/iv.json
 block_size = 100

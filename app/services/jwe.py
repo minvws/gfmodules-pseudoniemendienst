@@ -28,8 +28,8 @@ def encrypt(
         raise ValueError("Unsupported encryption algorithm")
     if algorithm != JweAlgorithms.DIR:
         raise ValueError("Unsupported algorithm")
-    if len(iv) != 12:
-        raise ValueError("IV length is not 12")
+    if len(iv) != 16:
+        raise ValueError("IV length is not 16")
 
     header = {
         "alg": algorithm,
@@ -64,8 +64,8 @@ def verify(jwe_token: str) -> tuple[dict[str, str], bytes, bytes, bytes, bytes]:
         raise JWEVerifyException("Missing key ID")
 
     # Check if the IV is valid
-    if len(iv) != 12:
-        raise JWEVerifyException("IV length is not 12")
+    if len(iv) != 16:
+        raise JWEVerifyException("IV length is not 16")
 
     # Check if the ciphertext is valid
     if len(ciphertext) == 0:
