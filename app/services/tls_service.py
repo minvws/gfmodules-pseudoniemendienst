@@ -82,8 +82,6 @@ class TLSService:
                 dns_entries = san_extension.value.get_values_for_type(x509.DNSName) # type: ignore
                 if cn[0].value not in dns_entries:
                     raise CertValidationException("CN is not in SAN")
-                print(cn[0].value)
-                print(validators.domain(cn[0].value))
                 if not validators.domain(cn[0].value):
                     raise CertValidationException("SAN is not a valid domain")
 
