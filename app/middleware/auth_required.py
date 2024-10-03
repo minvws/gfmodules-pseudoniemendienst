@@ -1,18 +1,53 @@
 from functools import wraps
 from typing import Callable, Any, TypeVar
 
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 from fastapi import HTTPException
 from starlette.requests import Request
 
 from app.config import get_config
 from app.services.tls_service import CertAuthentication, CertAuthentications, CertAuthenticationException, TLSService
 
+
 T = TypeVar("T", bound=Callable[..., Any])
 
-SSL_PROXY_HEADER = "x-proxy-ssl_client_cert"
+SSL_PROXY_HEADER = "ssl_client_cert"
+SSL_PROXY_CHAIN_HEADERS = [ "ssl_client_cert_chain_0", "ssl_client_cert_chain_1", "ssl_client_cert_chain_2", "ssl_client_cert_chain_3" ]
+
+def x509_validate_path(cert_pem: str, intermediate_certs_pem: list[str], root_certs_pem: list[str]) -> bool:
+    cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+    intermediates_certs = [x509.load_pem_x509_certificate(intermediate.encode(), default_backend()) for intermediate in intermediate_certs_pem]
+    root_certs = [x509.load_pem_x509_certificate(root.encode(), default_backend()) for root in root_certs_pem]
+
+    store = x509.CertificateStore()
+    for root_cert in root_certs:
+        store.add_cert(root_cert)
+    chain = intermediates_certs + [cert]
+
+    store_ctx = x509.CertificateStoreContext(store, cert)
+
+    try:
+        store_ctx.verify_certificate_chain(chain)
+        return True
+    except x509.CertificateStoreContextError as e:
+        print(f"Error validating certificate chain: {e}")
+
+    return False
+
+
+
 
 def get_cert_from_request(request: Request) -> bytes:
     str_pem = request.headers.get(SSL_PROXY_HEADER, None)
+    str_intermediates = []
+    for header in SSL_PROXY_CHAIN_HEADERS:
+        str_intermediates.append(request.headers.get(header, None))
+
+
+    if not x509_validate_path(str_pem, str_intermediates):
+        raise CertAuthenticationException("Client certificate chain is not valid")
+
 
     pem = bytes()
     if str_pem is not None:
