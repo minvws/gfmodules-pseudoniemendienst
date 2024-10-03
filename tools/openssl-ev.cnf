@@ -26,6 +26,7 @@ basicConstraints = critical, CA:FALSE
 keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth, clientAuth
 certificatePolicies = @policy_section
+subjectAltName = @alt_names
 
 [ policy_section ]
 policyIdentifier = 2.23.140.1.1

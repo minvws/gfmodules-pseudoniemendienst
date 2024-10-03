@@ -21,12 +21,11 @@ class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
     keystore: str = Field(default="json")
 
-
 class ConfigAuth(BaseModel):
     override_cert: str | None
     allowed_curves: str = Field(default="")
     min_rsa_bitsize: int = Field(default=2048)
-
+    allow_cert_list: str = Field(default="auth_cert.json")
 
 class ConfigRid(BaseModel):
     key_name : str= Field(default="REK")
