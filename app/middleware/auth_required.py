@@ -5,11 +5,12 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app.config import get_config
-from app.services.tls_service import CertAuthentication, CertAuthentications, CertAuthenticationException, TLSService
+from app.container import get_authorization_service
+from app.services.tls_service import CertAuthentication, CertAuthentications, CertAuthenticationException
 
 T = TypeVar("T", bound=Callable[..., Any])
 
-SSL_PROXY_HEADER = "x-proxy-ssl_client_cert"
+SSL_PROXY_HEADER = "ssl_client_cert"
 
 def get_cert_from_request(request: Request) -> bytes:
     str_pem = request.headers.get(SSL_PROXY_HEADER, None)
@@ -29,26 +30,26 @@ def get_cert_from_request(request: Request) -> bytes:
 
     return pem
 
-def auth_required(certs: list[CertAuthentication]) ->  Callable[[T], T]:
+def auth_required(allowed_cert_types: list[CertAuthentication]) ->  Callable[[T], T]:
     """
     Decorator to check if the client certificate is valid.
     """
     def decorator(func) -> Any:    # type: ignore
         @wraps(func)
         async def wrapper(request: Request, *args, **kwargs) -> Any: # type: ignore
+            auth_service = get_authorization_service()
+            pem = get_cert_from_request(request)
+
+            # Make sure the certificate is valid (technically, not expired, not revoked, etc.)
             try:
-                pem = get_cert_from_request(request)
+                auth_service.authorize(pem)
+            except Exception as e:
+                raise HTTPException(403, e)
 
-                tls_service = TLSService(get_config().auth.allowed_curves, get_config().auth.min_rsa_bitsize)
-                cert_type = tls_service.get_certificate_type(pem)
-            except CertAuthenticationException as e:
-                raise HTTPException(403, f"Client cert is not valid: {e}")
-
-            if cert_type not in certs and CertAuthentications.AUTH_ALL not in certs:
-                raise HTTPException(403, "No correct client certificate provided")
-
-            if not tls_service.validate_cert(pem):
-                raise HTTPException(403, "Provided client certificate is not valid")
+            # Next, check if the certificate is actually allowed to access the endpoint
+            cert_type = auth_service.get_certificate_type()
+            if cert_type not in allowed_cert_types and CertAuthentications.AUTH_ALL not in allowed_cert_types:
+                raise HTTPException(403, "Certificate not allowed")
 
             return func(request, *args, **kwargs)
 

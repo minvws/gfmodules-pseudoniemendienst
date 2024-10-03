@@ -2,6 +2,7 @@ import inject
 import redis
 
 from app.config import get_config
+from app.services.auth_cert_service import AuthCertService
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
 from app.services.crypto.hsm_api_crypto_service import HsmApiCryptoService
@@ -13,12 +14,17 @@ from app.services.iv_service import IvService
 from app.services.pdn_service import PdnService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService
+from app.services.tls_service import TLSService
 
 
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
 
-    crypto_service: CryptoService|None = None
+    tls_service = TLSService(config.auth.allowed_curves, config.auth.min_rsa_bitsize)
+    auth_cert_service = AuthCertService(config.auth.allow_cert_list, tls_service)
+    binder.bind(AuthCertService, auth_cert_service)
+
+    crypto_service: CryptoService | None = None
 
     if config.app.keystore == "json":
         store = JsonKeyStorage(config.json_keystore.path)
@@ -74,7 +80,6 @@ def get_bpg_service() -> BpgService:
 def get_pdn_service() -> PdnService:
     return inject.instance(PdnService)
 
-
 def get_redis() -> redis.Redis:
     return inject.instance(redis.Redis)
 
@@ -84,6 +89,8 @@ def get_rid_cache() -> RidCache:
 def get_crypto_service() -> CryptoService:
     return inject.instance(CryptoService)
 
+def get_authorization_service() -> AuthCertService:
+    return inject.instance(AuthCertService)
 
 if not inject.is_configured():
     inject.configure(container_config)
