@@ -3,3 +3,4 @@ __pycache__
 secrets/ssl/*
 secrets/*
 app.conf
+auth_cert.json
