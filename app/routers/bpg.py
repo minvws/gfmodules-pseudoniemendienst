@@ -60,7 +60,7 @@ def exhange_to_rid(
     if not rid:
         return JSONResponse({"error": "Cannot generate RID"}, status_code=400)
 
-    return JSONResponse({"rid": str(bp)})
+    return JSONResponse({"rid": str(rid)})
 
 
 @router.post("/org_pseudonym")
