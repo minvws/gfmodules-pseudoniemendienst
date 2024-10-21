@@ -52,3 +52,9 @@ class CryptoService:
         Generate a key with the given key_id. This will create both a GENERIC and AES key.
         """
         pass
+
+    def has_key(self, key_id: str) -> bool: # type: ignore
+        """
+        Check if a key with the given key_id exists.
+        """
+        pass

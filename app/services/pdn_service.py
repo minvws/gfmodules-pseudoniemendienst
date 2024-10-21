@@ -27,7 +27,8 @@ class PdnService:
         org_key_version = self.get_organisation_version(org_id)
 
         key_label = f"{str(org_id)}:{org_key_version}"
-        self.crypto_service.generate_key(key_label)
+        if not self.crypto_service.has_key(key_label):
+            self.crypto_service.generate_key(key_label)
 
         hmac = self.crypto_service.sign(self.hmac_algo, bp.as_bytes(), key_label)
         hmac_b64 = base64.b64encode(hmac).decode('utf-8')
