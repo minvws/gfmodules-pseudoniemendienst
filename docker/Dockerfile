@@ -59,4 +59,4 @@ WORKDIR ${PROJECT_DIR}
 
 ENV PYTHONPATH=${PROJECT_DIR}
 
-CMD docker/./init.sh addressing_db
+ENTRYPOINT [ "/src/docker/init.sh","addressing_db" ]
