@@ -54,6 +54,9 @@ class MemoryCryptoService(CryptoService):
     def generate_key(self, key_id: str) -> None:
         self.keystore.generate_key(key_id)
 
+    def has_key(self, key_id: str) -> bool:
+        return self.keystore.has_key(key_id)
+
     def _get_key(self, key_id: str) -> bytes:
         key = self.keystore.get_key(key_id)
         if key is None:

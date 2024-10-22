@@ -93,6 +93,12 @@ class HsmCryptoService(CryptoService):
         verified = sess.verify(obj[0], data, signature, mecha=self.get_mechanism(alg))
         return verified # type: ignore
 
+    def has_key(self, key_id: str) -> bool:
+        sess = self._open_session()
+
+        obj = sess.findObjects([(PyKCS11.LowLevel.CKA_LABEL, key_id + "-hmac")])
+        return bool(obj)
+
     def generate_key(self, key_id: str) -> None:
         sess = self._open_session()
 
