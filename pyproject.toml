@@ -27,6 +27,7 @@ pykcs11 = "^1.5.16"
 filelock = "^3.16.1"
 asn1crypto = "^1.5.1"
 validators = "^0.34.0"
+requests = "^2.32.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
