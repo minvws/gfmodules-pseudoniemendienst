@@ -29,18 +29,18 @@ class ConfigAuth(BaseModel):
 
 class ConfigRid(BaseModel):
     key_name : str= Field(default="REK")
-    key_version : str= Field(default=1)
-    alg : str= Field(default="AES-256-GCM")
-    key_renewal_at : str= Field(default=1000)
+    key_version : int = Field(default=1)
+    alg : str = Field(default="AES-256-GCM")
+    key_renewal_at : int = Field(default=1000)
     iv_prefix : str = Field(default="RIVF")
     max_age_for_pdn_exchange_via_vad : int = Field(default=10)
     max_age_for_pdn_exchange_via_healthcare_provider : int = Field(default=3600)
 
 
 class ConfigBpg(BaseModel):
-    key_name : str= Field(default="BPGK")
-    key_version : str= Field(default=1)
-    default_alg : str= Field(default="HS256")
+    key_name : str = Field(default="BPGK")
+    key_version : int = Field(default=1)
+    default_alg : str = Field(default="HS256")
 
     class Config:
         extra = "allow"
