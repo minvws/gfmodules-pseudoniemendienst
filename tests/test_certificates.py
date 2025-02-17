@@ -20,16 +20,16 @@ class CertOptions:
     add_san: bool = True
     extended_key_usage: list[str] = field(default_factory=lambda: ["server", "client"])
 
-def generate_cert(key_type: str, cn: str = "", san: list = [], options: CertOptions = CertOptions()) -> x509.Certificate:
+def generate_cert(key_type: str, cn: str = "", san: list[str] = [], options: CertOptions = CertOptions()) -> x509.Certificate:
     if key_type == "rsa":
         private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=options.rsa_key_size,
         )
     elif key_type == "ec":
-        private_key = ec.generate_private_key(options.ec_curve)
+        private_key = ec.generate_private_key(options.ec_curve)  # type: ignore
     elif key_type == "dsa":
-        private_key = dsa.generate_private_key(key_size=2048)
+        private_key = dsa.generate_private_key(key_size=2048)  # type: ignore
     else:
         raise ValueError(f"Unknown key type: {key_type}")
 
@@ -85,9 +85,9 @@ def generate_cert(key_type: str, cn: str = "", san: list = [], options: CertOpti
     return builder.sign(private_key, hashes.SHA256())
 
 
-
-def get_tls_service():
+def get_tls_service() -> TLSService:
     return TLSService("secp256r1,secp384r1,secp521r1", 2048)
+
 
 class TestCerts(unittest.TestCase):
     def test_minimum_rsa_key(self) -> None:

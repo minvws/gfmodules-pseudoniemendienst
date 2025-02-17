@@ -26,7 +26,7 @@ lint-fix: ## Fix linting errors
 	$(RUN_PREFIX) ruff check --fix --show-fixes
 
 type-check: ## Check for typing errors
-	$(RUN_PREFIX) mypy app
+	$(RUN_PREFIX) mypy app tests
 
 safety-check: ## Check for security vulnerabilities
 	$(RUN_PREFIX) safety check
