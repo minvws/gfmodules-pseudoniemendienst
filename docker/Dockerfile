@@ -35,7 +35,7 @@ RUN apt update && \
 
 
 RUN pip3 install --upgrade pip && \
-    pip3 install poetry==1.7 --no-cache-dir
+    pip3 install poetry --no-cache-dir
 
 RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages/setup*
 RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages/pkg_resources*
