@@ -1,11 +1,13 @@
 from enum import Enum
 import configparser
+import os
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from pydantic import Field
 
 _PATH = "app.conf"
+_ENVIRONMENT_CONFIG_PATH_NAME = "FASTAPI_CONFIG_PATH"
 _CONFIG = None
 
 
@@ -109,8 +111,14 @@ def read_ini_file(path: str) -> Any:
     ret = {}
     for section in ini_data.sections():
         ret[section] = dict(ini_data[section])
-
+        remove_empty_values(ret[section])
     return ret
+
+
+def remove_empty_values(section: dict[str, Any]) -> None:
+    for key in list(section.keys()):
+        if section[key] == "":
+            del section[key]
 
 
 def reset_config() -> None:
@@ -133,12 +141,14 @@ def get_config(path: str | None = None) -> Config:
     if path is None:
         path = _PATH
 
+    path = path or os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME) or _PATH
+
     # To be inline with other python code, we use INI-type files for configuration. Since this isn't
     # a standard format for pydantic, we need to do some manual parsing first.
     ini_data = read_ini_file(path)
 
     try:
-        _CONFIG = Config(**ini_data)
+        _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
         raise e
 

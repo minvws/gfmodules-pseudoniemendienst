@@ -2,6 +2,8 @@
 
 set -e
 
+APP_PATH="${FASTAPI_CONFIG_PATH:-app.conf}"
+
 echo "➡️ Generating TLS certificates"
 if [ -e secrets/ssl/server.key ] && [ -e secrets/ssl/server.cert ]; then
   echo "⚠️ TLS certificates already exist. Skipping."
@@ -11,10 +13,10 @@ else
 fi
 
 echo "➡️ Creating the configuration file"
-if [ -e app.conf ]; then
+if [ -e $APP_PATH ]; then
   echo "⚠️ Configuration file already exists. Skipping."
 else
-  cp app.conf.autopilot app.conf
+  cp app.conf.example $APP_PATH
 fi
 
 echo "➡️ Copying the auth_cert.json file"

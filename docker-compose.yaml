@@ -1,5 +1,3 @@
-version: "3.5"
-
 services:
   app:
     build:
@@ -8,6 +6,8 @@ services:
         NEW_UID: ${NEW_UID:-1000}
         NEW_GID: ${NEW_GID:-1000}
       dockerfile: docker/Dockerfile
+    environment:
+        FASTAPI_CONFIG_PATH: /src/app.conf
     volumes:
       - ./:/src
       - ./secrets:/usr/local/secrets
@@ -15,10 +15,6 @@ services:
       - 6502:6502
     depends_on:
       - redis
-    networks:
-      zmodules:
-        aliases:
-          - prs-app
 
   app-ssl:
     image: httpd
@@ -31,22 +27,11 @@ services:
       - ./docker/httpd-ssl.conf:/usr/local/apache2/conf/extra/httpd-ssl.conf
     depends_on:
       - app
-    networks:
-      zmodules:
-          aliases:
-          - prs-app-ssl
 
   redis:
     image: redis:6.2
     ports:
       - 6379:6379
-    networks:
-      - zmodules
-
-networks:
-  zmodules:
-    driver: bridge
-    name: zmodules
 
 volumes:
   secrets:
