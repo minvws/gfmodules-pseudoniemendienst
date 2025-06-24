@@ -71,9 +71,9 @@ class ConfigRedis(BaseModel):
     host: str = Field(default="localhost")
     port: int = Field(default=6379, gt=0, lt=65535)
     db: int = Field(default=0, ge=0)
-    cert_path: str | None
-    key_path: str | None
-    ca_path: str | None
+    cert_path: str | None = None
+    key_path: str | None = None
+    ca_path: str | None = None
 
 class ConfigJsonKeystore(BaseModel):
     path: str = Field(default="keystore.json")
