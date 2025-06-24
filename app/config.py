@@ -24,7 +24,7 @@ class ConfigApp(BaseModel):
     keystore: str = Field(default="json")
 
 class ConfigAuth(BaseModel):
-    override_cert: str | None
+    override_cert: str | None = Field(default=None)
     allowed_curves: str = Field(default="")
     min_rsa_bitsize: int = Field(default=2048)
     allow_cert_list: str = Field(default="auth_cert.json")
@@ -62,18 +62,18 @@ class ConfigUvicorn(BaseModel):
     reload_delay: float = Field(default=1)
     reload_dirs: list[str] = Field(default=["app"])
     use_ssl: bool = Field(default=False)
-    ssl_base_dir: str | None
-    ssl_cert_file: str | None
-    ssl_key_file: str | None
+    ssl_base_dir: str | None = Field(default=None)
+    ssl_cert_file: str | None = Field(default=None)
+    ssl_key_file: str | None = Field(default=None)
 
 
 class ConfigRedis(BaseModel):
     host: str = Field(default="localhost")
     port: int = Field(default=6379, gt=0, lt=65535)
     db: int = Field(default=0, ge=0)
-    cert_path: str | None = None
-    key_path: str | None = None
-    ca_path: str | None = None
+    cert_path: str | None = Field(default=None)
+    key_path: str | None = Field(default=None)
+    ca_path: str | None = Field(default=None)
 
 class ConfigJsonKeystore(BaseModel):
     path: str = Field(default="keystore.json")
