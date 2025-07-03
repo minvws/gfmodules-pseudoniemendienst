@@ -17,6 +17,7 @@ services:
       - redis
 
   app-ssl:
+    profiles: [ssl]
     image: httpd
     restart: no
     ports:

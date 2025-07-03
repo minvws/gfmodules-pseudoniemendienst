@@ -1,4 +1,4 @@
-# PRS POC
+# PRS
 
 
 ## Run the following commands to run the project:
@@ -24,8 +24,8 @@ first, the server is configured with server name "prs", meaning you need to add 
 Next, since the prs certificate is signed with our own development uzi ca cert, you need to import (temporarily) the uzi
 ca cert into your browser. Normally, this is done via pkcs12:
 
-```
-$ openssl pkcs12 -export -out secrets/uzi-server-ca.p12 -inkey uzi-server-ca.key -in uzi-server-ca.crt
+```bash
+openssl pkcs12 -export -out secrets/uzi-server-ca.p12 -inkey uzi-server-ca.key -in uzi-server-ca.crt
 ```
 It will ask for a password, you can use anything.
 Then import the uzi.p12 file into your browser. Again, the password is being asked.
@@ -37,9 +37,9 @@ You probably get asked for a client certificate. Here you can use a client certi
 For this you can use either `prs-client-1` or `prs-client-2` (same types). Note that you might need to import these 
 into your browser through pkcs12 again:
 
-```
-$ openssl pkcs12 -export -out secrets/prs-client-1.p12 -inkey prs-client-1.key -in prs-client-1.crt
-$ openssl pkcs12 -export -out secrets/prs-client-2.p12 -inkey prs-client-2.key -in prs-client-2.crt
+```bash
+openssl pkcs12 -export -out secrets/prs-client-1.p12 -inkey prs-client-1.key -in prs-client-1.crt
+openssl pkcs12 -export -out secrets/prs-client-2.p12 -inkey prs-client-2.key -in prs-client-2.crt
 ```
 
 If you weren't asked for a client certificate, make sure the site is secured correctly (you should see a lock in the 

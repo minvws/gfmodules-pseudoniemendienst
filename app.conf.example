@@ -42,7 +42,7 @@ default_alg = HS256
 bp-gen-key-bpgk-1-alg=HS256
 
 [redis]
-host = localhost
+host = redis
 port = 6379
 db = 0
 ; Set these values to enable tls for redis connections
