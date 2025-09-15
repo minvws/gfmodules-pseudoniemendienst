@@ -26,18 +26,18 @@ class PDN:
     def as_bytes(self) -> bytes:
         return self.pdn.encode()
 
-class OrganisationId:
-    def __init__(self, organisation_id: str):
-        self.organisation_id = organisation_id
+class OrganizationId:
+    def __init__(self, organization_id: str):
+        self.organization_id = organization_id
 
     def __str__(self) -> str:
-        return self.organisation_id
+        return self.organization_id
 
     def __repr__(self) -> str:
-        return f"ORGID[{self.organisation_id}]"
+        return f"ORGID[{self.organization_id}]"
 
     def as_bytes(self) -> bytes:
-        return self.organisation_id.encode()
+        return self.organization_id.encode()
 
 
 class Rid:

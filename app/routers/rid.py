@@ -13,7 +13,7 @@ from app.services.pdn_service import PdnService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService, NoExchangeAllowedException, RidException
 from app.services.tls_service import CertAuthentications, TLSService
-from app.prs_types import BasePseudonym, Rid, OrganisationId
+from app.prs_types import BasePseudonym, Rid, OrganizationId
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,7 +29,7 @@ def exchange_to_pdn(
     pdn_service: PdnService = Depends(container.get_pdn_service),
 ) -> JSONResponse:
     """
-    Converts a RID into a PDN for the specific organisation
+    Converts a RID into a PDN for the specific organization
     """
     result = verify_rid(rid_service, rid_cache, Rid(rid))
     if isinstance(result, JSONResponse):
@@ -40,7 +40,7 @@ def exchange_to_pdn(
     if not bp:
         return JSONResponse({"error": "Invalid BP"}, status_code=400)
 
-    pdn = pdn_service.exchange(bp, OrganisationId(org_id))
+    pdn = pdn_service.exchange(bp, OrganizationId(org_id))
 
     # Remove from cache so it can't be exchanged again
     rid_cache.remove_rid_from_cache(Rid(rid))
