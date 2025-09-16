@@ -37,7 +37,7 @@ httpx = "^0.28.1"
 ruff = "^0.13.0"
 safety = "^3.2.3"
 codespell = "^2.2.6"
-types-requests = "^2.32.4.20250809"
+types-requests = "^2.32.4.20250913"
 
 [build-system]
 requires = ["poetry-core"]
