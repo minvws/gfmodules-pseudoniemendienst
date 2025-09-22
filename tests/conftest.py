@@ -32,8 +32,6 @@ class DbSessionWrapper:
     def get_repository(self, repo_cls: Type[RepoT]) -> RepoT:  # codespell:ignore
         return repo_cls(self)
 
-    # def session(self) -> :
-    #     return self.session
 
     def commit(self) -> None:
         self.session.commit()
