@@ -21,6 +21,5 @@ async def post_request(data: PseudonymRequest):
 
     pseudonym = base64.urlsafe_b64encode(pyoprf.unblind(bf, subj))
 
-    print(f"[RECV]: Pesudonym for AUD {jwe_data['aud']} and scope {jwe_data['scope']}: {pseudonym}")
 
     return JSONResponse(content={"status": "received the pseudonym"}, status_code=200)
