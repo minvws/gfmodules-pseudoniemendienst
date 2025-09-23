@@ -9,6 +9,8 @@ from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.rid import router as rid_router
 from app.routers.bpg import router as bpg_router
+from app.routers.oprf import router as oprf_router
+from app.routers.key import router as key_router
 from app.config import get_config
 
 
@@ -76,7 +78,14 @@ def setup_fastapi() -> FastAPI:
         )
     )
 
-    routers = [default_router, health_router, rid_router, bpg_router]
+    routers = [
+        default_router,
+        health_router,
+        rid_router,
+        bpg_router,
+        oprf_router,
+        key_router,
+    ]
     for router in routers:
         fastapi.include_router(router)
 

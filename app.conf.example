@@ -3,6 +3,15 @@ loglevel=debug
 keystore=hsm_api
 # keystore=hsm
 
+[database]
+dsn=postgresql+psycopg://postgres:postgres@localhost:5432/prs
+create_tables=false
+retry_backoff=0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 4.8, 6.4, 10.0
+pool_size=5
+max_overflow=10
+pool_pre_ping=False
+pool_recycle=1800
+
 [auth]
 ; When set, the server will use this certificate to authenticate itself to the client
 override_cert = ./secrets/prs-uzi.crt
@@ -73,3 +82,7 @@ cert_path = secrets/hsm-api.crt
 
 [json_keystore]
 path=secrets/keystore.json
+
+[oprf]
+; file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
+server_key_file=

@@ -2,6 +2,7 @@ import inject
 import redis
 
 from app.config import get_config
+from app.db.db import Database
 from app.services.auth_cert_service import AuthCertService
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
@@ -11,6 +12,8 @@ from app.services.crypto.hsm_crypto_service import HsmCryptoService
 from app.services.crypto.json_keystore import JsonKeyStorage
 from app.services.crypto.memory_crypto_service import MemoryCryptoService
 from app.services.iv_service import IvService
+from app.services.key_resolver import KeyResolver
+from app.services.oprf.oprf_service import OprfService
 from app.services.pdn_service import PdnService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService
@@ -19,6 +22,9 @@ from app.services.tls_service import TLSService
 
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
+
+    db = Database(dsn=config.database.dsn)
+    binder.bind(Database, db)
 
     tls_service = TLSService(config.auth.allowed_curves, config.auth.min_rsa_bitsize)
     auth_cert_service = AuthCertService(config.auth.allow_cert_list, tls_service)
@@ -68,6 +74,22 @@ def container_config(binder: inject.Binder) -> None:
     pdn_service = PdnService(config.bpg, crypto_service, redis_service)
     binder.bind(PdnService, pdn_service)
 
+    key_resolver = KeyResolver(db)
+    binder.bind(KeyResolver, key_resolver)
+
+    with open(config.oprf.server_key_file, "r") as f:
+        key = f.read().strip()
+    if key == "":
+        raise ValueError("OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command.")
+    oprf_service = OprfService(key)
+    binder.bind(OprfService, oprf_service)
+
+
+def get_key_resolver() -> KeyResolver:
+    return inject.instance(KeyResolver)
+
+def get_oprf_service() -> OprfService:
+    return inject.instance(OprfService)
 
 def get_rid_service() -> RidService:
     return inject.instance(RidService)
@@ -91,6 +113,9 @@ def get_crypto_service() -> CryptoService:
 
 def get_authorization_service() -> AuthCertService:
     return inject.instance(AuthCertService)
+
+def get_database() -> Database:
+    return inject.instance(Database)
 
 if not inject.is_configured():
     inject.configure(container_config)

@@ -5,7 +5,7 @@ import redis
 
 from app.config import ConfigBpg
 from app.services.crypto.crypto_service import CryptoService, CryptoAlgorithms
-from app.prs_types import BasePseudonym, OrganisationId, PDN
+from app.prs_types import BasePseudonym, OrganizationId, PDN
 
 SALT = b"iRealisatie"       # Fixed salt?
 
@@ -20,11 +20,11 @@ class PdnService:
         self.key_len = 32
         self.hmac_algo = CryptoAlgorithms.SHA256
 
-    def exchange(self, bp: BasePseudonym, org_id: OrganisationId) -> PDN:
+    def exchange(self, bp: BasePseudonym, org_id: OrganizationId) -> PDN:
         """
-        Exchanges a Base Pseudonym for a PDN Pseudonym for the given organisation
+        Exchanges a Base Pseudonym for a PDN Pseudonym for the given organization
         """
-        org_key_version = self.get_organisation_version(org_id)
+        org_key_version = self.get_organization_version(org_id)
 
         key_label = f"{str(org_id)}:{org_key_version}"
         if not self.crypto_service.has_key(key_label):
@@ -35,9 +35,9 @@ class PdnService:
 
         return PDN(f"{str(self.config.key_version)}.{str(org_key_version)}.{hmac_b64}")
 
-    def get_organisation_version(self, org_id: OrganisationId) -> str:
+    def get_organization_version(self, org_id: OrganizationId) -> str:
         """
-        Get the version of the organisation key
+        Get the version of the organization key
         """
         p_gen_key_version = f"p-gen-key-{str(org_id)}"
         org_key_version = "1"

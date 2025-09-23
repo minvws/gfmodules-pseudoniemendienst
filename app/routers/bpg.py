@@ -12,7 +12,7 @@ from app.services.bpg_service import BpgService
 from app.services.pdn_service import PdnService
 from app.services.rid_service import RidService
 from app.services.tls_service import CertAuthentications
-from app.prs_types import OrganisationId
+from app.prs_types import OrganizationId
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -68,12 +68,12 @@ def exhange_to_rid(
 def get_org_pseudonym(
         request: Request,
         bsn: str = Query(str, description="The BSN to generate the PDN for"),
-        org_id: str = Query(str, description="The organisation ID for this PDN"),
+        org_id: str = Query(str, description="The organization ID for this PDN"),
         bpg_service: BpgService = Depends(container.get_bpg_service),
         pdn_service: PdnService = Depends(container.get_pdn_service),
 ) -> JSONResponse:
     """
-    Converts a BSN into a Pseudonym (PDN) for a specific organisation
+    Converts a BSN into a Pseudonym (PDN) for a specific organization
     """
     if not is_valid_bsn(bsn):
         logger.error(f"Invalid BSN: {bsn}")
@@ -83,6 +83,6 @@ def get_org_pseudonym(
     if not bp:
         return JSONResponse({"error": "Invalid BP"}, status_code=400)
 
-    pdn = pdn_service.exchange(bp, OrganisationId(org_id))
+    pdn = pdn_service.exchange(bp, OrganizationId(org_id))
 
     return JSONResponse({"pdn": str(pdn)})

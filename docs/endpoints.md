@@ -35,7 +35,7 @@ requests.post(ENDPOINT_URL, params=params)
 ```
 
 #### `POST /org_pseudonym`
-This endpoint converts a BSN into a pseudonym for a specific organisation (PDN). 
+This endpoint converts a BSN into a pseudonym for a specific organization (PDN). 
 
 ```python
 import requests

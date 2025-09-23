@@ -3,7 +3,7 @@ import configparser
 import os
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 from pydantic import Field
 
 _PATH = "app.conf"
@@ -22,6 +22,43 @@ class LogLevel(str, Enum):
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
     keystore: str = Field(default="json")
+
+class ConfigDatabase(BaseModel):
+    dsn: str
+    create_tables: bool = Field(default=False)
+    retry_backoff: list[float] = Field(
+        default=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 4.8, 6.4, 10.0]
+    )
+    pool_size: int = Field(default=5, ge=0, lt=100)
+    max_overflow: int = Field(default=10, ge=0, lt=100)
+    pool_pre_ping: bool = Field(default=False)
+    pool_recycle: int = Field(default=3600, ge=0)
+
+    @field_validator("create_tables", mode="before")
+    def validate_create_tables(cls, v: Any) -> bool:
+        if v in (None, "", " "):
+            return False
+        if isinstance(v, str):
+            return v.lower() in ("yes", "true", "t", "1")
+        return bool(v)
+
+    @field_validator("pool_size", mode="before")
+    def validate_pool_size(cls, v: Any) -> int:
+        if v in (None, "", " "):
+            return 5
+        return int(v)
+
+    @field_validator("max_overflow", mode="before")
+    def validate_max_overflow(cls, v: Any) -> int:
+        if v in (None, "", " "):
+            return 10
+        return int(v)
+
+    @field_validator("pool_recycle", mode="before")
+    def validate_pool_recycle(cls, v: Any) -> int:
+        if v in (None, "", " "):
+            return 3600
+        return int(v)
 
 class ConfigAuth(BaseModel):
     override_cert: str | None = Field(default=None)
@@ -90,9 +127,12 @@ class ConfigHsmKeystore(BaseModel):
     slot_pin: str = Field(default="1234")
     library: str = Field(default="/usr/local/lib/softhsm/libsofthsm2.so")
 
+class ConfigOprf(BaseModel):
+    server_key_file: str = Field(default="")
 
 class Config(BaseModel):
     app: ConfigApp
+    database: ConfigDatabase
     auth: ConfigAuth
     uvicorn: ConfigUvicorn
     rid: ConfigRid
@@ -102,6 +142,7 @@ class Config(BaseModel):
     json_keystore: ConfigJsonKeystore
     hsm_keystore: ConfigHsmKeystore
     hsm_api_keystore: ConfigHsmApiKeystore
+    oprf: ConfigOprf
 
 
 def read_ini_file(path: str) -> Any:
@@ -148,6 +189,15 @@ def get_config(path: str | None = None) -> Config:
     ini_data = read_ini_file(path)
 
     try:
+        # Convert database.retry_backoff to a list of floats
+        if "retry_backoff" in ini_data["database"] and isinstance(
+            ini_data["database"]["retry_backoff"], str
+        ):
+            # convert the string to a list of floats
+            ini_data["database"]["retry_backoff"] = [
+                float(i) for i in ini_data["database"]["retry_backoff"].split(",")
+            ]
+
         _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
         raise e
