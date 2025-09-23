@@ -21,6 +21,12 @@ def post_eval(
     if pub_key_jwk is None:
         return JSONResponse({"error": "No public key found for this organization"}, status_code=404)
 
-    jwe_str = oprf_service.eval_blind(req, pub_key_jwk)
+
+    try:
+        jwe_str = oprf_service.eval_blind(req, pub_key_jwk)
+    except ValueError as e:
+        logger.warning(f"Unable to evaluate blind: {e}")
+        return JSONResponse({"error": "Unable to evaluate blind"}, status_code=400)
+
     return JSONResponse({"jwe": jwe_str})
 

@@ -37,8 +37,11 @@ class OprfService:
         """
         Evaluate a blind and returns a JWE encrypted on the pubkey
         """
-        bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
-        eval = pyoprf.evaluate(self.__server_key, bi)
+        try:
+            bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
+            eval = pyoprf.evaluate(self.__server_key, bi)
+        except Exception as e:
+            raise ValueError(f"unable to evaluate blind: {e}")
 
         subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval).decode('utf-8')
         jwe = BlindJwe.build(
@@ -49,3 +52,25 @@ class OprfService:
         )
 
         return jwe
+
+    @staticmethod
+    def blind_input(input: str) -> dict[str, str]:
+        """
+        Blind an input and returns the blind factor and the blinded input
+        """
+        blind_factor, blinded_input = pyoprf.blind(input.encode('utf-8'))
+        return {
+            'blind_factor': base64.urlsafe_b64encode(blind_factor).decode('ascii'),
+            'blinded_input': base64.urlsafe_b64encode(blinded_input).decode('ascii'),
+        }
+
+
+    @staticmethod
+    def finalize(blind_factor: str, eval: str) -> str:
+        """
+        Finalize the OPRF by unblinding the evaluated input with the blind factor
+        """
+        bf = base64.urlsafe_b64decode(blind_factor)
+        ev = base64.urlsafe_b64decode(eval)
+        final = pyoprf.finalize(bf, ev)
+        return base64.urlsafe_b64encode(final).decode('ascii')
