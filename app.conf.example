@@ -84,5 +84,5 @@ cert_path = secrets/hsm-api.crt
 path=secrets/keystore.json
 
 [oprf]
-; base64 server key for oprf evaluation (create with oprf_service.generate_key)
-server_key=
+; file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
+server_key_file=

@@ -24,6 +24,15 @@ else
   cp auth_cert.json.example auth_cert.json
 fi
 
+OPRF_SECRET_KEY_FILE="secrets/oprf_secret.key"
+if [ ! -f $OPRF_SECRET_KEY_FILE ]; then
+  echo "➡️ Generating OPRF secret key"
+  python app/generate-oprf-key.py > $OPRF_SECRET_KEY_FILE
+else
+  echo "⚠️ OPRF secret key already exists. Skipping."
+fi
+
+
 echo "Migrating"
 tools/./migrate_db.sh $DB_HOST $DB_USER $DB_PASS $DB_NAME
 

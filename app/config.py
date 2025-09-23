@@ -128,7 +128,7 @@ class ConfigHsmKeystore(BaseModel):
     library: str = Field(default="/usr/local/lib/softhsm/libsofthsm2.so")
 
 class ConfigOprf(BaseModel):
-    server_key: str = Field(default="")
+    server_key_file: str = Field(default="")
 
 class Config(BaseModel):
     app: ConfigApp
