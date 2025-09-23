@@ -95,3 +95,124 @@ docker run -ti --rm -p 6502:6502 \
   --mount type=bind,source=./secrets,target=/src/secrets \
   gfmodules-prs
 ```
+
+
+
+# OPRF Testing
+
+This system uses OPRF for pseudonym generation. To test this, there are some available endpoints:
+
+- '/test/oprf/gen_rsa_key' - Generate a new RSA keypair for OPRF (small 1024 bit for testing)
+- '/test/oprf/oprf/client' - Emulates a client that generates OPRF information for a given input
+- '/test/oprf/oprf/receiver' - Emulates the receiver of the pseudonym and returns diagnostic information
+
+To use this system:
+
+1. First, generate a new keypair that will be used for a test organization with `/test/oprf/gen_rsa_key`.
+   ```shell
+    POST /test/oprf/gen_rsa_key 
+   
+    200 OK
+    {
+      "private_key_pem": "-----BEGIN PRIVATE KEY-----\nMIICdwIBA....neDKJ0DsvA5vfpt0=\n-----END PRIVATE KEY-----\n",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqG....uDQIDAQAB\n-----END PUBLIC KEY-----\n",
+      "public_key_kid": "ajGAx_LKNrJ8vqdahWlSJvOznBi6lnFfSOw72Z4R4uU"
+    } 
+   ```
+ 
+2. Create a new organization into the key resolver with a POST to `/keys`. Add your organization name like 
+   `ura:12345678`, and you can use scope `test` for testing. Add the **PUBLIC key** to the `public_key` field.
+
+    ```shell
+    POST /keys
+    {
+      "organization": "ura:12345678",
+      "scope": "test",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqG....uDQIDAQAB\n-----END PUBLIC KEY\n",
+    }
+   
+    201 Created
+    ```
+
+3. Emulate a client wanting to send a pseudonym over to a receiver by calling `/test/oprf/client` with a JSON body like:
+
+   ```shell
+   POST /test/oprf/client
+   {
+     "personalId": "testinput-like-a-bsn-number-or-other-id"
+   }
+   
+   200 OK
+   {
+     "blinded_input": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
+     "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8="
+   }
+   ```
+
+   This returns the `blinded_input` that must be sent to the receiver, and the `blind_factor` that must be send to the
+   receiver after the server has evaluated the blinded input.
+
+4. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the organization name and scope:
+   
+      ```shell
+      POST /oprf/eval
+      {
+        "encryptedPersonalId": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
+        "recipientOrganization": "ura:12345678",
+        "recipientScope": "test"
+      }
+
+      200 OK
+      {
+        "jwe": "eyJraWQiOi....bJUqbbSUIjqiw"
+      } 
+      ```
+   
+   At this point we will get back a JWE that contains the evaluated blinded input and
+   is encrypted with the public key of the organization. At this point, the client is 
+   not able to decrypt this information. It can only forward this to the receiver.
+
+5. Now emulate the receiver by calling `/test/oprf/receiver` with a JSON body like:
+   ```shell   
+    POST /test/oprf/receiver
+    {
+      "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
+      "jwe": "eyJraWQiOiA...SzZbJUqbbSUIjqiw",
+      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIB...oCfe0=\n-----END RSA PRIVATE KEY-----\n"
+    }
+   ```
+   
+    The blind factor is the one returned by the client, the JWE is the one returned by the prs evaluation, and 
+    the private key is returned by the key generation step.
+
+    At this point, it will return any diagnostic information about the OPRF process:
+
+    ```json
+    {
+      "jwe_data": "eyJraWQiOiAi...zZbJUqbbSUIjqiw",
+      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIBAAKBgH6gmpXpdhtiE...UpWRvoCfe0=\n-----END RSA PRIVATE KEY-----\n",
+      "priv_key_kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
+      "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
+      "jwe": {
+        "headers": {
+          "kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
+          "alg": "RSA-OAEP-256",
+          "enc": "A256GCM",
+          "cty": "application/json"
+        },
+        "decrypted": {
+          "subject": "pseudonym:eval:-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
+          "aud": "ura:12345678",
+          "scope": "nvi",
+          "version": "1.1",
+          "iat": 1758616285,
+          "exp": 1758616585
+        }
+      },
+      "eval_subject": "-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
+      "final_pseudonym": "fDZYIlajLAV3y8fWl1ObFBDmybUEGrR37pDb-5p5pJJGKvvpDvvMdQmYHKqtiQ8tdF4VL3w8nkbssHtOmkjiOg=="
+    }
+    ```
+
+    The `final_pseudonym` is the actual pseudonym that can be stored by the receiver. Note that this pseudonym is deterministic
+    for the same input, organization and scope. However, it is not possible to reverse this into a BSN.
