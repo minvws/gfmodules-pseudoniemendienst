@@ -134,7 +134,8 @@ class ConfigOprf(BaseModel):
 
 
 class ConfigPseudonym(BaseModel):
-    hmac_key: str
+    hmac_key: str | None = Field(default=None)
+    aes_key: str | None = Field(default=None)
 
 
 class Config(BaseModel):

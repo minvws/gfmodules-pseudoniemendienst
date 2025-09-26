@@ -1,11 +1,12 @@
 import logging
-from typing import Literal
+from typing import Literal, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator, ConfigDict
 from starlette.responses import JSONResponse, Response
 
 from app import container
+from app.personal_id import PersonalId
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.pseudonym_service import PseudonymService
@@ -14,10 +15,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class ExchangeRequest(BaseModel):
-    personalId: str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    personalId: Any
     recipientOrganization: str
     recipientScope: str
-    pseudonymType: Literal["irreversible"]
+    pseudonymType: Literal["irreversible", "reversible"]
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
+        pid = data.get("personalId")
+        if isinstance(pid, str):
+            data["personalId"] = PersonalId.from_str(pid)
+        if isinstance(pid, dict):
+            data["personalId"] = PersonalId.from_dict(pid)
+        return data
+
 
 @router.post("/exchange/pseudonym", summary="Exchange pseudonym")
 def exchange_pseudonym(
@@ -31,7 +45,14 @@ def exchange_pseudonym(
             recipient_organization=req.recipientOrganization,
             recipient_scope=req.recipientScope,
         )
-        subject = "pseudonym:" + res
+        subject = "pseudonym:irreverible:" + res
+    elif req.pseudonymType == "reversible":
+        res = pseudonym_service.exchange_reversible_pseudonym(
+            personal_id=req.personalId,
+            recipient_organization=req.recipientOrganization,
+            recipient_scope=req.recipientScope,
+        )
+        subject = "pseudonym:reversible:" + res
     else:
         raise HTTPException(status_code=400, detail="Unsupported pseudonym type")
 
@@ -41,7 +62,7 @@ def exchange_pseudonym(
 
     pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
     if pub_key_jwk is None:
-        return JSONResponse({"error": "No public key found for this organization"}, status_code=404)
+        return JSONResponse({"error": "No public key found for this organization and/or scope"}, status_code=404)
 
     jwe = BlindJwe.build(
         audience=req.recipientOrganization,

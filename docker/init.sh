@@ -42,6 +42,16 @@ else
   echo "⚠️ HMAC secret key already exists in app.conf. Skipping."
 fi
 
+# Generate new AES key if not found
+if ! grep -q "^aes_key=" $APP_PATH
+then
+  echo "➡️ Generating AES secret key"
+  AES_KEY=$(openssl rand -base64 32)
+  echo "aes_key=$AES_KEY" >> $APP_PATH
+else
+  echo "⚠️ AES secret key already exists in app.conf. Skipping."
+fi
+
 echo "Migrating"
 tools/./migrate_db.sh $DB_HOST $DB_USER $DB_PASS $DB_NAME
 

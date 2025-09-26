@@ -2,27 +2,34 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from app import container
+from app.personal_id import PersonalId, PersonalIdJSONEncoder
 from app.services.oprf.oprf_service import OprfService
+from app.services.pseudonym_service import PseudonymService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
 class InputRequest(BaseModel):
     personalId: str
+
 
 class ReceiverRequest(BaseModel):
     blind_factor: str
     jwe: str
     priv_key_pem: str
 
+
 class JweReceiverRequest(BaseModel):
     jwe: str
     priv_key_pem: str
+
 
 @router.post("/test/oprf/gen_rsa_key", summary="Create a RSA (1024bit) key for test usage.", tags=["test-oprf"])
 def post_gen_rsa_key() -> JSONResponse:
@@ -48,6 +55,7 @@ def post_test_eval(
         "blinded_input": res['blinded_input'],
         "blind_factor": res['blind_factor'],
     })
+
 
 @router.post("/test/oprf/receiver", summary="Test receiver decryption of JWE with blind factor", tags=["test-oprf"])
 def post_test_receiver(
@@ -90,6 +98,7 @@ def post_test_receiver(
 
     return JSONResponse(res)
 
+
 @router.post("/test/jwe/decode", summary="Decode a JWE with a specific private key", tags=["test-oprf"])
 def post_test_jwe_decode(
     req: JweReceiverRequest,
@@ -122,5 +131,25 @@ def post_test_jwe_decode(
 
     return JSONResponse(res)
 
+
+@router.post("/test/pseudonym/reversible", summary="Reverse a pseudonym", tags=["test-oprf"])
+def post_test_reversible_pseudonym(
+    pseudonym: str,
+    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+) -> JSONResponse:
+    parts = pseudonym.split(":")
+    if len(parts) == 3 and parts[0] == "pseudonym" and parts[1] == "reversible":
+        pseudonym = parts[2]
+    else:
+        return JSONResponse({
+            "error": "Invalid pseudonym format. Expected format: pseudonym:reversible:<value>"
+        }, status_code=400)
+
+    decoded = pseudonym_service.decode_reversible_pseudonym(pseudonym)
+
+    return JSONResponse(content=jsonable_encoder({
+        "pseudonym": pseudonym,
+        "decoded": decoded,
+    }, custom_encoder={PersonalId: lambda v: json.loads(json.dumps(v, cls=PersonalIdJSONEncoder))}))
 
 
