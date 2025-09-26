@@ -24,7 +24,7 @@ else
   cp auth_cert.json.example auth_cert.json
 fi
 
-OPRF_SECRET_KEY_FILE="secrets/oprf_secret.key"
+OPRF_SECRET_KEY_FILE="secrets/oprf-server.key"
 if [ ! -f $OPRF_SECRET_KEY_FILE ]; then
   echo "➡️ Generating OPRF secret key"
   python app/generate-oprf-key.py > $OPRF_SECRET_KEY_FILE

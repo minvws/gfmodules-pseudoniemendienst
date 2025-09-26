@@ -1,6 +1,9 @@
 services:
   app:
     build:
+      platforms:
+      - "linux/amd64"
+      - "linux/amd64/v8"
       context: .
       args:
         NEW_UID: ${NEW_UID:-1000}
