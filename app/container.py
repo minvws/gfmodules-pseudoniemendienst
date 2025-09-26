@@ -15,6 +15,7 @@ from app.services.iv_service import IvService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
 from app.services.pdn_service import PdnService
+from app.services.pseudonym_service import PseudonymService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService
 from app.services.tls_service import TLSService
@@ -84,6 +85,12 @@ def container_config(binder: inject.Binder) -> None:
     oprf_service = OprfService(key)
     binder.bind(OprfService, oprf_service)
 
+    pseudonym_service = PseudonymService(config.pseudonym.hmac_key.encode("utf-8"))
+    binder.bind(PseudonymService, pseudonym_service)
+
+
+def get_pseudonym_service() -> PseudonymService:
+    return inject.instance(PseudonymService)
 
 def get_key_resolver() -> KeyResolver:
     return inject.instance(KeyResolver)

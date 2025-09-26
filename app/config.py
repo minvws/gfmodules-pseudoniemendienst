@@ -122,13 +122,20 @@ class ConfigHsmApiKeystore(BaseModel):
     slot: str
     cert_path: str
 
+
 class ConfigHsmKeystore(BaseModel):
     slot: int = Field(default=0)
     slot_pin: str = Field(default="1234")
     library: str = Field(default="/usr/local/lib/softhsm/libsofthsm2.so")
 
+
 class ConfigOprf(BaseModel):
     server_key_file: str = Field(default="")
+
+
+class ConfigPseudonym(BaseModel):
+    hmac_key: str
+
 
 class Config(BaseModel):
     app: ConfigApp
@@ -143,6 +150,7 @@ class Config(BaseModel):
     hsm_keystore: ConfigHsmKeystore
     hsm_api_keystore: ConfigHsmApiKeystore
     oprf: ConfigOprf
+    pseudonym: ConfigPseudonym
 
 
 def read_ini_file(path: str) -> Any:

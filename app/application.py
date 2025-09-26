@@ -12,6 +12,7 @@ from app.routers.bpg import router as bpg_router
 from app.routers.oprf import router as oprf_router
 from app.routers.test_oprf import router as test_oprf_router
 from app.routers.key import router as key_router
+from app.routers.exchange import router as exchange_router
 from app.config import get_config
 
 
@@ -87,6 +88,7 @@ def setup_fastapi() -> FastAPI:
         oprf_router,
         test_oprf_router,
         key_router,
+        exchange_router
     ]
     for router in routers:
         fastapi.include_router(router)
