@@ -90,3 +90,5 @@ server_key_file=
 [pseudonym]
 ; Hmac secret key for temporary pseudonym hashing
 hmac_key=
+; AES key for pseudonym encryption
+aes_key=

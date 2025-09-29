@@ -19,7 +19,7 @@ def post_eval(
 
     pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
     if pub_key_jwk is None:
-        return JSONResponse({"error": "No public key found for this organization"}, status_code=404)
+        return JSONResponse({"error": "No public key found for this organization and/or scope"}, status_code=404)
 
 
     try:

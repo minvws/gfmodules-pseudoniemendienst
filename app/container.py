@@ -1,3 +1,5 @@
+import base64
+
 import inject
 import redis
 
@@ -85,7 +87,10 @@ def container_config(binder: inject.Binder) -> None:
     oprf_service = OprfService(key)
     binder.bind(OprfService, oprf_service)
 
-    pseudonym_service = PseudonymService(config.pseudonym.hmac_key.encode("utf-8"))
+    pseudonym_service = PseudonymService(
+        base64.urlsafe_b64decode(config.pseudonym.hmac_key or ""),
+        base64.urlsafe_b64decode(config.pseudonym.aes_key or ""),
+    )
     binder.bind(PseudonymService, pseudonym_service)
 
 
