@@ -1,12 +1,17 @@
 import base64
 import hashlib
 import hmac
+from enum import Enum
+
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 
 from app.personal_id import PersonalId
 
+class PseudonymType(str, Enum):
+    Irreversible = "irreversible"
+    Reversible = "reversible"
 
 class PseudonymService:
     def __init__(self, hmac_key: bytes, aes_key: bytes) -> None:

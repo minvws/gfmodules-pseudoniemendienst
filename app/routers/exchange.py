@@ -1,37 +1,15 @@
 import logging
-from typing import Literal, Any
-
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, model_validator, ConfigDict
 from starlette.responses import JSONResponse, Response
 
 from app import container
-from app.personal_id import PersonalId
+from app.models.requests import ExchangeRequest
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.jwe_token import BlindJwe
-from app.services.pseudonym_service import PseudonymService
+from app.services.pseudonym_service import PseudonymService, PseudonymType
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-class ExchangeRequest(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    personalId: Any
-    recipientOrganization: str
-    recipientScope: str
-    pseudonymType: Literal["irreversible", "reversible"]
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
-        pid = data.get("personalId")
-        if isinstance(pid, str):
-            data["personalId"] = PersonalId.from_str(pid)
-        if isinstance(pid, dict):
-            data["personalId"] = PersonalId.from_dict(pid)
-        return data
-
 
 @router.post("/exchange/pseudonym", summary="Exchange pseudonym")
 def exchange_pseudonym(
@@ -39,14 +17,14 @@ def exchange_pseudonym(
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
 ) -> Response:
-    if req.pseudonymType == "irreversible":
+    if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.exchange_irreversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=req.recipientOrganization,
             recipient_scope=req.recipientScope,
         )
         subject = "pseudonym:irreverible:" + res
-    elif req.pseudonymType == "reversible":
+    elif req.pseudonymType == PseudonymType.Reversible:
         res = pseudonym_service.exchange_reversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=req.recipientOrganization,
@@ -58,7 +36,6 @@ def exchange_pseudonym(
 
     if subject is None:
         raise HTTPException(status_code=500, detail="Pseudonym exchange failed")
-
 
     pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
     if pub_key_jwk is None:

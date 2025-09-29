@@ -4,31 +4,16 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
-from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from app import container
+from app.models.requests import InputRequest, ReceiverRequest, JweReceiverRequest
 from app.personal_id import PersonalId, PersonalIdJSONEncoder
 from app.services.oprf.oprf_service import OprfService
 from app.services.pseudonym_service import PseudonymService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-class InputRequest(BaseModel):
-    personalId: str
-
-
-class ReceiverRequest(BaseModel):
-    blind_factor: str
-    jwe: str
-    priv_key_pem: str
-
-
-class JweReceiverRequest(BaseModel):
-    jwe: str
-    priv_key_pem: str
 
 
 @router.post("/test/oprf/gen_rsa_key", summary="Create a RSA (1024bit) key for test usage.", tags=["test-oprf"])
