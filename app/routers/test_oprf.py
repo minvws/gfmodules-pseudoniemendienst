@@ -20,6 +20,10 @@ class ReceiverRequest(BaseModel):
     jwe: str
     priv_key_pem: str
 
+class JweReceiverRequest(BaseModel):
+    jwe: str
+    priv_key_pem: str
+
 @router.post("/test/oprf/gen_rsa_key", summary="Create a RSA (1024bit) key for test usage.", tags=["test-oprf"])
 def post_gen_rsa_key() -> JSONResponse:
     key = jwk.JWK.generate(kty='RSA', size=1024)
@@ -34,7 +38,7 @@ def post_gen_rsa_key() -> JSONResponse:
 
 
 @router.post("/test/oprf/client", summary="Create a blinded input and factor for a given BSN (or any other input)", tags=["test-oprf"])
-def post_eval(
+def post_test_eval(
     req: InputRequest,
     oprf_service: OprfService = Depends(container.get_oprf_service),
 ) -> JSONResponse:
@@ -46,7 +50,7 @@ def post_eval(
     })
 
 @router.post("/test/oprf/receiver", summary="Test receiver decryption of JWE with blind factor", tags=["test-oprf"])
-def post_receiver(
+def post_test_receiver(
     req: ReceiverRequest,
     oprf_service: OprfService = Depends(container.get_oprf_service),
 ) -> JSONResponse:
@@ -85,5 +89,38 @@ def post_receiver(
     }
 
     return JSONResponse(res)
+
+@router.post("/test/jwe/decode", summary="Decode a JWE with a specific private key", tags=["test-oprf"])
+def post_test_jwe_decode(
+    req: JweReceiverRequest,
+) -> JSONResponse:
+
+    token = jwe.JWE()
+    token.deserialize(req.jwe)
+    headers = token.jose_header
+
+    priv_key_kid = "unknown"
+    try:
+        priv_key = jwk.JWK.from_pem(req.priv_key_pem.encode('ascii'))
+        priv_key_kid = priv_key.thumbprint().rstrip("=")
+        token.decrypt(priv_key)
+        plaintext = token.payload.decode('utf-8')
+        plain_data = json.loads(plaintext)
+    except Exception as e:
+        plain_data = "Could not decrypt JWE: " + str(e)
+
+
+    res = {
+        'jwe_data': req.jwe,
+        'priv_key_pem': req.priv_key_pem,
+        'priv_key_kid': priv_key_kid,
+        'jwe': {
+            'headers': headers,
+            'decrypted': plain_data,
+        },
+    }
+
+    return JSONResponse(res)
+
 
 

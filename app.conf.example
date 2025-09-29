@@ -86,3 +86,7 @@ path=secrets/keystore.json
 [oprf]
 ; file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
 server_key_file=
+
+[pseudonym]
+; Hmac secret key for temporary pseudonym hashing
+hmac_key=

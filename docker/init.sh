@@ -32,6 +32,15 @@ else
   echo "⚠️ OPRF secret key already exists. Skipping."
 fi
 
+# Generate new HMAC secret if not found
+if ! grep -q "^hmac_key=" $APP_PATH
+then
+  echo "➡️ Generating HMAC secret key"
+  HMAC_KEY=$(openssl rand -base64 32)
+  echo "hmac_key=$HMAC_KEY" >> $APP_PATH
+else
+  echo "⚠️ HMAC secret key already exists in app.conf. Skipping."
+fi
 
 echo "Migrating"
 tools/./migrate_db.sh $DB_HOST $DB_USER $DB_PASS $DB_NAME
