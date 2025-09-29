@@ -39,6 +39,10 @@ RUN apt update && \
         postgresql-client-common \
         swig
 
+
+RUN mkdir -p /usr/lib/x86_64-linux-gnu/
+RUN mkdir -p /usr/local/lib
+
 # We need to compile liboprf from source as the current distributed versions are outdated.
 RUN git clone https://github.com/stef/liboprf.git && cd liboprf/src && make && make install
 
@@ -60,6 +64,8 @@ RUN --mount=type=cache,target=${POETRY_CACHE_DIR} poetry install --no-root --no-
 FROM base AS final
 
 COPY --from=builder /usr/lib/x86_64-linux-gnu/liboprf* /usr/lib/x86_64-linux-gnu/liboprf*
+COPY --from=builder /usr/local/lib/liboprf* /usr/local/lib/liboprf*
+
 RUN ldconfig
 
 COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local /usr/local
