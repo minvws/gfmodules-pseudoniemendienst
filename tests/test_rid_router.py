@@ -5,8 +5,16 @@ from jwcrypto import jwe, jwk
 
 from starlette.testclient import TestClient
 
-from app import container
-from app.application import create_fastapi_app
+from app.config import set_config
+from test_config import get_test_config
+
+cfg = get_test_config()
+set_config(cfg)
+
+# Note we can import the container only after setting the config, otherwise it will default to reading from the
+# real config file.
+from app import container   # noqa: E402
+from app.application import create_fastapi_app  # noqa: E402
 
 app = create_fastapi_app()
 client = TestClient(app)

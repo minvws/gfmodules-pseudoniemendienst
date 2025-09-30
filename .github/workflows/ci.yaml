@@ -99,6 +99,20 @@ jobs:
         name: Run the tests
         runs-on: ubuntu-24.04
         needs: build
+        services:
+          prs_db:
+            image: postgres:15
+            env:
+              POSTGRES_USER: postgres
+              POSTGRES_PASSWORD: postgres
+              POSTGRES_DB: testing
+            ports:
+              - 5432:5432
+            options: >-
+              --health-cmd pg_isready
+              --health-interval 10s
+              --health-timeout 5s
+              --health-retries 5
 
         steps:
             - name: Checkout repository
@@ -109,8 +123,25 @@ jobs:
               with:
                 python_version: "3.11"
 
+            - name: install dependencies
+              run: |
+                sudo apt update
+                sudo apt install -y libpq-dev build-essential postgresql-client
+
+            - name: install liboprf
+              run: |
+                sudo apt install -y libsodium-dev
+                git clone https://github.com/stef/liboprf.git
+                cd liboprf/src
+                make
+                sudo make install
+                sudo ldconfig
+
             - name: Run the tests
-              run: poetry run $(make test --just-print --silent)
+              run: |
+                sudo bash -c 'echo "127.0.0.1 prs_db" >> /etc/hosts'
+                ./tools/migrate_db.sh prs_db postgres postgres testing
+                poetry run $(make test --just-print --silent)
 
             - name: Upload coverage report
               uses: actions/upload-artifact@v4

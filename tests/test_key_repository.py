@@ -1,6 +1,7 @@
 from typing import List, Any
 
 import pytest
+
 from app.db.entities.key_entry import KeyEntry
 
 pytestmark = pytest.mark.postgres
