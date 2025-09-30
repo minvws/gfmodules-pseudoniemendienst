@@ -21,6 +21,7 @@ from app.services.pseudonym_service import PseudonymService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService
 from app.services.tls_service import TLSService
+from app.services.tmp_rid_service import TmpRidService
 
 
 def container_config(binder: inject.Binder) -> None:
@@ -93,6 +94,14 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(PseudonymService, pseudonym_service)
 
+    tmp_rid_service = TmpRidService(
+        base64.urlsafe_b64decode(config.pseudonym.rid_aes_key or ""),
+    )
+    binder.bind(TmpRidService, tmp_rid_service)
+
+
+def get_tmp_rid_service() -> TmpRidService:
+    return inject.instance(TmpRidService)
 
 def get_pseudonym_service() -> PseudonymService:
     return inject.instance(PseudonymService)

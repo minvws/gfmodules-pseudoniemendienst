@@ -57,7 +57,7 @@ def test_update_changes_scope_and_key(repo: Any, db_wrap: Any) -> None:
     db_wrap.session.add(e)
     db_wrap.session.commit()
 
-    updated = repo.update(str(e.entry_id), scope=["prs", "lmr"], pub_key="NEW")
+    updated = repo.update(str(e.entry_id), scope=["prs", "lmr"], pub_key="NEW", max_usage_level="irp")
     db_wrap.session.commit()
 
     assert updated is not None
