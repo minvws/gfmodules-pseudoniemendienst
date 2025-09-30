@@ -80,10 +80,13 @@ def container_config(binder: inject.Binder) -> None:
     key_resolver = KeyResolver(db)
     binder.bind(KeyResolver, key_resolver)
 
-    with open(config.oprf.server_key_file, "r") as f:
-        key = f.read().strip()
-    if key == "":
-        raise ValueError("OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command.")
+    try:
+        with open(config.oprf.server_key_file, "r") as f:
+            key = f.read().strip()
+        if key == "":
+            raise ValueError("OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command.")
+    except FileNotFoundError:
+        raise FileNotFoundError("OPRF server key file not found. Generate it using the 'make generate-oprf-key' command.")
     oprf_service = OprfService(key)
     binder.bind(OprfService, oprf_service)
 
