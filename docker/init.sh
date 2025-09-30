@@ -2,12 +2,6 @@
 
 set -e
 
-
-DB_HOST=${1}
-DB_USER=${2:-postgres}
-DB_PASS=${3:-postgres}
-DB_NAME=${4:-postgres}
-
 APP_PATH="${FASTAPI_CONFIG_PATH:-app.conf}"
 
 echo "➡️ Creating the configuration file"
@@ -19,41 +13,75 @@ fi
 
 echo "➡️ Copying the auth_cert.json file"
 if [ -e auth_cert.json ]; then
-  echo "⚠️ auth_cert_json file already exists. Skipping."
+  echo "⚠️ auth_cert.json file already exists. Skipping."
 else
   cp auth_cert.json.example auth_cert.json
 fi
 
-OPRF_SECRET_KEY_FILE="secrets/oprf-server.key"
-if [ ! -f $OPRF_SECRET_KEY_FILE ]; then
-  echo "➡️ Generating OPRF secret key"
-  python app/generate-oprf-key.py > $OPRF_SECRET_KEY_FILE
-else
-  echo "⚠️ OPRF secret key already exists. Skipping."
-fi
+ensure_secret() {
+  local key="$1"
+  local default="$2"
+  local generator="$3"
+  local is_file="$4"   # for file keys like server_key_file
 
-# Generate new HMAC secret if not found
-if ! grep -q "^hmac_key=" $APP_PATH
-then
-  echo "➡️ Generating HMAC secret key"
-  HMAC_KEY=$(openssl rand -base64 32)
-  echo "hmac_key=$HMAC_KEY" >> $APP_PATH
-else
-  echo "⚠️ HMAC secret key already exists in app.conf. Skipping."
-fi
+  if ! grep -q "^$key=" "$APP_PATH"; then
+    echo "❌ ERROR: $key= entry not found in $APP_PATH"
+    exit 1
+  fi
 
-# Generate new AES key if not found
-if ! grep -q "^aes_key=" $APP_PATH
-then
-  echo "➡️ Generating AES secret key"
-  AES_KEY=$(openssl rand -base64 32)
-  echo "aes_key=$AES_KEY" >> $APP_PATH
-else
-  echo "⚠️ AES secret key already exists in app.conf. Skipping."
-fi
+  local value=""
+  if grep -q "^$key=" "$APP_PATH"; then
+    value=$(awk -F= -v k="$key" '$1 == k {gsub(/^ +| +$/, "", $2); print $2}' "$APP_PATH")
+  fi
+
+  if [ -z "$value" ]; then
+    if [ "$is_file" == "true" ]; then
+      if [ -f "$default" ]; then
+        value="$default"
+        echo "➡️ Found existing $key file at $value, updating app.conf"
+      else
+        value="$default"
+        echo "➡️ Generating $key at default path $value"
+        mkdir -p "$(dirname "$value")"
+        eval "$generator > \"$value\""
+      fi
+      if grep -q "^$key=" "$APP_PATH"; then
+        sed -i "s|^$key=.*|$key=$value|" "$APP_PATH"
+      else
+        echo "$key=$value" >> "$APP_PATH"
+      fi
+    else
+      value=$($generator)
+      echo "➡️ Generating $key"
+      sed -i "s|^$key=.*|$key=$value|" "$APP_PATH"
+    fi
+  else
+    if [ "$is_file" == "true" ]; then
+      if [ -f "$value" ]; then
+        echo "⚠️ $key already exists at $value. Skipping."
+      else
+        echo "➡️ Generating $key at $value"
+        mkdir -p "$(dirname "$value")"
+        eval "$generator > \"$value\""
+      fi
+    else
+      echo "⚠️ $key already exists in app.conf. Skipping."
+    fi
+  fi
+}
+
+# HMAC secret key
+ensure_secret "hmac_key" "" "openssl rand -base64 32"
+
+# AES secret key
+ensure_secret "aes_key" "" "openssl rand -base64 32"
+
+# OPRF server key file
+ensure_secret "server_key_file" "secrets/oprf-server.key" "python app/generate-oprf-key.py" "true"
+
 
 echo "Migrating"
-tools/./migrate_db.sh $DB_HOST $DB_USER $DB_PASS $DB_NAME
+tools/./migrate_db.sh
 
 echo "Start main process"
 python -m app.main
