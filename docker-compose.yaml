@@ -46,7 +46,7 @@ services:
     ports:
       - 5432:5432
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - './docker/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
 
 volumes:
   secrets:

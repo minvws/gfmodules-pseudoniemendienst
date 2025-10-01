@@ -53,6 +53,7 @@ class KeyEntryRepository(RepositoryBase):
             max_rid_usage=max_usage_level,
         )
         self.db_session.session.add(entry)
+        self.db_session.session.flush()
 
         return entry
 

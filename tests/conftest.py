@@ -1,100 +1,58 @@
-import os
-from typing import Generator, Type, Protocol, TypeVar, Callable, Any
-
+from typing import Generator
+import inject
 import pytest
-from contextlib import contextmanager
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-from sqlalchemy import create_engine, Engine
-from sqlalchemy.orm import sessionmaker, Session, clear_mappers
-
-from app.db.entities.base import Base
-from app.db.session import DbSession
-
-try:
-    from testcontainers.postgres import PostgresContainer
-    HAVE_TESTCONTAINERS = True
-except Exception:
-    HAVE_TESTCONTAINERS = False
-
+from app.config import set_config
+from tests.test_config import get_test_config
+set_config(get_test_config())
+from app.application import create_fastapi_app
+from app.db.db import Database
 from app.db.repositories.key_entry_repository import KeyEntryRepository
-
-class RepositoryBaseProtocol(Protocol):
-    def __init__(self, _db_session: "DbSessionWrapper") -> None: ...
-
-RepoT = TypeVar("RepoT", bound=RepositoryBaseProtocol)  # codespell:ignore
-
-class DbSessionWrapper:
-    session: Session
-
-    def __init__(self, session: Session) -> None:
-        self.session = session
-
-    def get_repository(self, repo_cls: Type[RepoT]) -> RepoT:  # codespell:ignore
-        return repo_cls(self)
+from app.services.key_resolver import KeyResolver
 
 
-    def commit(self) -> None:
-        self.session.commit()
-
-class FakeDatabase:
-    _session_factory: Callable[[], Session]
-
-    def __init__(self, session_factory: Callable[[], Session]) -> None:
-        self._session_factory = session_factory
-
-    @contextmanager
-    def get_db_session(self) -> Generator[DbSessionWrapper, None, None]:
-        session = self._session_factory()
-        try:
-            # yield DbSession(session)
-            yield DbSessionWrapper(session)
-        finally:
-            session.close()
-
-@pytest.fixture(scope="session")
-def pg_url() -> Generator[str, None, None]:
-    """
-    Spins up a temp PostgreSQL with testcontainers.
-    Set TEST_PG_URL to reuse a local Postgres if you prefer.
-    """
-    env_url = os.getenv("TEST_PG_URL")
-    if env_url:
-        yield env_url
-        return
-
-    if not HAVE_TESTCONTAINERS:
-        pytest.skip("testcontainers not available and TEST_PG_URL not set")
-
-    with PostgresContainer("postgres:16-alpine", driver="psycopg") as pg:
-        yield pg.get_connection_url()
-
-@pytest.fixture(scope="session")
-def engine(pg_url: str) -> Generator[Engine, None, None]:
-    eng = create_engine(pg_url, future=True)
-    Base.metadata.create_all(eng)
-    yield eng
-    Base.metadata.drop_all(eng)
-    clear_mappers()
 
 @pytest.fixture
-def session(engine: Engine) -> Generator[Session, None, None]:
-    session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True, expire_on_commit=False)
-    sess = session_local()
+def app() -> Generator[FastAPI, None, None]:
+    from app.container import container_config
+    set_config(get_test_config())
+    # Configure the injector for each test, clear if already configured
+    if inject.is_configured():
+        inject.configure(container_config, clear=True)
+    else:
+        inject.configure(container_config)
+    app = create_fastapi_app()
+    yield app
+    inject.clear()
+
+
+@pytest.fixture
+def database() -> Database:
+    set_config(get_test_config())
     try:
-        yield sess
-        sess.rollback()
-    finally:
-        sess.close()
+        # first use the database from the injector
+        db = inject.instance(Database)
+        db.generate_tables()
+        db.truncate_tables()
+        return db
+    except inject.InjectorException:
+        pass
+    db = Database(dsn=get_test_config().database.dsn)
+    db.generate_tables()
+    db.truncate_tables()
+    return db
 
 @pytest.fixture
-def db_wrap(session: Session) -> DbSessionWrapper:
-    return DbSessionWrapper(session)
+def client(app: FastAPI) -> TestClient:
+    return TestClient(app)
 
 @pytest.fixture
-def repo(db_wrap: DbSession) -> KeyEntryRepository:
-    return KeyEntryRepository(db_wrap)
+def key_resolver(database: Database) -> KeyResolver:
+    return KeyResolver(database)
 
 @pytest.fixture
-def fake_db(session: Any) -> FakeDatabase:
-    session_local = sessionmaker(bind=session.get_bind(), autoflush=False, autocommit=False, future=True, expire_on_commit=False)
-    return FakeDatabase(session_local)
+def repo(key_resolver: KeyResolver) -> KeyEntryRepository:
+    with key_resolver.db.get_db_session() as session:
+        return session.get_repository(KeyEntryRepository)
