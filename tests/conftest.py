@@ -5,14 +5,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.config import set_config
-from tests.test_config import get_test_config
+from test_config import get_test_config
 set_config(get_test_config())
-from app.application import create_fastapi_app
-from app.db.db import Database
-from app.db.repositories.key_entry_repository import KeyEntryRepository
-from app.services.key_resolver import KeyResolver
 
-
+from app.application import create_fastapi_app  # noqa: E402
+from app.db.db import Database # noqa: E402
+from app.db.repositories.key_entry_repository import KeyEntryRepository # noqa: E402
+from app.services.key_resolver import KeyResolver # noqa: E402
 
 @pytest.fixture
 def app() -> Generator[FastAPI, None, None]:

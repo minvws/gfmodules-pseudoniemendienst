@@ -33,22 +33,30 @@ def test_create_and_get(repo: KeyEntryRepository) -> None:
 
 
 def test_star_matches_everything(repo: KeyEntryRepository) -> None:
-    e = make_entry(repo, scope=["*"], key=TEST_PUBKEY)
+    make_entry(repo, scope=["*"], key=TEST_PUBKEY)
 
     # Should match regardless of requested scopes
-    for requested in (["anything"], ["nvi"], ["prs"], ["foo"], ["*"]):
+    for requested in ("anything", "nvi", "prs", "foo", "*"):
         got = repo.get("ura:94252", requested)
         assert got is not None
         assert got.key == TEST_PUBKEY
 
 def test_get_by_org_lists_all(repo: KeyEntryRepository) -> None:
-    a = make_entry(repo, org="ura:1", scope=["a"])
-    b = make_entry(repo, org="ura:1", scope=["b"])
-    c = make_entry(repo, org="ura:2", scope=["c"])
+    make_entry(repo, org="ura:1", scope=["a"])
+    make_entry(repo, org="ura:1", scope=["b"])
+    make_entry(repo, org="ura:2", scope=["c"])
 
     rows = repo.get_by_org("ura:1")
+    if rows is None:
+        rows = []
     scopes = sorted([tuple(r.scope) for r in rows])
     assert scopes == [("a",), ("b",)]
+
+    rows = repo.get_by_org("ura:2")
+    if rows is None:
+        rows = []
+    scopes = sorted([tuple(r.scope) for r in rows])
+    assert scopes == [("c",)]
 
 def test_update_changes_scope_and_key(repo: KeyEntryRepository) -> None:
     e = make_entry(repo, scope=["nvi"], key="OLD")
