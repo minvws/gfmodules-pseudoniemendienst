@@ -16,7 +16,7 @@ fRs2Wy5kQi1QlyTzAgMBAAE=
 def make_entry(org: str="ura:94252", scope: List[str]|None=None, key: str=TEST_PUBKEY) -> KeyEntry:
     if scope is None:
         scope = ["nvi", "lmr"]
-    return KeyEntry(organization=org, scope=scope, key=key)
+    return KeyEntry(organization=org, scope=scope, key=key, max_rid_usage="rpi")
 
 def test_create_and_get(repo: Any, db_wrap: Any) -> None:
     e = make_entry()
