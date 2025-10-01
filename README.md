@@ -1,5 +1,33 @@
-# PRS
+# Pseudoniemendienst
 
+This app is the pseudoniemendienst(PRS) and is part of
+the 'Generieke Functies, lokalisatie en addressering' project of the Ministry of Health, Welfare and Sport of the Dutch government. 
+
+The purpose of this application is to provide a pseudonymisation of the Personal ID of Dutch Citizens. This pseudonymisation
+is used in other applications to minimize the processing of Personal Identifiable Information(PII).
+
+## Disclaimer
+
+This project and all associated code serve solely as documentation
+and demonstration purposes to illustrate potential system
+communication patterns and architectures.
+
+This codebase:
+
+- Is NOT intended for production use
+- Does NOT represent a final specification
+- Should NOT be considered feature-complete or secure
+- May contain errors, omissions, or oversimplified implementations
+- Has NOT been tested or hardened for real-world scenarios
+
+The code examples are only meant to help understand concepts and demonstrate possibilities.
+
+By using or referencing this code, you acknowledge that you do so at your own
+risk and that the authors assume no liability for any consequences of its use.
+
+## Release Process
+
+From version 1.0.0 this projects adheres the release flow as described in [Release Process](./docs/release-flow.md)
 
 ## Run the following commands to run the project:
 
