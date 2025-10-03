@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse
 
 from app import container
+from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver, KeyRequest
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ def put_key(
     if entry.organization != req.organization:
         raise HTTPException(status_code=404, detail="organization not found")
 
-    key_resolver.update(str(entry.entry_id), req.scope, req.pub_key)
+    key_resolver.update(str(entry.entry_id), req.scope, req.pub_key, req.max_key_usage or RidUsage.IrreversiblePseudonym)
     updated_entry = key_resolver.get_by_id(key_id)
     if updated_entry is None:
         raise HTTPException(status_code=500, detail="failed to retrieve updated key")

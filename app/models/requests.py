@@ -1,9 +1,37 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymType
+from app.rid import RidUsage
+
+class RidReceiveRequest(BaseModel):
+    rid: str
+    recipientOrganization: str
+    recipientScope: str
+    pseudonymType: Literal['rp', 'irp', 'bsn']
+
+class RidExchangeRequest(BaseModel):
+    personalId: Any
+    recipientOrganization: str
+    recipientScope: str
+    ridUsage: Any
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
+        pid = data.get("personalId")
+        if isinstance(pid, str):
+            data["personalId"] = PersonalId.from_str(pid)
+        if isinstance(pid, dict):
+            data["personalId"] = PersonalId.from_dict(pid)
+
+        ridUsage = data.get("ridUsage")
+        if isinstance(ridUsage, str):
+            data["ridUsage"] = RidUsage(ridUsage)
+
+        return data
 
 
 class ExchangeRequest(BaseModel):

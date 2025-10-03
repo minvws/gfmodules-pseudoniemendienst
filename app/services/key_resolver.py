@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field, field_validator
 from app.db.db import Database
 from app.db.entities.key_entry import KeyEntry
 from app.db.repositories.key_entry_repository import KeyEntryRepository
+from app.rid import RidUsage
+
 
 def _normalize_scope(items: List[str]) -> List[str]:
     cleaned = [s.strip().lower() for s in items if s and s.strip()]
@@ -15,6 +17,7 @@ class KeyRequest(BaseModel):
     organization: str = Field(..., min_length=2)
     scope: List[str] = Field(...)
     pub_key: str = Field(..., min_length=32)
+    max_key_usage: Optional[RidUsage] = None
 
     @field_validator("scope")
     @classmethod
@@ -54,21 +57,39 @@ class KeyResolver:
 
         return jwk.JWK.from_pem(entry.key.encode('ascii'))
 
-    def create(self, organization: str, scope: list[str], pub_key: str) -> KeyEntry:
+    def max_rid_usage(self, organization: str, scope: str) -> Optional[RidUsage]:
+        with self.db.get_db_session() as session:
+            entry = session.get_repository(KeyEntryRepository).get(organization, scope)
+
+        if entry is None:
+            return None
+
+        if entry.max_rid_usage is None:
+            return None
+        if entry.max_rid_usage == RidUsage.Bsn.value:
+            return RidUsage.Bsn
+        if entry.max_rid_usage == RidUsage.ReversiblePseudonym.value:
+            return RidUsage.ReversiblePseudonym
+        if entry.max_rid_usage == RidUsage.IrreversiblePseudonym.value:
+            return RidUsage.IrreversiblePseudonym
+
+        return None
+
+    def create(self, organization: str, scope: list[str], pub_key: str, max_usage_level: str = "irp") -> KeyEntry:
         scope = _normalize_scope(scope)
         pub_key = pub_key.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).create(organization, scope, pub_key)
+            entry = session.get_repository(KeyEntryRepository).create(organization, scope, pub_key, max_usage_level)
             session.commit()
             return entry
 
-    def update(self, entry_id: str, scope: list[str], pub_key: str) -> Optional[KeyEntry]:
+    def update(self, entry_id: str, scope: list[str], pub_key: str, max_usage_level: RidUsage) -> Optional[KeyEntry]:
         scope = _normalize_scope(scope)
         pub_key = pub_key.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).update(entry_id, scope, pub_key)
+            entry = session.get_repository(KeyEntryRepository).update(entry_id, scope, pub_key, max_usage_level.value)
             session.commit()
             return entry
 

@@ -1,9 +1,8 @@
-from typing import List, Any
+from typing import List
 
-import pytest
 from app.db.entities.key_entry import KeyEntry
+from app.db.repositories.key_entry_repository import KeyEntryRepository
 
-pytestmark = pytest.mark.postgres
 
 TEST_PUBKEY = """-----BEGIN PUBLIC KEY-----
 MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgG04s6v5MQpqRk7QIUDnfrWqVO3N
@@ -12,15 +11,18 @@ hvOXiM1EeTB7me9x2P6t6SznJA7+SQMLHpvD8oKUzbflMjlyW8fs21og2eQ1YNPi
 fRs2Wy5kQi1QlyTzAgMBAAE=
 -----END PUBLIC KEY-----"""
 
-def make_entry(org: str="ura:94252", scope: List[str]|None=None, key: str=TEST_PUBKEY) -> KeyEntry:
+def make_entry(repo: KeyEntryRepository, org: str="ura:94252", scope: List[str]|None=None, key: str=TEST_PUBKEY) -> KeyEntry:
     if scope is None:
         scope = ["nvi", "lmr"]
-    return KeyEntry(organization=org, scope=scope, key=key)
+    return repo.create(
+        organization=org,
+        scope=scope,
+        pub_key=key,
+        max_usage_level="irp",
+    )
 
-def test_create_and_get(repo: Any, db_wrap: Any) -> None:
-    e = make_entry()
-    db_wrap.session.add(e)
-    db_wrap.session.commit()
+def test_create_and_get(repo: KeyEntryRepository) -> None:
+    e = make_entry(repo)
 
     got = repo.get("ura:94252", "nvi")
     assert got is not None
@@ -30,35 +32,36 @@ def test_create_and_get(repo: Any, db_wrap: Any) -> None:
     assert got is None
 
 
-def test_star_matches_everything(repo: Any, db_wrap: Any) -> None:
-    e = make_entry(scope=["*"], key=TEST_PUBKEY)
-    db_wrap.session.add(e)
-    db_wrap.session.commit()
+def test_star_matches_everything(repo: KeyEntryRepository) -> None:
+    make_entry(repo, scope=["*"], key=TEST_PUBKEY)
 
     # Should match regardless of requested scopes
-    for requested in (["anything"], ["nvi"], ["prs"], ["foo"], ["*"]):
+    for requested in ("anything", "nvi", "prs", "foo", "*"):
         got = repo.get("ura:94252", requested)
         assert got is not None
         assert got.key == TEST_PUBKEY
 
-def test_get_by_org_lists_all(repo: Any, db_wrap: Any) -> None:
-    a = make_entry(org="ura:1", scope=["a"])
-    b = make_entry(org="ura:1", scope=["b"])
-    c = make_entry(org="ura:2", scope=["c"])
-    db_wrap.session.add_all([a, b, c])
-    db_wrap.session.commit()
+def test_get_by_org_lists_all(repo: KeyEntryRepository) -> None:
+    make_entry(repo, org="ura:1", scope=["a"])
+    make_entry(repo, org="ura:1", scope=["b"])
+    make_entry(repo, org="ura:2", scope=["c"])
 
     rows = repo.get_by_org("ura:1")
+    if rows is None:
+        rows = []
     scopes = sorted([tuple(r.scope) for r in rows])
     assert scopes == [("a",), ("b",)]
 
-def test_update_changes_scope_and_key(repo: Any, db_wrap: Any) -> None:
-    e = make_entry(scope=["nvi"], key="OLD")
-    db_wrap.session.add(e)
-    db_wrap.session.commit()
+    rows = repo.get_by_org("ura:2")
+    if rows is None:
+        rows = []
+    scopes = sorted([tuple(r.scope) for r in rows])
+    assert scopes == [("c",)]
 
-    updated = repo.update(str(e.entry_id), scope=["prs", "lmr"], pub_key="NEW")
-    db_wrap.session.commit()
+def test_update_changes_scope_and_key(repo: KeyEntryRepository) -> None:
+    e = make_entry(repo, scope=["nvi"], key="OLD")
+
+    updated = repo.update(str(e.entry_id), scope=["prs", "lmr"], pub_key="NEW", max_usage_level="irp")
 
     assert updated is not None
     assert sorted(updated.scope) == ["lmr", "prs"]

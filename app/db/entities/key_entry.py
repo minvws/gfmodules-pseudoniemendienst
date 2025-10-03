@@ -14,6 +14,7 @@ class KeyEntry(Base):
     organization = Column(String, nullable=False)
     scope = Column(JSONB, nullable=False, server_default="{}")
     key = Column(Text, nullable=False)
+    max_rid_usage = Column(String, nullable=False)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -21,4 +22,5 @@ class KeyEntry(Base):
             "organization": self.organization,
             "scope": self.scope,
             "pub_key": self.key,
+            "max_rid_usage": self.max_rid_usage,
         }

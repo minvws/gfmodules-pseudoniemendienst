@@ -92,3 +92,5 @@ server_key_file=
 hmac_key=
 ; AES key for pseudonym encryption
 aes_key=
+; AES key for rid encryption
+rid_aes_key=

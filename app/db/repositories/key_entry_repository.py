@@ -42,7 +42,7 @@ class KeyEntryRepository(RepositoryBase):
         query = select(KeyEntry).where(KeyEntry.organization == organization)
         return self.db_session.session.execute(query).scalars().all()
 
-    def create(self, organization: str, scope: list[str], pub_key: str) -> KeyEntry:
+    def create(self, organization: str, scope: list[str], pub_key: str, max_usage_level: str) -> KeyEntry:
         """
         Creates a new key entry.
         """
@@ -50,12 +50,14 @@ class KeyEntryRepository(RepositoryBase):
             organization=organization,
             scope=scope,
             key=pub_key,
+            max_rid_usage=max_usage_level,
         )
         self.db_session.session.add(entry)
+        self.db_session.session.flush()
 
         return entry
 
-    def update(self, entry_id: str, scope: list[str], pub_key: str) -> Optional[KeyEntry]:
+    def update(self, entry_id: str, scope: list[str], pub_key: str, max_usage_level: str) -> Optional[KeyEntry]:
         """
         Updates an existing key entry.
         """
@@ -65,5 +67,6 @@ class KeyEntryRepository(RepositoryBase):
 
         entry.scope = scope # type: ignore
         entry.key = pub_key # type: ignore
+        entry.max_rid_usage = max_usage_level # type: ignore
         self.db_session.session.add(entry)
         return entry

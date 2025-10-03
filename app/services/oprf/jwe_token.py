@@ -6,7 +6,7 @@ import time
 class BlindJwe():
 
     @staticmethod
-    def build(audience: str, scope: str, subject: str, pub_key: jwk.JWK) -> str:
+    def build(audience: str, scope: str, subject: str, pub_key: jwk.JWK, extra_claims: dict[str, str] = {}) -> str:
         """
         Build a JWT token
         """
@@ -18,6 +18,7 @@ class BlindJwe():
             "version": "1.1",
             "iat": now,
             "exp": now + 300,
+            **extra_claims,
         }
 
         protected_headers = {
