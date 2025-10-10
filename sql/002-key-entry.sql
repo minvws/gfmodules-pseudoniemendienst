@@ -6,3 +6,5 @@ CREATE TABLE key_entry (
 );
 
 CREATE INDEX key_entry_scope_gin ON key_entry USING GIN (scope);
+
+ALTER TABLE key_entry OWNER TO 'prs';
