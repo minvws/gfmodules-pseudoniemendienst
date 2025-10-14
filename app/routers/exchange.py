@@ -10,6 +10,7 @@ from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveR
 from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.jwe_token import BlindJwe
+from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
 from app.services.tmp_rid_service import TmpRidService
 
@@ -64,7 +65,11 @@ def receive(
             detail="Requested pseudonym type not allowed for this RID",
         )
 
-    max_rid_usage = key_resolver.max_rid_usage(req.recipientOrganization, req.recipientScope)
+    if not req.recipientOrganization.startswith("ura:"):
+        raise HTTPException(status_code=400, detail="Invalid organization URA")
+    ura = req.recipientOrganization[4:]
+
+    max_rid_usage = key_resolver.max_rid_usage(ura)
     if max_rid_usage is None:
         raise HTTPException(
             status_code=400,
@@ -102,11 +107,11 @@ def exchange_rid(
     req: RidExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     rid_service: TmpRidService = Depends(container.get_tmp_rid_service),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> Response:
     """
     Exchange a personal ID for a RID that can be used by the recipient organization/scope
     """
-
     rid_data = {
         "usage": str(req.ridUsage),         # Maximum usage allowed for this RID (capped by the recipient org/scope)
         "recipient_organization": req.recipientOrganization,
@@ -116,7 +121,15 @@ def exchange_rid(
     rid_str = json.dumps(rid_data)
     rid = rid_service.encrypt_rid(rid_str)
 
-    pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
+    if not req.recipientOrganization.startswith("ura:"):
+        return JSONResponse({"error": "Invalid organization URA"}, status_code=400)
+    ura = req.recipientOrganization[4:]
+
+    org = org_service.get_by_ura(ura)
+    if org is None:
+        return JSONResponse({"error": "No such organization"}, status_code=404)
+
+    pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         return JSONResponse({"error": "No public key found for this organization and/or scope"}, status_code=404)
 
@@ -139,6 +152,7 @@ def exchange_pseudonym(
     req: ExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> Response:
     if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.exchange_irreversible_pseudonym(
@@ -160,7 +174,11 @@ def exchange_pseudonym(
     if subject is None:
         raise HTTPException(status_code=500, detail="Pseudonym exchange failed")
 
-    pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
+    org = org_service.get_by_ura(req.recipientOrganization)
+    if org is None:
+        return JSONResponse({"error": "No such organization"}, status_code=404)
+
+    pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         return JSONResponse({"error": "No public key found for this organization and/or scope"}, status_code=404)
 

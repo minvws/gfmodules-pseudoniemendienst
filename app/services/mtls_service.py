@@ -16,10 +16,10 @@ class MtlsService:
             # read file
             with open(override_cert, "r") as f:
                 override_cert = f.read().strip()
-            self.__cert = override_cert
+            self.__cert = override_cert.encode("ascii")
 
-    def _enforce_cert_newlines(self, cert_data: str) -> str:
-        cert_data = cert_data.split(self._CERT_START)[-1].split(self._CERT_END)[0].strip()
+    def _enforce_cert_newlines(self, cert_bytes: bytes) -> str:
+        cert_data = cert_bytes.decode('ascii').split(self._CERT_START)[-1].split(self._CERT_END)[0].strip()
         result = self._CERT_START
         result += "\n"
         result += "\n".join(textwrap.wrap(cert_data.replace(" ", ""), 64))
@@ -28,7 +28,7 @@ class MtlsService:
 
         return result
 
-    def get_mtls_cert(self, request: Request):
+    def get_mtls_cert(self, request: Request) -> bytes:
         """s
         Returns the MTLS cert found in the request, or returns the override certificate if set
         """
@@ -40,15 +40,15 @@ class MtlsService:
                 status_code=401,
                 detail="Missing client certificate",
             )
-        return request.headers[self._SSL_CLIENT_CERT_HEADER_NAME]
+        return request.headers[self._SSL_CLIENT_CERT_HEADER_NAME].encode("ascii")
 
     def get_mtls_pub_key(self, request: Request) -> str:
         """
         Extract the public key from the client certificate
         """
-        cert = self.get_mtls_cert(request)
+        cert_bytes = self.get_mtls_cert(request)
 
-        cert = x509.load_pem_x509_certificate(cert.encode("utf-8"))
+        cert = x509.load_pem_x509_certificate(cert_bytes)
         public_key = cert.public_key()
         public_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
@@ -62,7 +62,6 @@ class MtlsService:
         """
         Extract UZI data from the client certificate
         """
-        cert = self.get_mtls_cert(request)
-
-        formatted_cert = self._enforce_cert_newlines(cert)
+        cert_bytes = self.get_mtls_cert(request)
+        formatted_cert = self._enforce_cert_newlines(cert_bytes)
         return UziServer(verify="SUCCESS", cert=formatted_cert)

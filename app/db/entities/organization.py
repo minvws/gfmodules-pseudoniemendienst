@@ -1,8 +1,9 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import Column, String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.entities.base import Base
 
@@ -10,7 +11,7 @@ from app.db.entities.base import Base
 class Organization(Base):
     __tablename__ = "organization"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     ura = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
     max_rid_usage = Column(String, nullable=False)

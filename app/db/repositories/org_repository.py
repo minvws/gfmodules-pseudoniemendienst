@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Optional
 
 from app.db.decorator import repository
@@ -33,7 +34,7 @@ class OrgRepository(RepositoryBase):
 
         return entry
 
-    def update(self, org_id: str, name: str, max_usage_level: str) -> Optional[Organization]:
+    def update(self, org_id: uuid.UUID, name: str, max_usage_level: str) -> Optional[Organization]:
         """
         Updates an existing key entry.
         """
@@ -46,7 +47,7 @@ class OrgRepository(RepositoryBase):
         self.db_session.session.add(org)
         return org
 
-    def delete(self, org_id: str) -> bool:
+    def delete(self, org_id: uuid.UUID) -> bool:
         """
         Deletes an organization by its unique ID.
         """
@@ -57,7 +58,7 @@ class OrgRepository(RepositoryBase):
         self.db_session.session.delete(org)
         return True
 
-    def get_by_id(self, org_id: str) -> Optional[Organization]:
+    def get_by_id(self, org_id: uuid.UUID) -> Optional[Organization]:
         """
         Fetches the organization by its unique ID.
         """

@@ -6,7 +6,7 @@ from starlette.responses import JSONResponse
 from app import container
 from app.models.requests import OrgRequest
 from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver, KeyRequest
+from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)

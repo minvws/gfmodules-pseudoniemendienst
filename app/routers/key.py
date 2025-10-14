@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
@@ -7,7 +8,6 @@ from starlette.responses import JSONResponse
 from app import container
 from app.models.requests import RegisterRequest
 from app.services.mtls_service import MtlsService
-from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
 
@@ -76,15 +76,17 @@ def put_key(
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
 
-    entry = key_resolver.get_by_id(key_id)
+    try:
+        key_uuid = uuid.UUID(key_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid key id")
+
+    entry = key_resolver.get_by_id(key_uuid)
     if entry is None:
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization != req.organization:
-        raise HTTPException(status_code=404, detail="organization not found")
-
-    key_resolver.update(str(entry.entry_id), req.scope, req.pub_key, req.max_key_usage or RidUsage.IrreversiblePseudonym)
-    updated_entry = key_resolver.get_by_id(key_id)
+    key_resolver.update(entry.id, req.scope, req.pub_key)
+    updated_entry = key_resolver.get_by_id(key_uuid)
     if updated_entry is None:
         raise HTTPException(status_code=500, detail="failed to retrieve updated key")
 
@@ -96,12 +98,16 @@ def delete_key(
     key_id: str,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
+    try:
+        key_uuid = uuid.UUID(key_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid key id")
 
-    entry = key_resolver.get_by_id(key_id)
+    entry = key_resolver.get_by_id(key_uuid)
     if entry is None:
         raise HTTPException(status_code=404, detail="key not found")
 
-    key_resolver.delete(str(entry.entry_id))
+    key_resolver.delete(entry.id)
     return JSONResponse(status_code=200, content={"message": "key deleted"})
 
 

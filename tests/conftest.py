@@ -5,12 +5,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.config import set_config
+from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.services.org_service import OrgService
 from test_config import get_test_config
 set_config(get_test_config())
 
 from app.application import create_fastapi_app  # noqa: E402
 from app.db.db import Database # noqa: E402
-from app.db.repositories.key_entry_repository import KeyEntryRepository # noqa: E402
 from app.services.key_resolver import KeyResolver # noqa: E402
 
 @pytest.fixture
@@ -52,6 +53,10 @@ def key_resolver(database: Database) -> KeyResolver:
     return KeyResolver(database)
 
 @pytest.fixture
-def repo(key_resolver: KeyResolver) -> KeyEntryRepository:
+def repo(key_resolver: KeyResolver) -> OrganizationKeyRepository:
     with key_resolver.db.get_db_session() as session:
-        return session.get_repository(KeyEntryRepository)
+        return session.get_repository(OrganizationKeyRepository)
+
+@pytest.fixture
+def org_service(database: Database) -> OrgService:
+    return OrgService(database)
