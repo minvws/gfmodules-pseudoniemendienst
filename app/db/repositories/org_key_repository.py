@@ -36,11 +36,11 @@ class OrganizationKeyRepository(RepositoryBase):
         query = select(OrganizationKey).where(OrganizationKey.id == id)
         return self.db_session.session.execute(query).scalars().first()
 
-    def get_by_org(self, organization_id: str) -> Optional[Sequence[OrganizationKey]]:
+    def get_by_org(self, org_id: str) -> Optional[Sequence[OrganizationKey]]:
         """
         Fetches all key entries for a given organization.
         """
-        query = select(OrganizationKey).where(OrganizationKey.organization_id == organization_id)
+        query = select(OrganizationKey).where(OrganizationKey.organization_id == org_id)
         return self.db_session.session.execute(query).scalars().all()
 
     def create(self, organization_id: str, scope: list[str], key_data: str) -> OrganizationKey:

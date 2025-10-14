@@ -5,7 +5,7 @@ import redis
 
 from app.config import get_config
 from app.db.db import Database
-from app.db.repositories.org_repository import OrgRepository
+from app.services.mtls_service import MtlsService
 from app.services.auth_cert_service import AuthCertService
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
@@ -86,6 +86,9 @@ def container_config(binder: inject.Binder) -> None:
     org_service = OrgService(db)
     binder.bind(OrgService, org_service)
 
+    mtls_service = MtlsService(config.app.mtls_override_cert)
+    binder.bind(MtlsService, mtls_service)
+
     try:
         with open(config.oprf.server_key_file, "r") as f:
             key = f.read().strip()
@@ -107,6 +110,9 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(TmpRidService, tmp_rid_service)
 
+
+def get_mtls_service() -> MtlsService:
+    return inject.instance(MtlsService)
 
 def get_org_service() -> OrgService:
     return inject.instance(OrgService)

@@ -22,6 +22,7 @@ class LogLevel(str, Enum):
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
     keystore: str = Field(default="json")
+    mtls_override_cert: str | None = Field(default=None)
 
 class ConfigDatabase(BaseModel):
     dsn: str

@@ -33,6 +33,7 @@ jwcrypto = "^1.5.6"
 sqlalchemy = "^2.0.44"
 psycopg = "^3.2.10"
 testcontainers = "^4.13.2"
+puzi = { git = "https://github.com/minvws/puzi-python" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"

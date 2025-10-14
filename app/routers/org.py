@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse
 
 from app import container
-from app.db.repositories.org_repository import OrgRepository
 from app.models.requests import OrgRequest
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver, KeyRequest

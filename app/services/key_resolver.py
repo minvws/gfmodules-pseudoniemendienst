@@ -9,6 +9,9 @@ from app.db.repositories.org_key_repository import OrganizationKeyRepository
 from app.rid import RidUsage
 
 
+class AlreadyExistsError(Exception):
+    pass
+
 def _normalize_scope(items: List[str]) -> List[str]:
     cleaned = [s.strip().lower() for s in items if s and s.strip()]
     return sorted(set(cleaned))
@@ -75,21 +78,24 @@ class KeyResolver:
 
         return None
 
-    def create(self, organization: str, scope: list[str], pub_key: str, max_usage_level: str = "irp") -> OrganizationKey:
+    def create(self, org_id: str, scope: list[str], key_data: str) -> OrganizationKey:
         scope = _normalize_scope(scope)
-        pub_key = pub_key.strip()
+        key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).create(organization, scope, pub_key)
+            try:
+                entry = session.get_repository(OrganizationKeyRepository).create(org_id, scope, key_data)
+            except Exception as e:
+                raise AlreadyExistsError(f"key for org/scope already exists: {e}")
             session.commit()
             return entry
 
-    def update(self, entry_id: str, scope: list[str], pub_key: str, max_usage_level: RidUsage) -> Optional[OrganizationKey]:
+    def update(self, entry_id: str, scope: list[str], key_data: str) -> Optional[OrganizationKey]:
         scope = _normalize_scope(scope)
-        pub_key = pub_key.strip()
+        key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).update(entry_id, scope, pub_key)
+            entry = session.get_repository(OrganizationKeyRepository).update(entry_id, scope, key_data)
             session.commit()
             return entry
 
@@ -98,9 +104,9 @@ class KeyResolver:
             entry = session.get_repository(OrganizationKeyRepository).get_by_id(entry_id)
         return entry
 
-    def get_by_org(self, organization: str) -> Sequence[OrganizationKey]|None:
+    def get_by_org(self, org_id: str) -> Sequence[OrganizationKey]|None:
         with self.db.get_db_session() as session:
-            entries = session.get_repository(OrganizationKeyRepository).get_by_org(organization)
+            entries = session.get_repository(OrganizationKeyRepository).get_by_org(org_id)
             return entries
 
     def delete(self, entry_id: str) -> bool:
