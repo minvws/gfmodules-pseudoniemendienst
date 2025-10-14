@@ -27,7 +27,7 @@ risk and that the authors assume no liability for any consequences of its use.
 
 ## Release Process
 
-From version 1.0.0 this projects adheres the release flow as described in [Release Process](./docs/release-flow.md)
+From version 1.0.0 this projects adheres the release flow as described in [Release Process](./docs/release-process.md)
 
 ## Run the following commands to run the project:
 
