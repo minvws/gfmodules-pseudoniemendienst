@@ -4,8 +4,8 @@ from jwcrypto import jwk
 from pydantic import BaseModel, Field, field_validator
 
 from app.db.db import Database
-from app.db.entities.key_entry import KeyEntry
-from app.db.repositories.key_entry_repository import KeyEntryRepository
+from app.db.entities.organization_key import OrganizationKey
+from app.db.repositories.org_key_repository import OrganizationKeyRepository
 from app.rid import RidUsage
 
 
@@ -50,7 +50,7 @@ class KeyResolver:
 
     def resolve(self, organization: str, scope: str) -> Optional[jwk.JWK]:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get(organization, scope)
+            entry = session.get_repository(OrganizationKeyRepository).get(organization, scope)
 
         if entry is None:
             return None
@@ -59,7 +59,7 @@ class KeyResolver:
 
     def max_rid_usage(self, organization: str, scope: str) -> Optional[RidUsage]:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get(organization, scope)
+            entry = session.get_repository(OrganizationKeyRepository).get(organization, scope)
 
         if entry is None:
             return None
@@ -75,38 +75,43 @@ class KeyResolver:
 
         return None
 
-    def create(self, organization: str, scope: list[str], pub_key: str, max_usage_level: str = "irp") -> KeyEntry:
+    def create(self, organization: str, scope: list[str], pub_key: str, max_usage_level: str = "irp") -> OrganizationKey:
         scope = _normalize_scope(scope)
         pub_key = pub_key.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).create(organization, scope, pub_key, max_usage_level)
+            entry = session.get_repository(OrganizationKeyRepository).create(organization, scope, pub_key)
             session.commit()
             return entry
 
-    def update(self, entry_id: str, scope: list[str], pub_key: str, max_usage_level: RidUsage) -> Optional[KeyEntry]:
+    def update(self, entry_id: str, scope: list[str], pub_key: str, max_usage_level: RidUsage) -> Optional[OrganizationKey]:
         scope = _normalize_scope(scope)
         pub_key = pub_key.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).update(entry_id, scope, pub_key, max_usage_level.value)
+            entry = session.get_repository(OrganizationKeyRepository).update(entry_id, scope, pub_key)
             session.commit()
             return entry
 
-    def get_by_id(self, entry_id: str) -> Optional[KeyEntry]:
+    def get_by_id(self, entry_id: str) -> Optional[OrganizationKey]:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get_by_id(entry_id)
+            entry = session.get_repository(OrganizationKeyRepository).get_by_id(entry_id)
         return entry
 
-    def get_by_org(self, organization: str) -> Sequence[KeyEntry]|None:
+    def get_by_org(self, organization: str) -> Sequence[OrganizationKey]|None:
         with self.db.get_db_session() as session:
-            entries = session.get_repository(KeyEntryRepository).get_by_org(organization)
+            entries = session.get_repository(OrganizationKeyRepository).get_by_org(organization)
             return entries
 
     def delete(self, entry_id: str) -> bool:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get_by_id(entry_id)
+            entry = session.get_repository(OrganizationKeyRepository).get_by_id(entry_id)
             session.session.delete(entry)
             session.commit()
             return True
 
+    def delete_by_org(self, ura: str) -> int:
+        with self.db.get_db_session() as session:
+            count = session.get_repository(OrganizationKeyRepository).delete_by_org(ura)
+            session.commit()
+            return count

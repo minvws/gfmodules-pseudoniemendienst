@@ -5,6 +5,7 @@ import redis
 
 from app.config import get_config
 from app.db.db import Database
+from app.db.repositories.org_repository import OrgRepository
 from app.services.auth_cert_service import AuthCertService
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
@@ -16,6 +17,7 @@ from app.services.crypto.memory_crypto_service import MemoryCryptoService
 from app.services.iv_service import IvService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
+from app.services.org_service import OrgService
 from app.services.pdn_service import PdnService
 from app.services.pseudonym_service import PseudonymService
 from app.services.rid_cache import RidCache
@@ -81,6 +83,9 @@ def container_config(binder: inject.Binder) -> None:
     key_resolver = KeyResolver(db)
     binder.bind(KeyResolver, key_resolver)
 
+    org_service = OrgService(db)
+    binder.bind(OrgService, org_service)
+
     try:
         with open(config.oprf.server_key_file, "r") as f:
             key = f.read().strip()
@@ -102,6 +107,9 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(TmpRidService, tmp_rid_service)
 
+
+def get_org_service() -> OrgService:
+    return inject.instance(OrgService)
 
 def get_tmp_rid_service() -> TmpRidService:
     return inject.instance(TmpRidService)

@@ -6,6 +6,11 @@ from app.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
 
+class OrgRequest(BaseModel):
+    ura: str
+    name: str
+    max_key_usage: RidUsage
+
 class RidReceiveRequest(BaseModel):
     rid: str
     recipientOrganization: str
