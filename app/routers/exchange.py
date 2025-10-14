@@ -146,7 +146,7 @@ def exchange_pseudonym(
             recipient_organization=req.recipientOrganization,
             recipient_scope=req.recipientScope,
         )
-        subject = "pseudonym:irreverible:" + res
+        subject = "pseudonym:irreversible:" + res
     elif req.pseudonymType == PseudonymType.Reversible:
         res = pseudonym_service.exchange_reversible_pseudonym(
             personal_id=req.personalId,

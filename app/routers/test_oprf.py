@@ -35,7 +35,7 @@ def post_test_eval(
     oprf_service: OprfService = Depends(container.get_oprf_service),
 ) -> JSONResponse:
 
-    res = oprf_service.blind_input(req.personalId)
+    res = oprf_service.blind_input(req.personalId.as_str())
     return JSONResponse({
         "blinded_input": res['blinded_input'],
         "blind_factor": res['blind_factor'],
