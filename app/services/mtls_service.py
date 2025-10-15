@@ -11,12 +11,17 @@ class MtlsService:
     _CERT_END = "-----END CERTIFICATE-----"
     _SSL_CLIENT_CERT_HEADER_NAME = "x-proxy-ssl_client_cert"
 
-    def __init__(self, override_cert: str) -> None:
+    def __init__(self, override_cert: str|None, allow_missing_cert: bool) -> None:
+        self.__cert: bytes | None = None
+
         if override_cert is not None and override_cert != "":
-            # read file
-            with open(override_cert, "r") as f:
-                override_cert = f.read().strip()
-            self.__cert = override_cert.encode("ascii")
+            try:
+                with open(override_cert, "r") as f:
+                    override_cert = f.read().strip()
+                self.__cert = override_cert.encode("ascii")
+            except FileNotFoundError:
+                if not allow_missing_cert:
+                    raise FileNotFoundError(f"MTLS override certificate file '{override_cert}' not found.")
 
     def _enforce_cert_newlines(self, cert_bytes: bytes) -> str:
         cert_data = cert_bytes.decode('ascii').split(self._CERT_START)[-1].split(self._CERT_END)[0].strip()

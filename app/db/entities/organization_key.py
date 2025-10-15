@@ -19,7 +19,7 @@ class OrganizationKey(Base):
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
-            # "organization_id": str(self.organization_id),
+            # We omit organization_id since this is an internal detail.
             "scope": self.scope,
             "key_data": self.key_data,
         }

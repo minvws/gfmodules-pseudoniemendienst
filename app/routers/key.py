@@ -64,8 +64,6 @@ def list_keys_for_org(
     if entries is None:
         raise HTTPException(status_code=404, detail="no keys found")
 
-    print(entries)
-
     return JSONResponse(status_code=200, content=[e.to_dict() for e in entries])
 
 

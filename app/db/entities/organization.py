@@ -18,7 +18,6 @@ class Organization(Base):
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": str(self.id),
             "ura": self.ura,
             "name": self.name,
             "max_rid_usage": self.max_rid_usage,

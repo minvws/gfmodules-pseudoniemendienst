@@ -39,4 +39,3 @@ def post_eval(
         return JSONResponse({"error": "Unable to evaluate blind"}, status_code=400)
 
     return JSONResponse({"jwe": jwe_str})
-
