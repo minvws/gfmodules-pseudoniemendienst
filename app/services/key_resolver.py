@@ -1,13 +1,18 @@
+import uuid
 from typing import List, Optional, Sequence
 
 from jwcrypto import jwk
 from pydantic import BaseModel, Field, field_validator
 
 from app.db.db import Database
-from app.db.entities.key_entry import KeyEntry
-from app.db.repositories.key_entry_repository import KeyEntryRepository
+from app.db.entities.organization_key import OrganizationKey
+from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.db.repositories.org_repository import OrgRepository
 from app.rid import RidUsage
 
+
+class AlreadyExistsError(Exception):
+    pass
 
 def _normalize_scope(items: List[str]) -> List[str]:
     cleaned = [s.strip().lower() for s in items if s and s.strip()]
@@ -48,65 +53,72 @@ class KeyResolver:
     def __init__(self, db: Database):
         self.db = db
 
-    def resolve(self, organization: str, scope: str) -> Optional[jwk.JWK]:
+    def max_rid_usage(self, ura: str) -> Optional[RidUsage]:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get(organization, scope)
+            org = session.get_repository(OrgRepository).get_by_ura(ura)
+            if org is None:
+                return None
 
-        if entry is None:
+        if org.max_rid_usage is None:
             return None
-
-        return jwk.JWK.from_pem(entry.key.encode('ascii'))
-
-    def max_rid_usage(self, organization: str, scope: str) -> Optional[RidUsage]:
-        with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get(organization, scope)
-
-        if entry is None:
-            return None
-
-        if entry.max_rid_usage is None:
-            return None
-        if entry.max_rid_usage == RidUsage.Bsn.value:
+        if org.max_rid_usage == RidUsage.Bsn.value:
             return RidUsage.Bsn
-        if entry.max_rid_usage == RidUsage.ReversiblePseudonym.value:
+        if org.max_rid_usage == RidUsage.ReversiblePseudonym.value:
             return RidUsage.ReversiblePseudonym
-        if entry.max_rid_usage == RidUsage.IrreversiblePseudonym.value:
+        if org.max_rid_usage == RidUsage.IrreversiblePseudonym.value:
             return RidUsage.IrreversiblePseudonym
 
         return None
 
-    def create(self, organization: str, scope: list[str], pub_key: str, max_usage_level: str = "irp") -> KeyEntry:
+    def resolve(self, org_id: uuid.UUID, scope: str) -> Optional[jwk.JWK]:
+        with self.db.get_db_session() as session:
+            entry = session.get_repository(OrganizationKeyRepository).get(org_id, scope)
+
+        if entry is None:
+            return None
+
+        return jwk.JWK.from_pem(entry.key_data.encode('ascii'))
+
+    def create(self, org_id: uuid.UUID, scope: list[str], key_data: str) -> OrganizationKey:
         scope = _normalize_scope(scope)
-        pub_key = pub_key.strip()
+        key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).create(organization, scope, pub_key, max_usage_level)
+            try:
+                entry = session.get_repository(OrganizationKeyRepository).create(org_id, scope, key_data)
+            except Exception as e:
+                raise AlreadyExistsError(f"key for org/scope already exists: {e}")
             session.commit()
             return entry
 
-    def update(self, entry_id: str, scope: list[str], pub_key: str, max_usage_level: RidUsage) -> Optional[KeyEntry]:
+    def update(self, key_id: uuid.UUID, scope: list[str], key_data: str) -> Optional[OrganizationKey]:
         scope = _normalize_scope(scope)
-        pub_key = pub_key.strip()
+        key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).update(entry_id, scope, pub_key, max_usage_level.value)
+            entry = session.get_repository(OrganizationKeyRepository).update(key_id, scope, key_data)
             session.commit()
             return entry
 
-    def get_by_id(self, entry_id: str) -> Optional[KeyEntry]:
+    def get_by_id(self, key_id: uuid.UUID) -> Optional[OrganizationKey]:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get_by_id(entry_id)
+            entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
         return entry
 
-    def get_by_org(self, organization: str) -> Sequence[KeyEntry]|None:
+    def get_by_org(self, org_id: uuid.UUID) -> Sequence[OrganizationKey]|None:
         with self.db.get_db_session() as session:
-            entries = session.get_repository(KeyEntryRepository).get_by_org(organization)
+            entries = session.get_repository(OrganizationKeyRepository).get_by_org(org_id)
             return entries
 
-    def delete(self, entry_id: str) -> bool:
+    def delete(self, key_id: uuid.UUID) -> bool:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(KeyEntryRepository).get_by_id(entry_id)
+            entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
             session.session.delete(entry)
             session.commit()
             return True
 
+    def delete_by_org(self, org_id: uuid.UUID) -> int:
+        with self.db.get_db_session() as session:
+            count = session.get_repository(OrganizationKeyRepository).delete_by_org(org_id)
+            session.commit()
+            return count

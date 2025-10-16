@@ -1,11 +1,12 @@
 import json
+import uuid
 from typing import List, Tuple, Dict, Any
 from Crypto.PublicKey import RSA
 from jwcrypto import jwe, jwk
 
 from starlette.testclient import TestClient
 from app.services.key_resolver import KeyResolver
-
+from app.services.org_service import OrgService
 
 MOCK_ORGS = {
     "ura:12345678": (["nvi"], "irp", "", ""),
@@ -13,13 +14,18 @@ MOCK_ORGS = {
     "ura:11223344": (["brp"], "bsn", "", ""),
 }
 
-def generate_org(key_resolver: KeyResolver, org_id: str, scope: List[str], max_usage_level: str, pub_key: str) -> None:
-    print(f"Generating org {org_id} with scope {scope} and max usage {max_usage_level}")
+def generate_keys(
+    key_resolver: KeyResolver,
+    org_id: uuid.UUID,
+    scope: List[str],
+    max_usage_level: str,
+    pub_key: str
+) -> None:
     entries = key_resolver.get_by_org(org_id)
     if entries is not None:
         for entry in entries:
-            key_resolver.delete(str(entry.entry_id))
-    key_resolver.create(org_id, scope, pub_key, max_usage_level)
+            key_resolver.delete(entry.id)
+    key_resolver.create(org_id, scope, pub_key,)
 
 def gen_rsa_key(bits: int = 1024) -> Tuple[str, str]:
     key = RSA.generate(bits)
@@ -28,11 +34,16 @@ def gen_rsa_key(bits: int = 1024) -> Tuple[str, str]:
     pub_key = key.publickey().export_key().decode('utf-8')
     return priv_key, pub_key
 
-def create_mock_orgs(key_resolver: KeyResolver, mock_orgs: Dict[str, Any]) -> None:
-    for ura, org in mock_orgs.items():
+def create_mock_orgs(org_service: OrgService, key_resolver: KeyResolver, mock_orgs: Dict[str, Any]) -> None:
+    for ura, org_data in mock_orgs.items():
+        stripped_ura = ura.replace("ura:", "")
+        org = org_service.create(stripped_ura, f"MyOrg-{ura}", org_data[1])
+        if org is None:
+            raise RuntimeError(f"Could not create mock org {ura}")
+
         (priv_key, pub_key) = gen_rsa_key(1024)
-        generate_org(key_resolver, ura, org[0], org[1], pub_key)
-        mock_orgs[ura] = (org[0], org[1], priv_key, pub_key)
+        generate_keys(key_resolver, org.id, org_data[0], org_data[1], pub_key)
+        mock_orgs[ura] = (org_data[0], org_data[1], priv_key, pub_key)
 
 def decode_jwe(jwe_token: str, priv_key_pem: str) -> Tuple[dict[str, Any], dict[str, Any]]:
     token = jwe.JWE()
@@ -48,8 +59,8 @@ def decode_jwe(jwe_token: str, priv_key_pem: str) -> Tuple[dict[str, Any], dict[
 
     return headers, data
 
-def test_create_happy_path(client: TestClient, key_resolver: KeyResolver) -> None:
-    create_mock_orgs(key_resolver, MOCK_ORGS)
+def test_create_happy_path(client: TestClient, org_service: OrgService, key_resolver: KeyResolver,) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:12345678",
@@ -61,8 +72,9 @@ def test_create_happy_path(client: TestClient, key_resolver: KeyResolver) -> Non
     assert response.headers["Content-Type"] == "Multipart/Encrypted"
     assert response.content.startswith(b"eyJra")
 
-def test_invalid_scope(client: TestClient, key_resolver: KeyResolver) -> None:
-    create_mock_orgs(key_resolver, MOCK_ORGS)
+def test_invalid_scope(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
+
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:12345678",
@@ -71,9 +83,10 @@ def test_invalid_scope(client: TestClient, key_resolver: KeyResolver) -> None:
     })
 
     assert response.status_code == 404
-    assert response.json() == {"error": "No public key found for this organization and/or scope"}
+    assert response.json() == {"detail": "No public key found for organization '12345678' and scope 'invalid-scope'"}
     assert response.headers["Content-Type"] == "application/json"
 
+    # Unknown org
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:1234567823751735703297509312759013275097125",
@@ -82,11 +95,12 @@ def test_invalid_scope(client: TestClient, key_resolver: KeyResolver) -> None:
     })
 
     assert response.status_code == 404
-    assert response.json() == {"error": "No public key found for this organization and/or scope"}
+    assert response.json() == {'detail': "Organization with URA '1234567823751735703297509312759013275097125' not found"}
     assert response.headers["Content-Type"] == "application/json"
 
+def test_decode_as_receiver(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
-def test_decode_as_receiver(client: TestClient) -> None:
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:12345678",
@@ -118,8 +132,9 @@ def test_decode_as_receiver(client: TestClient) -> None:
     # Make sure a new RID is generated each time
     assert data['subject'] != data2['subject']
 
+def test_receive_rids(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
-def test_receive_rids(client: TestClient) -> None:
     response = client.post("/receive", json={
         "rid": "foobar",
         "recipientOrganization": "ura:12345678",
@@ -127,7 +142,7 @@ def test_receive_rids(client: TestClient) -> None:
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "Invalid RID format"}
+    assert response.json() == {"detail": "Invalid RID. Should start with 'rid:'"}
 
 
     response = client.post("/receive", json={
@@ -139,8 +154,9 @@ def test_receive_rids(client: TestClient) -> None:
     assert response.status_code == 400
     assert response.json() == {"detail": "Failed to decrypt RID"}
 
+def test_receive_incorrect_org(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
-def test_receive_incorrect_org(client: TestClient) -> None:
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:12345678",
@@ -159,7 +175,7 @@ def test_receive_incorrect_org(client: TestClient) -> None:
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "RID not intended for this organization and/or scope"}
+    assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
 
     # We should not be able to decrypt to incorrect scope
     response = client.post("/receive", json={
@@ -169,7 +185,7 @@ def test_receive_incorrect_org(client: TestClient) -> None:
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "RID not intended for this organization and/or scope"}
+    assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
 
     # We should not be able to decrypt to BSN
     response = client.post("/receive", json={
@@ -181,7 +197,9 @@ def test_receive_incorrect_org(client: TestClient) -> None:
     assert response.status_code == 400
     assert response.json() == {"detail": "Organization / scope is not allowed to exchange BSNs"}
 
-def test_receive_incorrect_usage(client: TestClient) -> None:
+def test_receive_incorrect_usage(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
+
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:12345678",
@@ -200,7 +218,7 @@ def test_receive_incorrect_usage(client: TestClient) -> None:
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "Requested pseudonym type not allowed for this RID"}
+    assert response.json() == {"detail": "Requested pseudonym type not allowed by RID usage"}
 
     # We should not be able to decrypt to BSN, even if we are allowed as an organisation
     response = client.post("/receive", json={
@@ -210,7 +228,7 @@ def test_receive_incorrect_usage(client: TestClient) -> None:
         "pseudonymType": "bsn"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "Requested pseudonym type not allowed for this RID"}
+    assert response.json() == {"detail": "Requested pseudonym type not allowed by RID usage"}
 
     # But we should be able to decrypt to IRP
     response = client.post("/receive", json={
@@ -222,8 +240,9 @@ def test_receive_incorrect_usage(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()['type'] == 'irp'
 
+def test_min_usage_level(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
-def test_min_usage_level(client: TestClient) -> None:
     response = client.post("/exchange/rid", json={
         "personalId": { "landCode": "NL", "type": "bsn", "value": "9500009012" },
         "recipientOrganization": "ura:87654321",

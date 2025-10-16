@@ -1,10 +1,19 @@
-from typing import Any, Literal
+from typing import Any, Literal, List
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
+
+
+class RegisterRequest(BaseModel):
+    scope: List[str]
+
+class OrgRequest(BaseModel):
+    ura: str
+    name: str
+    max_key_usage: RidUsage
 
 class RidReceiveRequest(BaseModel):
     rid: str

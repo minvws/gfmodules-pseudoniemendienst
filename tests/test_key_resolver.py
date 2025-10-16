@@ -1,6 +1,9 @@
+
 from jwcrypto import jwk
 
+from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver, KeyRequest
+from app.services.org_service import OrgService
 
 TEST_PUBKEY = """-----BEGIN PUBLIC KEY-----
 MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgG04s6v5MQpqRk7QIUDnfrWqVO3N
@@ -9,32 +12,34 @@ hvOXiM1EeTB7me9x2P6t6SznJA7+SQMLHpvD8oKUzbflMjlyW8fs21og2eQ1YNPi
 fRs2Wy5kQi1QlyTzAgMBAAE=
 -----END PUBLIC KEY-----"""
 
-def test_resolver_create_and_resolve_roundtrip(key_resolver: KeyResolver) -> None:
+def test_resolver_create_and_resolve_roundtrip(key_resolver: KeyResolver, org_service: OrgService) -> None:
+    org = org_service.create(ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym)
 
     # create
     req = KeyRequest(organization="ura:94252", scope=["NVI", " lmr "], pub_key=TEST_PUBKEY)
-    entry = key_resolver.create(req.organization, req.scope, req.pub_key)
+    entry = key_resolver.create(org.id, req.scope, req.pub_key)
 
-    assert entry.organization == "ura:94252"
+    assert entry.organization_id == org.id
     assert sorted(entry.scope) == ["lmr", "nvi"]
 
-    key = key_resolver.resolve("ura:94252", "nvi")
+    key = key_resolver.resolve(org.id, "nvi")
     assert isinstance(key, jwk.JWK)
     assert not key.has_private
 
-def test_resolver_get_and_delete(key_resolver: KeyResolver) -> None:
-    e = key_resolver.create("ura:x", ["*"], TEST_PUBKEY)
-    print(e.entry_id)
+def test_resolver_get_and_delete(key_resolver: KeyResolver, org_service: OrgService) -> None:
+    org = org_service.create(ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym)
 
-    items = key_resolver.get_by_org("ura:x") or []
+    e = key_resolver.create(org.id, ["*"], TEST_PUBKEY)
+
+    items = key_resolver.get_by_org(org.id) or []
     assert len(items) == 1
-    assert items[0].entry_id == e.entry_id
+    assert items[0].id == e.id
 
-    by_id = key_resolver.get_by_id(str(e.entry_id))
+    by_id = key_resolver.get_by_id(e.id)
     assert by_id is not None
 
-    ok = key_resolver.delete(str(e.entry_id))
+    ok = key_resolver.delete(e.id)
     assert ok is True
 
-    items2 = key_resolver.get_by_org("ura:x")
+    items2 = key_resolver.get_by_org(org.id)
     assert items2 == []

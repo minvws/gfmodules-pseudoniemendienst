@@ -5,6 +5,7 @@ import redis
 
 from app.config import get_config
 from app.db.db import Database
+from app.services.mtls_service import MtlsService
 from app.services.auth_cert_service import AuthCertService
 from app.services.bpg_service import BpgService
 from app.services.crypto.crypto_service import CryptoService
@@ -16,13 +17,16 @@ from app.services.crypto.memory_crypto_service import MemoryCryptoService
 from app.services.iv_service import IvService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
+from app.services.org_service import OrgService
 from app.services.pdn_service import PdnService
 from app.services.pseudonym_service import PseudonymService
 from app.services.rid_cache import RidCache
 from app.services.rid_service import RidService
 from app.services.tls_service import TLSService
 from app.services.tmp_rid_service import TmpRidService
+import logging
 
+logger = logging.getLogger(__name__)
 
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
@@ -81,6 +85,12 @@ def container_config(binder: inject.Binder) -> None:
     key_resolver = KeyResolver(db)
     binder.bind(KeyResolver, key_resolver)
 
+    org_service = OrgService(db)
+    binder.bind(OrgService, org_service)
+
+    mtls_service = MtlsService(config.app.mtls_override_cert)
+    binder.bind(MtlsService, mtls_service)
+
     try:
         with open(config.oprf.server_key_file, "r") as f:
             key = f.read().strip()
@@ -102,6 +112,12 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(TmpRidService, tmp_rid_service)
 
+
+def get_mtls_service() -> MtlsService:
+    return inject.instance(MtlsService)
+
+def get_org_service() -> OrgService:
+    return inject.instance(OrgService)
 
 def get_tmp_rid_service() -> TmpRidService:
     return inject.instance(TmpRidService)

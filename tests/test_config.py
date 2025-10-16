@@ -39,6 +39,7 @@ def get_test_config() -> Config:
         app=ConfigApp(
             loglevel=LogLevel.error,
             keystore="json",
+            mtls_override_cert=None,
         ),
         database=ConfigDatabase(
             dsn="postgresql+psycopg://postgres:postgres@localhost/testing",

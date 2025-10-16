@@ -10,11 +10,28 @@ from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveR
 from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.jwe_token import BlindJwe
+from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
 from app.services.tmp_rid_service import TmpRidService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+class OrganizationNotFound(HTTPException):
+    def __init__(self, ura: str) -> None:
+        super().__init__(status_code=404, detail=f"Organization with URA '{ura}' not found")
+
+class InvalidRID(HTTPException):
+    def __init__(self, message: str = "Invalid RID.") -> None:
+        super().__init__(status_code=400, detail=message)
+
+class InvalidURA(HTTPException):
+    def __init__(self, ura: str) -> None:
+        super().__init__(status_code=400, detail=f"Invalid organization URA '{ura}'")
+
+class PubKeyNotFound(HTTPException):
+    def __init__(self, ura: str, scope: str) -> None:
+        super().__init__(status_code=404, detail=f"No public key found for organization '{ura}' and scope '{scope}'")
 
 
 @router.post("/receive", summary="Receive and decrypt RID")
@@ -27,7 +44,7 @@ def receive(
     Receive and decrypt a RID, validate it, and return a pseudonym of the requested type if allowed.
     """
     if not req.rid.startswith("rid:"):
-        raise HTTPException(status_code=400, detail="Invalid RID format")
+        raise InvalidRID("Invalid RID. Should start with 'rid:'")
     rid = req.rid.removeprefix("rid:")
 
     try:
@@ -35,13 +52,12 @@ def receive(
         if not plaintext:
             raise Exception("Empty plaintext")
     except Exception:
-        raise HTTPException(status_code=400, detail="Failed to decrypt RID")
-
+        raise InvalidRID("Failed to decrypt RID")
 
     try:
         payload: Dict[str, Any] = json.loads(plaintext)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Malformed RID payload")
+        raise InvalidRID(message="Malformed RID payload")
 
     recipient_org = payload.get("recipient_organization")
     recipient_scope = payload.get("recipient_scope")
@@ -49,22 +65,21 @@ def receive(
 
     # Make sure the recipient org/scope matches what is in the RID
     if recipient_org != req.recipientOrganization or recipient_scope != req.recipientScope:
-        raise HTTPException(
-            status_code=400,
-            detail="RID not intended for this organization and/or scope",
-        )
+        raise InvalidRID(message="Invalid recipient organization and/or scope")
 
     # Make sure we have got the correct permissions to exchange the requested pseudonym type
     if rid_usage not in ALLOWED_BY_RID_USAGE:
-        raise HTTPException(status_code=400, detail="Unsupported RID usage")
+        raise InvalidRID(message="Unsupported RID usage")
 
     if req.pseudonymType not in ALLOWED_BY_RID_USAGE[rid_usage]:
-        raise HTTPException(
-            status_code=400,
-            detail="Requested pseudonym type not allowed for this RID",
-        )
+        raise InvalidRID(message="Requested pseudonym type not allowed by RID usage")
 
-    max_rid_usage = key_resolver.max_rid_usage(req.recipientOrganization, req.recipientScope)
+    if not req.recipientOrganization.startswith("ura:"):
+        raise InvalidURA(req.recipientOrganization)
+
+    ura = req.recipientOrganization[4:]
+
+    max_rid_usage = key_resolver.max_rid_usage(ura)
     if max_rid_usage is None:
         raise HTTPException(
             status_code=400,
@@ -102,11 +117,11 @@ def exchange_rid(
     req: RidExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     rid_service: TmpRidService = Depends(container.get_tmp_rid_service),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> Response:
     """
     Exchange a personal ID for a RID that can be used by the recipient organization/scope
     """
-
     rid_data = {
         "usage": str(req.ridUsage),         # Maximum usage allowed for this RID (capped by the recipient org/scope)
         "recipient_organization": req.recipientOrganization,
@@ -116,9 +131,17 @@ def exchange_rid(
     rid_str = json.dumps(rid_data)
     rid = rid_service.encrypt_rid(rid_str)
 
-    pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
+    if not req.recipientOrganization.startswith("ura:"):
+        raise InvalidURA(req.recipientOrganization)
+    ura = req.recipientOrganization[4:]
+
+    org = org_service.get_by_ura(ura)
+    if org is None:
+        raise OrganizationNotFound(ura)
+
+    pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
-        return JSONResponse({"error": "No public key found for this organization and/or scope"}, status_code=404)
+        raise PubKeyNotFound(ura, req.recipientScope)
 
     # Create a blind JWE token containing the RID
     jwe = BlindJwe.build(
@@ -139,6 +162,7 @@ def exchange_pseudonym(
     req: ExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> Response:
     if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.exchange_irreversible_pseudonym(
@@ -160,9 +184,13 @@ def exchange_pseudonym(
     if subject is None:
         raise HTTPException(status_code=500, detail="Pseudonym exchange failed")
 
-    pub_key_jwk = key_resolver.resolve(req.recipientOrganization, req.recipientScope)
+    org = org_service.get_by_ura(req.recipientOrganization)
+    if org is None:
+        raise OrganizationNotFound(req.recipientOrganization)
+
+    pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
-        return JSONResponse({"error": "No public key found for this organization and/or scope"}, status_code=404)
+        raise PubKeyNotFound(str(org.ura), req.recipientScope)
 
     jwe = BlindJwe.build(
         audience=req.recipientOrganization,
