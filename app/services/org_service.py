@@ -17,22 +17,34 @@ class OrgService:
 
     def create(self, ura: str, name: str, max_key_usage: RidUsage) -> Organization:
         with self.__db.get_db_session() as session:
-            repo = session.get_repository(OrgRepository)
-            org = repo.create(ura, name, max_key_usage)
-            session.commit()
+            try:
+                repo = session.get_repository(OrgRepository)
+                org = repo.create(ura, name, max_key_usage)
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                raise e
             return org
 
     def update(self, org_id: uuid.UUID, name: str, max_key_usage: RidUsage) -> Organization|None:
         with self.__db.get_db_session() as session:
-            repo = session.get_repository(OrgRepository)
-            org = repo.update(org_id, name, max_key_usage)
-            session.commit()
+            try:
+                repo = session.get_repository(OrgRepository)
+                org = repo.update(org_id, name, max_key_usage)
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                raise e
             return org
 
     def delete(self, org_id: uuid.UUID) -> bool:
         with self.__db.get_db_session() as session:
-            repo = session.get_repository(OrgRepository)
-            success = repo.delete(org_id)
-            session.commit()
+            try:
+                repo = session.get_repository(OrgRepository)
+                success = repo.delete(org_id)
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                raise e
             return success
 

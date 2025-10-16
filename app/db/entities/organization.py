@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy import Column, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.entities.base import Base
 
@@ -15,6 +15,12 @@ class Organization(Base):
     ura = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
     max_rid_usage = Column(String, nullable=False)
+
+    keys = relationship(
+        "OrganizationKey",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -88,7 +88,7 @@ def container_config(binder: inject.Binder) -> None:
     org_service = OrgService(db)
     binder.bind(OrgService, org_service)
 
-    mtls_service = MtlsService(config.app.mtls_override_cert, config.app.mtls_allow_override_cert_not_present)
+    mtls_service = MtlsService(config.app.mtls_override_cert)
     binder.bind(MtlsService, mtls_service)
 
     try:

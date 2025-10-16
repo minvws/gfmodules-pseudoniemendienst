@@ -83,7 +83,7 @@ def test_invalid_scope(client: TestClient, org_service: OrgService, key_resolver
     })
 
     assert response.status_code == 404
-    assert response.json() == {"error": "No public key found for this organization and/or scope"}
+    assert response.json() == {"detail": "No public key found for organization '12345678' and scope 'invalid-scope'"}
     assert response.headers["Content-Type"] == "application/json"
 
     # Unknown org
@@ -95,7 +95,7 @@ def test_invalid_scope(client: TestClient, org_service: OrgService, key_resolver
     })
 
     assert response.status_code == 404
-    assert response.json() == {"error": "No such organization"}
+    assert response.json() == {'detail': "Organization with URA '1234567823751735703297509312759013275097125' not found"}
     assert response.headers["Content-Type"] == "application/json"
 
 def test_decode_as_receiver(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:
@@ -142,7 +142,7 @@ def test_receive_rids(client: TestClient, org_service: OrgService, key_resolver:
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "Invalid RID format"}
+    assert response.json() == {"detail": "Invalid RID. Should start with 'rid:'"}
 
 
     response = client.post("/receive", json={
@@ -175,7 +175,7 @@ def test_receive_incorrect_org(client: TestClient, org_service: OrgService, key_
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "RID not intended for this organization and/or scope"}
+    assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
 
     # We should not be able to decrypt to incorrect scope
     response = client.post("/receive", json={
@@ -185,7 +185,7 @@ def test_receive_incorrect_org(client: TestClient, org_service: OrgService, key_
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "RID not intended for this organization and/or scope"}
+    assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
 
     # We should not be able to decrypt to BSN
     response = client.post("/receive", json={
@@ -218,7 +218,7 @@ def test_receive_incorrect_usage(client: TestClient, org_service: OrgService, ke
         "pseudonymType": "rp"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "Requested pseudonym type not allowed for this RID"}
+    assert response.json() == {"detail": "Requested pseudonym type not allowed by RID usage"}
 
     # We should not be able to decrypt to BSN, even if we are allowed as an organisation
     response = client.post("/receive", json={
@@ -228,7 +228,7 @@ def test_receive_incorrect_usage(client: TestClient, org_service: OrgService, ke
         "pseudonymType": "bsn"
     })
     assert response.status_code == 400
-    assert response.json() == {"detail": "Requested pseudonym type not allowed for this RID"}
+    assert response.json() == {"detail": "Requested pseudonym type not allowed by RID usage"}
 
     # But we should be able to decrypt to IRP
     response = client.post("/receive", json={

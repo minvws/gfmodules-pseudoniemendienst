@@ -39,8 +39,7 @@ def get_test_config() -> Config:
         app=ConfigApp(
             loglevel=LogLevel.error,
             keystore="json",
-            mtls_override_cert="./secrets/uzi.crt",
-            mtls_allow_override_cert_not_present=True,
+            mtls_override_cert=None,
         ),
         database=ConfigDatabase(
             dsn="postgresql+psycopg://postgres:postgres@localhost/testing",

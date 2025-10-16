@@ -3,7 +3,6 @@ loglevel=debug
 keystore=hsm_api
 # keystore=hsm
 mtls_allow_override_cert=
-mtls_allow_override_cert_not_present=False
 
 [database]
 dsn=postgresql+psycopg://postgres:postgres@localhost:5432/prs
