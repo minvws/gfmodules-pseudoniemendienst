@@ -61,8 +61,8 @@ FROM base AS final
 
 # We need to copy the compiled shared libraries from the builder stage to the correct location so they can be found.
 RUN mkdir -p /usr/lib/x86_64-linux-gnu/
-COPY --from=builder liboprf/src/noise_xk/lib*.so /usr/lib/x86_64-linux-gnu/
-COPY --from=builder liboprf/src/lib*.so /usr/lib/x86_64-linux-gnu/
+COPY --from=builder liboprf/src/noise_xk/lib*.so /usr/local/lib/
+COPY --from=builder liboprf/src/lib*.so /usr/local/lib/
 RUN ldconfig
 
 COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local /usr/local
