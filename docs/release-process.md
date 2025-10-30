@@ -9,7 +9,7 @@
 
 ## Introduction
 
-This release flow provides a clear, predictable, and stable progression from development builds to final releases.  
+This release flow provides a clear, predictable, and stable progression from development builds to final releases.
 
 Releases always fall into one of three categories:
 - **Development** – ongoing work, unstable features.  
@@ -22,7 +22,7 @@ A release candidate represents the version being validated, while a final releas
 In the diagram below an example is drawn out where features are merged to the main branch.
 At a certain point the decision is made to create a final release. At that moment `v4.1.5-rc` tag is created.
 If additional work is required by QA, privacy or security on the RC a release branch is created.
-Work done on the release branch needs also be merged back to the main branch when this is releated to functionality
+Work done on the release branch needs also be merged back to the main branch when this is related to functionality
 that is still in the main branch. In this example v4.2.10 does include fixes that does not needs to be merged back.
 
 ```mermaid
@@ -97,6 +97,15 @@ gitGraph:
 
 ---
 
+### Release reliability
+
+> [!IMPORTANT]  
+> Use only **Final releases** on production environments. 
+
+Do not make any assumptions on non **Final releases**. During the development phase pre-releases are created to test and
+validate the software. Only when the software is **Final** you can assume that the checks are performed and approved
+by QA, Privacy and Security.
+
 ## Development Phase
 
 During development, versions use the `-pre-release` suffix.  
@@ -121,6 +130,12 @@ Example progression:
   - `3.1.0-rc`
   - `3.1.1-rc`
   - `3.1.2-rc`  
+
+During this release the following checklists are executed. 
+
+- [QA](qa-release-checklist.md)
+- [Privacy](privacy-release-checklist.md)
+- [Security](security-release-checklist.md)
 
 ---
 
