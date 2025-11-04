@@ -138,9 +138,12 @@ jobs:
                 sudo ldconfig
 
             - name: Run the tests
+              env:
+                FASTAPI_CONFIG_PATH: ./app.ci.conf
+
               run: |
                 sudo bash -c 'echo "127.0.0.1 prs_db" >> /etc/hosts'
-                ./tools/migrate_db.sh prs_db postgres postgres testing
+                ./tools/migrate_db.sh
                 poetry run $(make test --just-print --silent)
 
             - name: Upload coverage report
