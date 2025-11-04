@@ -68,6 +68,7 @@ RUN ldconfig
 COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local /usr/local
 RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages
 COPY . /src
+RUN chown -R ${APP_USER}:${APP_GROUP} /src
 
 COPY ./docker/init-standalone.sh /usr/local/bin
 COPY ./docker/init.sh /usr/local/bin
