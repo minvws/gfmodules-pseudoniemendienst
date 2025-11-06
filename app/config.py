@@ -191,9 +191,7 @@ def get_config(path: str | None = None) -> Config:
         return _CONFIG
 
     if path is None:
-        path = _PATH
-
-    path = path or os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME) or _PATH
+        path = os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME) or _PATH
 
     # To be inline with other python code, we use INI-type files for configuration. Since this isn't
     # a standard format for pydantic, we need to do some manual parsing first.

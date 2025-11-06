@@ -4,7 +4,9 @@ from app.db.db import Database
 from app.db.entities.organization import Organization
 from app.db.repositories.org_repository import OrgRepository
 from app.rid import RidUsage
+import logging
 
+logger = logging.getLogger(__name__)
 
 class OrgService:
     def __init__(self, db: Database) -> None:
@@ -23,7 +25,9 @@ class OrgService:
                 session.commit()
             except Exception as e:
                 session.rollback()
+                logger.error(f"failed to create org: {e}")
                 raise e
+
             return org
 
     def update(self, org_id: uuid.UUID, name: str, max_key_usage: RidUsage) -> Organization|None:

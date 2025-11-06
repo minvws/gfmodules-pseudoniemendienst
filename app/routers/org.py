@@ -17,12 +17,14 @@ def post_org(
     req: OrgRequest,
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
+    org = org_service.get_by_ura(req.ura)
+    if org is not None:
+        raise HTTPException(status_code=409, detail="organization with this ura already exists")
     try:
         org_service.create(req.ura, req.name, req.max_key_usage)
     except Exception as e:
         logger.error(f"failed to create org: {e}")
-        raise HTTPException(status_code=500, detail="failed to create org")
-
+        raise HTTPException(status_code=500, detail="failed to create organization")
     return JSONResponse(status_code=201, content={"message": "Org created successfully"})
 
 

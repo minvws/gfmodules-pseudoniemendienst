@@ -34,13 +34,14 @@ class MtlsService:
         return result
 
     def get_mtls_cert(self, request: Request) -> bytes:
-        """s
+        """
         Returns the MTLS cert found in the request, or returns the override certificate if set
         """
         if self.__cert:
             return self.__cert
 
         if self._SSL_CLIENT_CERT_HEADER_NAME not in request.headers:
+            logger.error(f"MTLS certificate {self._SSL_CLIENT_CERT_HEADER_NAME} header missing in request")
             raise HTTPException(
                 status_code=401,
                 detail="Missing client certificate",

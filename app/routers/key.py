@@ -30,7 +30,8 @@ def post_key(
     data = mtls_service.get_mtls_uzi_data(request)
     if data["CardType"] != "S":
         raise HTTPException(status_code=401, detail="Invalid client certificate. Need an UZI S-type certificate.")
-    ura = data["UziNumber"]
+
+    ura = data["SubscriberNumber"]
 
     # Make sure we have (pre)registered the organization for this URa
     org = org_service.get_by_ura(ura)
