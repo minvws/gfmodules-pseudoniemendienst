@@ -214,8 +214,8 @@ jobs:
             - name: Build and push Docker image
               uses: docker/build-push-action@v6
               env:
-                NEW_UID: 1000
-                NEW_GID: 1000
+                NEW_UID: 1003
+                NEW_GID: 1003
               with:
                 context: .
                 file: docker/Dockerfile
