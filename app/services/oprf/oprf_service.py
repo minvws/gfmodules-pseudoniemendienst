@@ -72,5 +72,5 @@ class OprfService:
         """
         bf = base64.urlsafe_b64decode(blind_factor)
         ev = base64.urlsafe_b64decode(eval)
-        final = pyoprf.finalize(bf, ev)
+        final = pyoprf.unblind(bf, ev)
         return base64.urlsafe_b64encode(final).decode('ascii')
