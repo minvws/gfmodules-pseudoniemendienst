@@ -130,7 +130,13 @@ def post_test_reversible_pseudonym(
             "error": "Invalid pseudonym format. Expected format: pseudonym:reversible:<value>"
         }, status_code=400)
 
-    decoded = pseudonym_service.decode_reversible_pseudonym(pseudonym)
+    try:
+        decoded = pseudonym_service.decode_reversible_pseudonym(pseudonym)
+    except Exception as e:
+        return JSONResponse({
+            "error": f"Failed to reverse pseudonym: {str(e)}"
+        }, status_code=400)
+
 
     return JSONResponse(content=jsonable_encoder({
         "pseudonym": pseudonym,

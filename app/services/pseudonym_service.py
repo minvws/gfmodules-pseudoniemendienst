@@ -47,10 +47,13 @@ class PseudonymService:
         """
         Decode a reversible pseudonym to retrieve the original personal ID and associated info.
         """
-        subject = self.decode_pseudonym(encoded_pseudonym)
-        parts = subject.split('|')
-        if len(parts) != 3:
-            raise ValueError("Invalid encoded subject format")
+        try:
+            subject = self.decode_pseudonym(encoded_pseudonym)
+            parts = subject.split('|')
+            if len(parts) != 3:
+                raise ValueError("Invalid encoded subject format")
+        except ValueError as e:
+            raise ValueError("Failed to decode reversible pseudonym") from e
 
         return {
             'personal_id': PersonalId.from_str(parts[0]),
@@ -75,19 +78,25 @@ class PseudonymService:
         """
         Encode the personal ID using AES encryption in CBC mode with PKCS7 padding.
         """
-        iv = get_random_bytes(AES.block_size)
-        message = f"{pseudonym}".encode('utf-8')
-        cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
-        ciphertext = cipher.encrypt(pad(message, AES.block_size))
-        return base64.urlsafe_b64encode(iv + ciphertext).decode('utf-8')
+        try:
+            iv = get_random_bytes(AES.block_size)
+            message = f"{pseudonym}".encode('utf-8')
+            cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
+            ciphertext = cipher.encrypt(pad(message, AES.block_size))
+            return base64.urlsafe_b64encode(iv + ciphertext).decode('utf-8')
+        except Exception as e:
+            raise ValueError("Failed to encode pseudonym") from e
 
 
     def decode_pseudonym(self, encoded_pseudonym: str) -> str:
         """
         Decode the personal ID using AES decryption
         """
-        data = base64.urlsafe_b64decode(encoded_pseudonym)
-        iv = data[:AES.block_size]
-        ciphertext = data[AES.block_size:]
-        cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
-        return unpad(cipher.decrypt(ciphertext), AES.block_size).decode('utf-8')
+        try:
+            data = base64.urlsafe_b64decode(encoded_pseudonym)
+            iv = data[:AES.block_size]
+            ciphertext = data[AES.block_size:]
+            cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
+            return unpad(cipher.decrypt(ciphertext), AES.block_size).decode('utf-8')
+        except Exception as e:
+            raise ValueError("Failed to decode pseudonym") from e
