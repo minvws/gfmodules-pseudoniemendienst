@@ -29,7 +29,35 @@ def post_gen_rsa_key() -> JSONResponse:
     })
 
 
-@router.post("/test/oprf/client", summary="Create a blinded input and factor for a given BSN (or any other input)", tags=["test-oprf"])
+@router.post(
+    "/test/oprf/client",
+    summary="Create a blinded input and factor for a given BSN (or any other input)",
+    tags=["test-oprf"],
+    description="""
+This endpoint is for testing purposes only. It simulates the client-side OPRF
+blinding process. Given a personal ID (e.g., BSN), it returns a blinded input
+and the blind factor used for blinding.
+
+It takes the form of:
+
+```json
+{
+    "personalId": {
+      "landCode": "NL",
+      "type": "bsn",
+      "value": "950000012"
+}
+```
+
+or as a string:
+
+```json
+{
+    "personalId": "NL:bsn:950000012"
+}
+```
+"""
+)
 def post_test_eval(
     req: InputRequest,
     oprf_service: OprfService = Depends(container.get_oprf_service),

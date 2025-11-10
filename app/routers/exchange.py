@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse, Response
 
 from app import container
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
+from app.personal_id import PersonalId
 from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.jwe_token import BlindJwe
@@ -27,7 +28,7 @@ class InvalidRID(HTTPException):
 
 class InvalidURA(HTTPException):
     def __init__(self, ura: str) -> None:
-        super().__init__(status_code=400, detail=f"Invalid organization URA '{ura}'")
+        super().__init__(status_code=400, detail=f"Invalid organization URA '{ura}'. Must start with 'ura:'")
 
 class PubKeyNotFound(HTTPException):
     def __init__(self, ura: str, scope: str) -> None:
@@ -39,6 +40,7 @@ def receive(
     req: RidReceiveRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     rid_service: TmpRidService = Depends(container.get_tmp_rid_service),
+    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
 ) -> Response:
     """
     Receive and decrypt a RID, validate it, and return a pseudonym of the requested type if allowed.
@@ -101,13 +103,33 @@ def receive(
             detail=f"Organization / scope is not allowed to exchange {msg}",
         )
 
-    # TODO: Here we would generate the actual pseudonyms
+    try:
+        pid = payload["personal_id"]
+        if isinstance(pid, str):
+            personal_id = PersonalId.from_str(pid)
+        elif isinstance(pid, dict):
+            personal_id = PersonalId.from_dict(pid)
+        else:
+            raise InvalidRID(message="Invalid personal_id format in RID payload")
+    except Exception:
+        raise InvalidRID(message="Invalid personal_id in RID payload")
+
     if req.pseudonymType == "bsn":
-        value = "bsn:foobar"
+        value = personal_id.as_str()
     elif req.pseudonymType == "rp":
-        value = "pseudonym:reversible:foobar"
+        res = pseudonym_service.exchange_reversible_pseudonym(
+            personal_id=personal_id,
+            recipient_organization=payload["recipient_organization"] or "",
+            recipient_scope=payload["recipient_scope"] or "",
+        )
+        value = "pseudonym:reversible:" + res
     else:
-        value = "pseudonym:irreversible:foobar"
+        res = pseudonym_service.exchange_irreversible_pseudonym(
+            personal_id=personal_id,
+            recipient_organization=payload["recipient_organization"] or "",
+            recipient_scope=payload["recipient_scope"] or "",
+        )
+        value = "pseudonym:irreversible:" + res
 
     return JSONResponse(content={"pseudonym": value, "type": req.pseudonymType})
 
@@ -156,7 +178,6 @@ def exchange_rid(
 
     return Response(status_code=201, content=jwe, headers={"Content-Type": "Multipart/Encrypted"})
 
-
 @router.post("/exchange/pseudonym", summary="Exchange pseudonym")
 def exchange_pseudonym(
     req: ExchangeRequest,
@@ -164,17 +185,25 @@ def exchange_pseudonym(
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> Response:
+    if not req.recipientOrganization.startswith("ura:"):
+        raise InvalidURA(req.recipientOrganization)
+    recipient_organization = req.recipientOrganization[4:]
+
+    org = org_service.get_by_ura(recipient_organization)
+    if org is None:
+        raise OrganizationNotFound(recipient_organization)
+
     if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.exchange_irreversible_pseudonym(
             personal_id=req.personalId,
-            recipient_organization=req.recipientOrganization,
+            recipient_organization=recipient_organization,
             recipient_scope=req.recipientScope,
         )
         subject = "pseudonym:irreversible:" + res
     elif req.pseudonymType == PseudonymType.Reversible:
         res = pseudonym_service.exchange_reversible_pseudonym(
             personal_id=req.personalId,
-            recipient_organization=req.recipientOrganization,
+            recipient_organization=recipient_organization,
             recipient_scope=req.recipientScope,
         )
         subject = "pseudonym:reversible:" + res
@@ -184,16 +213,12 @@ def exchange_pseudonym(
     if subject is None:
         raise HTTPException(status_code=500, detail="Pseudonym exchange failed")
 
-    org = org_service.get_by_ura(req.recipientOrganization)
-    if org is None:
-        raise OrganizationNotFound(req.recipientOrganization)
-
     pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         raise PubKeyNotFound(str(org.ura), req.recipientScope)
 
     jwe = BlindJwe.build(
-        audience=req.recipientOrganization,
+        audience=recipient_organization,
         scope=req.recipientScope,
         subject=subject,
         pub_key=pub_key_jwk

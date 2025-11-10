@@ -20,7 +20,7 @@ def post_eval(
 ) -> JSONResponse:
 
     if not req.recipientOrganization.startswith("ura:"):
-        return JSONResponse({"error": "Invalid recipient organization"}, status_code=400)
+        return JSONResponse({"error": "Invalid recipient organization. Format: ura:<ura_number>"}, status_code=400)
     ura = req.recipientOrganization[4:]
 
     org = org_service.get_by_ura(ura)
