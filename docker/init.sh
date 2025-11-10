@@ -19,7 +19,7 @@ else
 fi
 
 OPRF_SECRET_KEY_FILE="secrets/oprf-server.key"
-if [ ! -f $OPRF_SECRET_KEY_FILE ]; then
+if [ ! -s $OPRF_SECRET_KEY_FILE ]; then
   echo "➡️ Generating OPRF secret key"
   python app/generate-oprf-key.py > $OPRF_SECRET_KEY_FILE
 else
