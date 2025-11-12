@@ -1,9 +1,0 @@
-[
-  {
-    "hostname": "ev.irealisatie.nl",
-    "role": "DVA",
-    "org_name": "O=Example Inc.,ST=foobar,C=US",
-    "org_id":"URA-12345",
-    "za_name": "CN=Example Inc. Root CA,OU=VAD,O=Example Inc.,ST=foobar,C=US"
-  }
-]
