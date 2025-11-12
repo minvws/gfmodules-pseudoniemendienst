@@ -21,7 +21,6 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
-    keystore: str = Field(default="json")
     mtls_override_cert: str | None = Field(default=None)
 
 class ConfigDatabase(BaseModel):
@@ -61,35 +60,6 @@ class ConfigDatabase(BaseModel):
             return 3600
         return int(v)
 
-class ConfigAuth(BaseModel):
-    override_cert: str | None = Field(default=None)
-    allowed_curves: str = Field(default="")
-    min_rsa_bitsize: int = Field(default=2048)
-    allow_cert_list: str = Field(default="auth_cert.json")
-
-class ConfigRid(BaseModel):
-    key_name : str= Field(default="REK")
-    key_version : int = Field(default=1)
-    alg : str = Field(default="AES-256-GCM")
-    key_renewal_at : int = Field(default=1000)
-    iv_prefix : str = Field(default="RIVF")
-    max_age_for_pdn_exchange_via_vad : int = Field(default=10)
-    max_age_for_pdn_exchange_via_healthcare_provider : int = Field(default=3600)
-
-
-class ConfigBpg(BaseModel):
-    key_name : str = Field(default="BPGK")
-    key_version : int = Field(default=1)
-    default_alg : str = Field(default="HS256")
-
-    class Config:
-        extra = "allow"
-
-class ConfigIv(BaseModel):
-    path: str = Field(default="iv.json")
-    block_size: int = Field(default=100)
-    start: int = Field(default=9223372036854775807) # 2^63 - 1
-
 class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
     docs_url: str = Field(default="/docs")
@@ -105,31 +75,6 @@ class ConfigUvicorn(BaseModel):
     ssl_key_file: str | None = Field(default=None)
 
 
-class ConfigRedis(BaseModel):
-    host: str = Field(default="localhost")
-    port: int = Field(default=6379, gt=0, lt=65535)
-    db: int = Field(default=0, ge=0)
-    cert_path: str | None = Field(default=None)
-    key_path: str | None = Field(default=None)
-    ca_path: str | None = Field(default=None)
-
-class ConfigJsonKeystore(BaseModel):
-    path: str = Field(default="keystore.json")
-
-
-class ConfigHsmApiKeystore(BaseModel):
-    url: str
-    module: str
-    slot: str
-    cert_path: str
-
-
-class ConfigHsmKeystore(BaseModel):
-    slot: int = Field(default=0)
-    slot_pin: str = Field(default="1234")
-    library: str = Field(default="/usr/local/lib/softhsm/libsofthsm2.so")
-
-
 class ConfigOprf(BaseModel):
     server_key_file: str = Field(default="")
 
@@ -143,15 +88,7 @@ class ConfigPseudonym(BaseModel):
 class Config(BaseModel):
     app: ConfigApp
     database: ConfigDatabase
-    auth: ConfigAuth
     uvicorn: ConfigUvicorn
-    rid: ConfigRid
-    bpg: ConfigBpg
-    redis: ConfigRedis
-    iv: ConfigIv
-    json_keystore: ConfigJsonKeystore
-    hsm_keystore: ConfigHsmKeystore
-    hsm_api_keystore: ConfigHsmApiKeystore
     oprf: ConfigOprf
     pseudonym: ConfigPseudonym
 

@@ -13,7 +13,7 @@ from app.services.key_resolver import KeyResolver
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
-from app.services.tmp_rid_service import TmpRidService
+from app.services.rid_service import RidService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,7 +39,7 @@ class PubKeyNotFound(HTTPException):
 def receive(
     req: RidReceiveRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    rid_service: TmpRidService = Depends(container.get_tmp_rid_service),
+    rid_service: RidService = Depends(container.get_rid_service),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
 ) -> Response:
     """
@@ -138,7 +138,7 @@ def receive(
 def exchange_rid(
     req: RidExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    rid_service: TmpRidService = Depends(container.get_tmp_rid_service),
+    rid_service: RidService = Depends(container.get_rid_service),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> Response:
     """
