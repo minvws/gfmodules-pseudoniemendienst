@@ -61,11 +61,8 @@ def test_pseudonym_service_reversible() -> None:
         recipient_organization="ura:12345",
         recipient_scope="nvi"
     )
-    # Encrypted pseudonym should be different due to random IV
-    assert pseudonym != pseudonym2
-    # But the result should be decodable to the same
-    decoded2 = svc.decode_reversible_pseudonym(pseudonym2)
-    assert decoded == decoded2
+    # Every time a pseudonym is created it should result in the same output
+    assert pseudonym == pseudonym2
 
     # Different input should yield different pseudonym
     pseudonym3 = svc.exchange_reversible_pseudonym(

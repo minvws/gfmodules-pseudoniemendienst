@@ -5,7 +5,6 @@ from enum import Enum
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-from Crypto.Random import get_random_bytes
 
 from app.personal_id import PersonalId
 
