@@ -1,5 +1,59 @@
 # PRS
 
+## Development with poetry
+
+
+
+### Poetry Dependencies
+
+Below are the requirements that needs to be in place before you're able to run or test the application outside the 
+docker environment.
+
+
+#### pkgconf
+
+Required to build [liboprf](#liboprf).
+You can check with:
+
+```bash
+which pkgconf
+``` 
+ 
+
+#### Libsodium-dev
+
+Required for liboprf.
+
+You can check with:
+
+```bash
+pkg-config --modversion libsodium
+```
+
+
+#### liboprf
+
+See the [installation instructions](https://github.com/stef/liboprf?tab=readme-ov-file#installation)
+how to install this library.
+
+### Run tests
+
+The tests have a dependency on a postgres database. You can easily setup a database with docker:
+```bash
+docker compose up -d postgres
+```
+
+Now I'm able to run the tests with:
+```bash
+LD_LIBRARY_PATH=/usr/local/lib poetry run pytest
+```
+TODO: Check if LD_LIBRARY_PATH is required
+
+
+## Development with docker
+
+### Run tests
+
 
 ## Run the following commands to run the project:
 
