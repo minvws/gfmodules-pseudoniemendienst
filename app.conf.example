@@ -26,7 +26,7 @@ ssl_key_file = server.key
 
 [oprf]
 ; file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
-server_key_file=
+server_key_file=secrets/test-oprf.key
 
 [pseudonym]
 ; Hmac secret key for temporary pseudonym hashing
