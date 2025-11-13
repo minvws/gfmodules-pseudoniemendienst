@@ -5,7 +5,6 @@ from enum import Enum
 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-from Crypto.Random import get_random_bytes
 
 from app.personal_id import PersonalId
 
@@ -79,7 +78,8 @@ class PseudonymService:
         Encode the personal ID using AES encryption in CBC mode with PKCS7 padding.
         """
         try:
-            iv = get_random_bytes(AES.block_size)
+            iv_input = hashlib.sha256("|".join(pseudonym.split('|')[:-2]).encode('utf-8')).digest()
+            iv = iv_input[:AES.block_size]
             message = f"{pseudonym}".encode('utf-8')
             cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
             ciphertext = cipher.encrypt(pad(message, AES.block_size))
