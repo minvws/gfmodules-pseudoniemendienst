@@ -176,7 +176,7 @@ def exchange_rid(
         }
     )
 
-    return Response(status_code=201, content=jwe, headers={"Content-Type": "Multipart/Encrypted"})
+    return Response(status_code=201, content=jwe, headers={"Content-Type": "application/jwe"})
 
 @router.post("/exchange/pseudonym", summary="Exchange pseudonym")
 def exchange_pseudonym(
@@ -224,5 +224,5 @@ def exchange_pseudonym(
         pub_key=pub_key_jwk
     )
 
-    return Response(status_code=201, content=jwe, headers={"Content-Type": "Multipart/Encrypted"})
+    return Response(status_code=201, content=jwe, headers={"Content-Type": "application/jwe"})
 
