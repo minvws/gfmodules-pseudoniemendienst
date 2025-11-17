@@ -1,6 +1,6 @@
 from typing import Any, Literal, List
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
 
 from app.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymType
@@ -11,9 +11,15 @@ class RegisterRequest(BaseModel):
     scope: List[str]
 
 class OrgRequest(BaseModel):
-    ura: str
-    name: str
+    ura: str = Field(..., pattern=r"^\d{8}$")
+    name: str = Field(..., min_length=5, max_length=50)
     max_key_usage: RidUsage
+
+    @field_validator("ura")
+    def ura_must_be_numbers(cls, v: Any) -> Any:
+        if not v.isdigit():
+            raise ValueError("URA must contain 8 digits")
+        return v
 
 class RidReceiveRequest(BaseModel):
     rid: str
@@ -54,7 +60,7 @@ class ExchangeRequest(BaseModel):
 
     personalId: Any
     recipientOrganization: str
-    recipientScope: str
+    recipientScope: str = Field(..., min_length=1, max_length=100)
     pseudonymType: PseudonymType
 
     @model_validator(mode="before")
