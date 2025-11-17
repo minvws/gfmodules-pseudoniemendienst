@@ -7,6 +7,9 @@ from starlette.requests import Request
 from uzireader.uziserver import UziServer
 import logging
 
+from app.db.entities.organization import Organization
+from app.services.org_service import OrgService
+
 logger = logging.getLogger(__name__)
 
 class MtlsService:
@@ -14,8 +17,13 @@ class MtlsService:
     _CERT_END = "-----END CERTIFICATE-----"
     _SSL_CLIENT_CERT_HEADER_NAME = "x-proxy-ssl_client_cert"
 
-    def __init__(self, override_cert: str|None) -> None:
+    def __init__(
+        self,
+        override_cert: str|None,
+        org_service: OrgService,
+    ) -> None:
         self.__cert: bytes | None = None
+        self.org_service = org_service
 
         if override_cert is not None and override_cert != "":
             with open(override_cert, "r") as f:
@@ -71,3 +79,22 @@ class MtlsService:
         cert_bytes = self.get_mtls_cert(request)
         formatted_cert = self._enforce_cert_newlines(cert_bytes)
         return UziServer(verify="SUCCESS", cert=formatted_cert)
+
+
+    def get_org_from_request(self, request: Request) -> Organization:
+        """
+        Extract the organization from the client certificate in the request
+        """
+
+        data = self.get_mtls_uzi_data(request)
+        if data["CardType"] != "S":
+            raise HTTPException(status_code=401,
+                                detail="Invalid client certificate. Need an UZI S-type certificate.")
+
+        ura = data["SubscriberNumber"]
+        org = self.org_service.get_by_ura(ura)
+        if org is None:
+            raise HTTPException(status_code=404, detail=f"organization for URA {ura} is not registered")
+
+        return org
+

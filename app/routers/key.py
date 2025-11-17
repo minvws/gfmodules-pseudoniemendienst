@@ -20,23 +20,10 @@ def post_key(
     request: Request,
     mtls_service: MtlsService = Depends(container.get_mtls_service),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
 
-    # Fetch public key from the client certificate
     mtls_pub_key = mtls_service.get_mtls_pub_key(request)
-
-    # Extract URA from the client certificate and validate S-type
-    data = mtls_service.get_mtls_uzi_data(request)
-    if data["CardType"] != "S":
-        raise HTTPException(status_code=401, detail="Invalid client certificate. Need an UZI S-type certificate.")
-
-    ura = data["SubscriberNumber"]
-
-    # Make sure we have (pre)registered the organization for this URa
-    org = org_service.get_by_ura(ura)
-    if org is None:
-        raise HTTPException(status_code=404, detail="organization for this URA is not registered")
+    org = mtls_service.get_org_from_request(request)
 
     # Create the key entry
     try:

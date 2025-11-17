@@ -4,11 +4,14 @@ import logging
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
 from app.models.requests import InputRequest, ReceiverRequest, JweReceiverRequest
 from app.personal_id import PersonalId, PersonalIdJSONEncoder
+from app.rid import RidUsage
+from app.services.mtls_service import MtlsService
 from app.services.oprf.oprf_service import OprfService
 from app.services.pseudonym_service import PseudonymService
 
@@ -147,9 +150,18 @@ def post_test_jwe_decode(
 
 @router.post("/test/pseudonym/reversible", summary="Reverse a pseudonym", tags=["test-oprf"])
 def post_test_reversible_pseudonym(
+    request: Request,
     pseudonym: str,
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+    mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> JSONResponse:
+    # Check if we as an organization are allowed to reverse pseudonyms (max_key_usage == BSN)
+    org = mtls_service.get_org_from_request(request)
+    if org.max_rid_usage != RidUsage.Bsn:
+        return JSONResponse({
+            "error": "Organization is not authorized to reverse pseudonyms."
+        }, status_code=403)
+
     parts = pseudonym.split(":")
     if len(parts) == 3 and parts[0] == "pseudonym" and parts[1] == "reversible":
         pseudonym = parts[2]
@@ -165,10 +177,10 @@ def post_test_reversible_pseudonym(
             "error": f"Failed to reverse pseudonym: {str(e)}"
         }, status_code=400)
 
-
     return JSONResponse(content=jsonable_encoder({
         "pseudonym": pseudonym,
         "decoded": decoded,
     }, custom_encoder={PersonalId: lambda v: json.loads(json.dumps(v, cls=PersonalIdJSONEncoder))}))
+
 
 
