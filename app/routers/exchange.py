@@ -3,13 +3,15 @@ import logging
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app import container
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
-from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK
+from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK, RidUsage
 from app.services.key_resolver import KeyResolver
+from app.services.mtls_service import MtlsService
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
@@ -181,9 +183,11 @@ def exchange_rid(
 @router.post("/exchange/pseudonym", summary="Exchange pseudonym")
 def exchange_pseudonym(
     req: ExchangeRequest,
+    request: Request,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
     org_service: OrgService = Depends(container.get_org_service),
+    mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> Response:
     if not req.recipientOrganization.startswith("ura:"):
         raise InvalidURA(req.recipientOrganization)
@@ -201,6 +205,13 @@ def exchange_pseudonym(
         )
         subject = "pseudonym:irreversible:" + res
     elif req.pseudonymType == PseudonymType.Reversible:
+        source_org = mtls_service.get_org_from_request(request)
+        if source_org.max_rid_usage == RidUsage.IrreversiblePseudonym:
+            raise HTTPException(
+                status_code=400,
+                detail="Source organization is not allowed to exchange reversible pseudonyms.",
+            )
+
         res = pseudonym_service.exchange_reversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=recipient_organization,
