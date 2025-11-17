@@ -4,24 +4,28 @@ set -e
 
 APP_PATH="${FASTAPI_CONFIG_PATH:-app.conf}"
 
+# where default config file is coming from
+APP_CONFIG_TEMPLATE_PATH="${APP_CONFIG_TEMPLATE_PATH:-app.conf.example}"
+
 echo "➡️ Creating the configuration file"
 if [ -e $APP_PATH ]; then
   echo "⚠️ Configuration file already exists. Skipping."
 else
-  cp app.conf.example $APP_PATH
-fi
+  cp $APP_CONFIG_TEMPLATE_PATH $APP_PATH
 
-echo "➡️ Copying the auth_cert.json file"
-if [ -e auth_cert.json ]; then
-  echo "⚠️ auth_cert_json file already exists. Skipping."
-else
-  cp auth_cert.json.example auth_cert.json
+  HMAC_KEY="$(openssl rand -base64 32)"
+  AES_KEY="$(openssl rand -base64 32)"
+  RID_AES_KEY="$(openssl rand -base64 32)"
+
+  sed -i "s|^\(hmac_key=\).*|\1$HMAC_KEY|" "$APP_PATH"
+  sed -i "s|^\(aes_key=\).*|\1$AES_KEY|" "$APP_PATH"
+  sed -i "s|^\(rid_aes_key=\).*|\1$RID_AES_KEY|" "$APP_PATH"
 fi
 
 OPRF_SECRET_KEY_FILE="secrets/oprf-server.key"
 if [ ! -s $OPRF_SECRET_KEY_FILE ]; then
   echo "➡️ Generating OPRF secret key"
-  python app/generate-oprf-key.py > $OPRF_SECRET_KEY_FILE
+  python app/generate-oprf-key.py >$OPRF_SECRET_KEY_FILE
 else
   echo "⚠️ OPRF secret key already exists. Skipping."
 fi
