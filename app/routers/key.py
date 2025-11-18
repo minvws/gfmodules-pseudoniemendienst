@@ -14,7 +14,7 @@ from app.services.org_service import OrgService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/register/certificate", summary="Insert public key information for an organization", tags=["key-service"])
+@router.post("/register/certificate", summary="Insert public key information for an organization", tags=["Key Registration Services"])
 def post_key(
     req: RegisterRequest,
     request: Request,
@@ -38,7 +38,7 @@ def post_key(
     return JSONResponse(status_code=201, content={"message": "Key created successfully"})
 
 
-@router.get("/keys/{ura}", summary="List public key information for an organization", tags=["key-service"])
+@router.get("/keys/{ura}", summary="List public key information for an organization", tags=["Key Registration Services"])
 def list_keys_for_org(
     ura: str,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -55,7 +55,7 @@ def list_keys_for_org(
     return JSONResponse(status_code=200, content=[e.to_dict() for e in entries])
 
 
-@router.put("/keys/{key_id}", summary="Update specific key for key/scope", tags=["key-service"])
+@router.put("/keys/{key_id}", summary="Update specific key for key/scope", tags=["Key Registration Services"])
 def put_key(
     key_id: str,
     req: KeyRequest,
@@ -79,7 +79,7 @@ def put_key(
     return JSONResponse(status_code=200, content=updated_entry.to_dict())
 
 
-@router.delete("/keys/{key_id}", summary="Delete specific key for key/scope", tags=["key-service"])
+@router.delete("/keys/{key_id}", summary="Delete specific key for key/scope", tags=["Key Registration Services"])
 def delete_key(
     key_id: str,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),

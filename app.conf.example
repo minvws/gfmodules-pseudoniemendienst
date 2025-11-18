@@ -1,6 +1,8 @@
 [app]
 loglevel=debug
 mtls_allow_override_cert=
+# Enable the /test routes
+enable_test_routes=True
 
 [database]
 dsn=postgresql+psycopg://postgres:postgres@postgres:5432/postgres

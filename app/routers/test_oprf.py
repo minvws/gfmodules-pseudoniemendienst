@@ -1,6 +1,7 @@
 import json
 import logging
 
+from cryptography import x509
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
@@ -19,23 +20,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/test/oprf/gen_rsa_key", summary="Create a RSA (1024bit) key for test usage.", tags=["test-oprf"])
-def post_gen_rsa_key() -> JSONResponse:
-    key = jwk.JWK.generate(kty='RSA', size=1024)
-    priv_pem = key.export_to_pem(private_key=True, password=None).decode('ascii')
-    pub_pem = key.export_to_pem(private_key=False, password=None).decode('ascii')
-
-    return JSONResponse({
-        "private_key_pem": priv_pem,
-        "public_key_pem": pub_pem,
-        "public_key_kid": key.thumbprint().rstrip("="),
-    })
-
-
 @router.post(
     "/test/oprf/client",
     summary="Create a blinded input and factor for a given BSN (or any other input)",
-    tags=["test-oprf"],
+    tags=["OPRF Testing Services"],
     description="""
 This endpoint is for testing purposes only. It simulates the client-side OPRF
 blinding process. Given a personal ID (e.g., BSN), it returns a blinded input
@@ -73,7 +61,19 @@ def post_test_eval(
     })
 
 
-@router.post("/test/oprf/receiver", summary="Test receiver decryption of JWE with blind factor", tags=["test-oprf"])
+@router.post(
+    "/test/oprf/receiver",
+    summary="Test receiver decryption of JWE with blind factor",
+    tags=["OPRF Testing Services"],
+    description="""
+This endpoint is for testing purposes only. It simulates the server-side OPRF
+finalization process. Given a JWE and a blind factor, it decrypts the JWE
+using the provided private key and finalizes the pseudonym using the blind factor.
+
+Note that the private key provided should starts with -----BEGIN PRIVATE KEY-----
+and should be all on a single line.
+"""
+)
 def post_test_receiver(
     req: ReceiverRequest,
     oprf_service: OprfService = Depends(container.get_oprf_service),
@@ -115,7 +115,15 @@ def post_test_receiver(
     return JSONResponse(res)
 
 
-@router.post("/test/jwe/decode", summary="Decode a JWE with a specific private key", tags=["test-oprf"])
+@router.post(
+    "/test/jwe/decode",
+    summary="Decode a JWE with a specific private key",
+    tags=["OPRF Testing Services"],
+    description="""
+This endpoint is for testing purposes only. It decodes a given JWE using the provided private key. It does not
+check any mtls or organizational permissions.
+"""
+)
 def post_test_jwe_decode(
     req: JweReceiverRequest,
 ) -> JSONResponse:
@@ -148,7 +156,15 @@ def post_test_jwe_decode(
     return JSONResponse(res)
 
 
-@router.post("/test/pseudonym/reversible", summary="Reverse a pseudonym", tags=["test-oprf"])
+@router.post(
+    "/test/pseudonym/reversible",
+    summary="Reverse a pseudonym",
+    tags=["OPRF Testing Services"],
+    description="""
+This endpoint is for testing purposes only. It reverses a reversible pseudonym. Note that this endpoint DOES check
+if the calling organization is authorized to reverse pseudonyms (max_key_usage == BSN).
+"""
+)
 def post_test_reversible_pseudonym(
     request: Request,
     pseudonym: str,
@@ -182,5 +198,43 @@ def post_test_reversible_pseudonym(
         "decoded": decoded,
     }, custom_encoder={PersonalId: lambda v: json.loads(json.dumps(v, cls=PersonalIdJSONEncoder))}))
 
+
+@router.get(
+    "/test/mtls",
+    summary="Returns MTLS information about the calling organization",
+    tags=["OPRF Testing Services"],
+    description="""
+This endpoint is for testing purposes only. It will return information about the organization
+that called this endpoint using MTLS.
+"""
+)
+def test_mtls(
+    request: Request,
+    mtls_service: MtlsService = Depends(container.get_mtls_service),
+) -> JSONResponse:
+    org = mtls_service.get_org_from_request(request)
+
+    cert_pem = mtls_service.get_mtls_cert(request)
+    cert = x509.load_pem_x509_certificate(cert_pem)
+
+    ret = {
+        "cert_pem": cert_pem,
+        "cert": {
+            'subject': str(cert.subject),
+            'issuer': str(cert.issuer),
+            'not_valid_before': cert.not_valid_before.isoformat(),
+            'not_valid_after': cert.not_valid_after.isoformat(),
+        },
+        "uzi": mtls_service.get_mtls_uzi_data(request),
+    }
+
+    if org:
+        ret["organization"] = {
+            "name": org.name,
+            "id": org.id,
+            "max_rid_usage": org.max_rid_usage,
+        }
+
+    return JSONResponse(content=jsonable_encoder(ret))
 
 
