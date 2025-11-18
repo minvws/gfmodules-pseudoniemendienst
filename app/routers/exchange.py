@@ -119,14 +119,14 @@ def receive(
     if req.pseudonymType == "bsn":
         value = personal_id.as_str()
     elif req.pseudonymType == "rp":
-        res = pseudonym_service.exchange_reversible_pseudonym(
+        res = pseudonym_service.generate_reversible_pseudonym(
             personal_id=personal_id,
             recipient_organization=payload["recipient_organization"] or "",
             recipient_scope=payload["recipient_scope"] or "",
         )
         value = "pseudonym:reversible:" + res
     else:
-        res = pseudonym_service.exchange_irreversible_pseudonym(
+        res = pseudonym_service.generate_irreversible_pseudonym(
             personal_id=personal_id,
             recipient_organization=payload["recipient_organization"] or "",
             recipient_scope=payload["recipient_scope"] or "",
@@ -198,7 +198,7 @@ def exchange_pseudonym(
         raise OrganizationNotFound(recipient_organization)
 
     if req.pseudonymType == PseudonymType.Irreversible:
-        res = pseudonym_service.exchange_irreversible_pseudonym(
+        res = pseudonym_service.generate_irreversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=recipient_organization,
             recipient_scope=req.recipientScope,
@@ -212,7 +212,7 @@ def exchange_pseudonym(
                 detail="Source organization is not allowed to exchange reversible pseudonyms.",
             )
 
-        res = pseudonym_service.exchange_reversible_pseudonym(
+        res = pseudonym_service.generate_reversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=recipient_organization,
             recipient_scope=req.recipientScope,

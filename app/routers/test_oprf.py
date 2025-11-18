@@ -187,7 +187,7 @@ def post_test_reversible_pseudonym(
         }, status_code=400)
 
     try:
-        decoded = pseudonym_service.decode_reversible_pseudonym(pseudonym)
+        decoded = pseudonym_service.decrypt_reversible_pseudonym(pseudonym, str(org.ura))
     except Exception as e:
         return JSONResponse({
             "error": f"Failed to reverse pseudonym: {str(e)}"
