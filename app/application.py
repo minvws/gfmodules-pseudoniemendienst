@@ -72,7 +72,10 @@ def setup_fastapi() -> FastAPI:
         FastAPI(
             docs_url=config.uvicorn.docs_url,
             redoc_url=config.uvicorn.redoc_url,
-            title="PRS API",
+            title="Pseudoniemendienst API",
+            summary="API for the Pseudoniemendienst",
+            description="Provides endpoints for OPRF, key management, organization management, and RID exchange.",
+
         ) if config.uvicorn.swagger_enabled else FastAPI(
             docs_url=None,
             redoc_url=None
@@ -83,11 +86,13 @@ def setup_fastapi() -> FastAPI:
         default_router,
         health_router,
         oprf_router,
-        test_oprf_router,
         key_router,
         exchange_router,
         org_router,
     ]
+    if config.app.enable_test_routes:
+        routers.append(test_oprf_router)
+
     for router in routers:
         fastapi.include_router(router)
 

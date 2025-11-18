@@ -12,7 +12,7 @@ from app.services.org_service import OrgService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/orgs", summary="Create new organization", tags=["org-service"])
+@router.post("/orgs", summary="Create new organization", tags=["Organizational Services"])
 def post_org(
     req: OrgRequest,
     org_service: OrgService = Depends(container.get_org_service),
@@ -28,7 +28,7 @@ def post_org(
     return JSONResponse(status_code=201, content={"message": "Org created successfully"})
 
 
-@router.get("/org/{ura}", summary="List organization", tags=["org-service"])
+@router.get("/org/{ura}", summary="List organization", tags=["Organizational Services"])
 def list_keys_for_org(
     ura: str,
     org_service: OrgService = Depends(container.get_org_service),
@@ -40,7 +40,7 @@ def list_keys_for_org(
     return JSONResponse(status_code=200, content=org.to_dict())
 
 
-@router.put("/org/{ura}", summary="Update specific org", tags=["org-service"])
+@router.put("/org/{ura}", summary="Update specific org", tags=["Organizational Services"])
 def put_org(
     ura: str,
     req: OrgRequest,
@@ -62,7 +62,7 @@ def put_org(
     return JSONResponse(status_code=200, content=updated_entry.to_dict())
 
 
-@router.delete("/org/{ura}", summary="Delete specific org", tags=["org-service"])
+@router.delete("/org/{ura}", summary="Delete specific org", tags=["Organizational Services"])
 def delete_org(
     ura: str,
     org_service: OrgService = Depends(container.get_org_service),

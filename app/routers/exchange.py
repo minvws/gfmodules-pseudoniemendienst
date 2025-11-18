@@ -37,7 +37,7 @@ class PubKeyNotFound(HTTPException):
         super().__init__(status_code=404, detail=f"No public key found for organization '{ura}' and scope '{scope}'")
 
 
-@router.post("/receive", summary="Receive and decrypt RID")
+@router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 def receive(
     req: RidReceiveRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -136,7 +136,7 @@ def receive(
     return JSONResponse(content={"pseudonym": value, "type": req.pseudonymType})
 
 
-@router.post("/exchange/rid", summary="Exchange RID")
+@router.post("/exchange/rid", summary="Exchange RID", tags=["Exchange Services"])
 def exchange_rid(
     req: RidExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -180,7 +180,7 @@ def exchange_rid(
 
     return Response(status_code=201, content=jwe, headers={"Content-Type": "application/jwe"})
 
-@router.post("/exchange/pseudonym", summary="Exchange pseudonym")
+@router.post("/exchange/pseudonym", summary="Exchange pseudonym", tags=["Exchange Services"])
 def exchange_pseudonym(
     req: ExchangeRequest,
     request: Request,
