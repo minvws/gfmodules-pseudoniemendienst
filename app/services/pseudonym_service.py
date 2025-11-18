@@ -75,7 +75,7 @@ class PseudonymService:
 
     def encode_pseudonym(self, pseudonym: str) -> str:
         """
-        Encode the personal ID using AES encryption in CBC mode with PKCS7 padding.
+        Encode the personal ID using AES encryption in GCM mode with PKCS7 padding.
         """
         try:
             iv_input = hashlib.sha256("|".join(pseudonym.split('|')[:-2]).encode('utf-8')).digest()
