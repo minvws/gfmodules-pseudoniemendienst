@@ -165,7 +165,6 @@ Now you're able to run the pytest in poetry:
 ```bash
 poetry run pytest
 ```
-TODO: Check if LD_LIBRARY_PATH is required
 
 
 ## Testing with OV or EV certificates
