@@ -1,6 +1,8 @@
 [app]
 loglevel=debug
 mtls_allow_override_cert=
+# Enable the /test routes
+enable_test_routes=True
 
 [database]
 dsn=postgresql+psycopg://postgres:postgres@postgres:5432/postgres
@@ -26,12 +28,8 @@ ssl_key_file = server.key
 
 [oprf]
 ; file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
-server_key_file=secrets/test-oprf.key
+server_key_file=secrets/oprf-server.key
 
 [pseudonym]
-; Hmac secret key for temporary pseudonym hashing
-hmac_key=
-; AES key for pseudonym encryption
-aes_key=
-; AES key for rid encryption
-rid_aes_key=
+; Master key for hkdf
+master_key=

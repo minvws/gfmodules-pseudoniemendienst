@@ -3,13 +3,15 @@ import logging
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app import container
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
-from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK
+from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK, RidUsage
 from app.services.key_resolver import KeyResolver
+from app.services.mtls_service import MtlsService
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
@@ -35,7 +37,7 @@ class PubKeyNotFound(HTTPException):
         super().__init__(status_code=404, detail=f"No public key found for organization '{ura}' and scope '{scope}'")
 
 
-@router.post("/receive", summary="Receive and decrypt RID")
+@router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 def receive(
     req: RidReceiveRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -117,14 +119,14 @@ def receive(
     if req.pseudonymType == "bsn":
         value = personal_id.as_str()
     elif req.pseudonymType == "rp":
-        res = pseudonym_service.exchange_reversible_pseudonym(
+        res = pseudonym_service.generate_reversible_pseudonym(
             personal_id=personal_id,
             recipient_organization=payload["recipient_organization"] or "",
             recipient_scope=payload["recipient_scope"] or "",
         )
         value = "pseudonym:reversible:" + res
     else:
-        res = pseudonym_service.exchange_irreversible_pseudonym(
+        res = pseudonym_service.generate_irreversible_pseudonym(
             personal_id=personal_id,
             recipient_organization=payload["recipient_organization"] or "",
             recipient_scope=payload["recipient_scope"] or "",
@@ -134,7 +136,7 @@ def receive(
     return JSONResponse(content={"pseudonym": value, "type": req.pseudonymType})
 
 
-@router.post("/exchange/rid", summary="Exchange RID")
+@router.post("/exchange/rid", summary="Exchange RID", tags=["Exchange Services"])
 def exchange_rid(
     req: RidExchangeRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -176,14 +178,16 @@ def exchange_rid(
         }
     )
 
-    return Response(status_code=201, content=jwe, headers={"Content-Type": "Multipart/Encrypted"})
+    return Response(status_code=201, content=jwe, headers={"Content-Type": "application/jwe"})
 
-@router.post("/exchange/pseudonym", summary="Exchange pseudonym")
+@router.post("/exchange/pseudonym", summary="Exchange pseudonym", tags=["Exchange Services"])
 def exchange_pseudonym(
     req: ExchangeRequest,
+    request: Request,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
     org_service: OrgService = Depends(container.get_org_service),
+    mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> Response:
     if not req.recipientOrganization.startswith("ura:"):
         raise InvalidURA(req.recipientOrganization)
@@ -194,14 +198,21 @@ def exchange_pseudonym(
         raise OrganizationNotFound(recipient_organization)
 
     if req.pseudonymType == PseudonymType.Irreversible:
-        res = pseudonym_service.exchange_irreversible_pseudonym(
+        res = pseudonym_service.generate_irreversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=recipient_organization,
             recipient_scope=req.recipientScope,
         )
         subject = "pseudonym:irreversible:" + res
     elif req.pseudonymType == PseudonymType.Reversible:
-        res = pseudonym_service.exchange_reversible_pseudonym(
+        source_org = mtls_service.get_org_from_request(request)
+        if source_org.max_rid_usage == RidUsage.IrreversiblePseudonym:
+            raise HTTPException(
+                status_code=400,
+                detail="Source organization is not allowed to exchange reversible pseudonyms.",
+            )
+
+        res = pseudonym_service.generate_reversible_pseudonym(
             personal_id=req.personalId,
             recipient_organization=recipient_organization,
             recipient_scope=req.recipientScope,
@@ -224,5 +235,5 @@ def exchange_pseudonym(
         pub_key=pub_key_jwk
     )
 
-    return Response(status_code=201, content=jwe, headers={"Content-Type": "Multipart/Encrypted"})
+    return Response(status_code=201, content=jwe, headers={"Content-Type": "application/jwe"})
 

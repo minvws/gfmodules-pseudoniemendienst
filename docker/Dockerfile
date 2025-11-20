@@ -38,7 +38,8 @@ RUN apt update && \
         postgresql-client \
         postgresql-client-common \
         gettext-base \
-        swig
+        swig \
+        sed
 
 # We need to compile liboprf from source as the current distributed versions are outdated.
 RUN git clone https://github.com/stef/liboprf.git && cd liboprf/src && make

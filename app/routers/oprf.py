@@ -11,7 +11,7 @@ from app.services.org_service import OrgService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/oprf/eval", summary="Evaluate OPRF blind and returns an encrypted JWE for the organization", tags=["oprf"])
+@router.post("/oprf/eval", summary="Evaluate OPRF blind and returns an encrypted JWE for the organization", tags=["OPRF Services"])
 def post_eval(
     req: BlindRequest,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),

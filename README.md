@@ -217,44 +217,46 @@ docker run -ti --rm -p 6502:6502 \
 
 This system uses OPRF for pseudonym generation. To test this, there are some available endpoints:
 
-- '/test/oprf/gen_rsa_key' - Generate a new RSA keypair for OPRF (small 1024 bit for testing)
 - '/test/oprf/oprf/client' - Emulates a client that generates OPRF information for a given input
 - '/test/oprf/oprf/receiver' - Emulates the receiver of the pseudonym and returns diagnostic information
 
 To use this system:
 
-1. First, generate a new keypair that will be used for a test organization with `/test/oprf/gen_rsa_key`.
-   ```shell
-    POST /test/oprf/gen_rsa_key 
-   
-    200 OK
-    {
-      "private_key_pem": "-----BEGIN PRIVATE KEY-----\nMIICdwIBA....neDKJ0DsvA5vfpt0=\n-----END PRIVATE KEY-----\n",
-      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqG....uDQIDAQAB\n-----END PUBLIC KEY-----\n",
-      "public_key_kid": "ajGAx_LKNrJ8vqdahWlSJvOznBi6lnFfSOw72Z4R4uU"
-    } 
-   ```
- 
-2. Create a new organization into the key resolver with a POST to `/keys`. Add your organization name like 
-   `ura:12345678`, and you can use scope `test` for testing. Add the **PUBLIC key** to the `public_key` field.
+1. You will need a generated UZI Server certificate (https://www.uziregister.nl/servercertificaat) or create a 
+   self-signed certificate for testing purposes.
 
-    ```shell
-    POST /keys
-    {
-      "organization": "ura:12345678",
-      "scope": "test",
-      "public_key": "-----BEGIN PUBLIC KEY-----\nMIGfMA0GCSqG....uDQIDAQAB\n-----END PUBLIC KEY\n",
-    }
-   
-    201 Created
+   Since the system uses mTLS, you can either setup a mTLS setup (caddy, apache, etc), or enable the override in the
+    app.conf file:
+  
     ```
+    [app]
+    mtls_override_cert=./secrets/self-signed-uzi-server-cert.crt
+ 
+2. Insert a new organization via a POST to `/orgs`. The organization ura should be the URA of the uzi certificate you 
+   will be testing with.
 
-3. Emulate a client wanting to send a pseudonym over to a receiver by calling `/test/oprf/client` with a JSON body like:
+   Note: there is no mTLS check here. You can add multiple organizations with different URA values for testing. 
+
+3. Next, you will need to register your public key to the key services. You can do this by calling `/register/certificate` with a JSON body like:
+   
+   ```shell
+   POST /register/certificate
+   {
+     "scope": [
+        "nvi",
+     ]
+   }
+   ```
+   
+   This will take the public key from the uzi server certificate using in this mTLS connection, and register it for the given scope.
+
+
+4. Emulate a client wanting to send a pseudonym over to a receiver by calling `/test/oprf/client` with a JSON body like:
 
    ```shell
    POST /test/oprf/client
    {
-     "personalId": "testinput-like-a-bsn-number-or-other-id"
+     "personalId": "nl:bsn:950000012"
    }
    
    200 OK
@@ -264,7 +266,7 @@ To use this system:
    }
    ```
 
-   This returns the `blinded_input` that must be sent to the receiver, and the `blind_factor` that must be send to the
+   This returns the `blinded_input` that must be sent to the receiver, and the `blind_factor` that must be sent to the
    receiver after the server has evaluated the blinded input.
 
 4. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the organization name and scope:
@@ -287,13 +289,13 @@ To use this system:
    is encrypted with the public key of the organization. At this point, the client is 
    not able to decrypt this information. It can only forward this to the receiver.
 
-5. Now emulate the receiver by calling `/test/oprf/receiver` with a JSON body like:
+5. Now emulate the receiving party by calling `/test/oprf/receiver` with a JSON body like:
    ```shell   
     POST /test/oprf/receiver
     {
       "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
       "jwe": "eyJraWQiOiA...SzZbJUqbbSUIjqiw",
-      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIB...oCfe0=\n-----END RSA PRIVATE KEY-----\n"
+      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY----- MIICXAIB...oCfe0= -----END RSA PRIVATE KEY-----"
     }
    ```
    
@@ -305,7 +307,7 @@ To use this system:
     ```json
     {
       "jwe_data": "eyJraWQiOiAi...zZbJUqbbSUIjqiw",
-      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIBAAKBgH6gmpXpdhtiE...UpWRvoCfe0=\n-----END RSA PRIVATE KEY-----\n",
+      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY----- MIICXAIBAAKBgH6gmpXpdhtiE...UpWRvoCfe0= -----END RSA PRIVATE KEY-----",
       "priv_key_kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
       "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
       "jwe": {
@@ -331,6 +333,22 @@ To use this system:
 
     The `final_pseudonym` is the actual pseudonym that can be stored by the receiver. Note that this pseudonym is deterministic
     for the same input, organization and scope. However, it is not possible to reverse this into a BSN.
+
+## max-key-usage
+
+The max-key-usage is a property that defines what kind of pseudonyms an organization can create and reverse.
+
+There are 3 levels of max_key_usage:
+
+- BSN - can create reversible and irreversible pseudonyms, and can reverse reversible pseudonyms back to BSN
+- RP (Reversible Pseudonym) - can create reversible and irreversible pseudonyms, but cannot reverse any pseudonyms
+- IRP (Irreversible Pseudonym) - can only create irreversible pseudonyms, and cannot reverse any pseudonyms
+
+The "RP" level is mainly intended for organizations that need to create reversible pseudonyms for other organizations, 
+but is not allowed to reverse them back to BSN itself.
+
+The "IRP" level is intended for organizations that only need to create irreversible pseudonyms, and do not have access to 
+BSN information at all.
 
 ## Contribution
 

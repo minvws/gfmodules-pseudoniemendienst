@@ -69,7 +69,7 @@ def test_create_happy_path(client: TestClient, org_service: OrgService, key_reso
     })
     assert response.status_code == 201
     assert response.content is not None
-    assert response.headers["Content-Type"] == "Multipart/Encrypted"
+    assert response.headers["Content-Type"] == "application/jwe"
     assert response.content.startswith(b"eyJra")
 
 def test_invalid_scope(client: TestClient, org_service: OrgService, key_resolver: KeyResolver) -> None:

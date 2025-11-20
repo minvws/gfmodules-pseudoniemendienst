@@ -22,6 +22,7 @@ class LogLevel(str, Enum):
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
     mtls_override_cert: str | None = Field(default=None)
+    enable_test_routes: bool = Field(default=False)
 
 class ConfigDatabase(BaseModel):
     dsn: str
@@ -80,10 +81,7 @@ class ConfigOprf(BaseModel):
 
 
 class ConfigPseudonym(BaseModel):
-    hmac_key: str | None = Field(default=None)
-    aes_key: str | None = Field(default=None)
-    rid_aes_key: str | None = Field(default=None)
-
+    master_key: str = Field(default="")
 
 class Config(BaseModel):
     app: ConfigApp

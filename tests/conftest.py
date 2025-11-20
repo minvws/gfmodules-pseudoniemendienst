@@ -28,12 +28,8 @@ if not os.path.exists(oprf_path):
     with open(oprf_path, "w") as f:
         f.write(genkey(32))
 
-if conf.pseudonym.hmac_key is None:
-    conf.pseudonym.hmac_key = genkey(32)
-if conf.pseudonym.aes_key is None:
-    conf.pseudonym.aes_key = genkey(32)
-if conf.pseudonym.rid_aes_key is None:
-    conf.pseudonym.rid_aes_key = genkey(32)
+if conf.pseudonym.master_key is None:
+    conf.pseudonym.master_key = genkey(32)
 set_config(conf)
 
 @pytest.fixture
