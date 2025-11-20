@@ -1,7 +1,54 @@
-# PRS
+# GFModules Pseudoniemendienst
 
+This app is the 'Pseudoniemendienst' and is part of the 'Generieke Functies, lokalisatie en addressering' project of the 
+Ministry of Health, Welfare and Sport of the Dutch government. 
 
-## Run the following commands to run the project:
+The Pseudoniemendienst is a **Proof of Concept** application that explores the functionality and requirements of a 
+pseudonymization service for pseudonymizing the **Dutch citizen number (BSN)** in various healthcare applications.
+
+The Pseudoniemendienst is used in the [Nationale Verwijsindex](#nationale-verwijsindex--), by the
+**Vertrouwde Authenticatie Dienst (VAD)** and in the
+[MedMij afsprakenstelsel](https://medmij.nl/medmij-afsprakenstelsel/).
+
+## Disclaimer
+
+This project and all associated code serve solely as documentation
+and demonstration purposes to illustrate potential system
+communication patterns and architectures.
+
+This codebase:
+
+- Is NOT intended for production use
+- Does NOT represent a final specification
+- Should NOT be considered feature-complete or secure
+- May contain errors, omissions, or oversimplified implementations
+- Has NOT been tested or hardened for real-world scenarios
+
+The code examples are only meant to help understand concepts and demonstrate possibilities.
+
+By using or referencing this code, you acknowledge that you do so at your own
+risk and that the authors assume no liability for any consequences of its use.
+
+## Development setup
+
+This project can be setup and tested either as a python application directly on an operating system or in a Docker 
+environment. 
+
+> **Quickstart**
+> 
+> The easiest way is to start the docker-compose project by running:
+> 
+> ```bash
+> docker compose up
+> ```
+> This will start the project on 'http://localhost:6502'
+>
+
+### Docker development setup
+
+The docker compose file contains the required databases, an SSL offloading apache container and the python app itself.
+
+You can start the services without the SSL offloading service by running:
 
 ```bash
 docker compose up
@@ -9,9 +56,7 @@ docker compose up
 
 This will start the project on 'http://localhost:6502'
 
-
-
-# Using mTLS
+#### Using mTLS
 
 To use/test mTLS, you need to setup the following:
 
@@ -49,6 +94,78 @@ It's also possible that client certificates are disabled for this site. In firef
 certificates | view certificates | authentication decicions and delete the entry for the site. This will make the browser
 ask for a client certificate again.
 
+You can start the services now by running:
+
+```bash
+docker compose --profile ssl up
+```
+
+## Poetry development setup
+
+Sometimes it's required, or easier to run the application natively on an operating system. To run and test the
+application on an operating system Poetry is used. Before you're able to install this project, the following
+requirements needs to be available:
+
+* [Poetry](#poetry)
+* [pkgconf](#pkgconf)
+* [libsodium-dev](#libsodium-dev)
+* [liboprf](#liboprf)
+
+### Poetry Development dependencies
+
+#### Poetry
+
+Please see the [official docs](https://python-poetry.org/docs/#installation) to follow the Poetry installation process.
+
+#### pkgconf
+
+This is required to build [liboprf](#liboprf).
+
+You can check if [pkgconf](https://github.com/pkgconf/pkgconf) is installed by running:
+
+```bash
+which pkgconf
+```
+
+Installation instructions vary depending on the operating system and available package managers.
+
+#### Libsodium-dev
+
+This is required by [liboprf](#liboprf).
+
+You can check if libsodium is installed by running:
+
+```bash
+pkgconf --modversion libsodium
+```
+
+See the [official installation instructions](https://doc.libsodium.org/doc/installation) to install libsodium.
+
+#### liboprf
+
+Liboprf is used by the OPRF functionality of the Pseudoniemendienst.
+
+See the [installation instructions](https://github.com/stef/liboprf?tab=readme-ov-file#installation)
+how to install this library.
+
+After installing update the shared library cache by running:
+
+```bash
+sudo ldconfig
+```
+
+### Poetry pytest
+
+The tests have a dependency on a postgres database. You can easily setup a database with docker:
+```bash
+docker compose up -d postgres
+```
+
+Now you're able to run the pytest in poetry:
+```bash
+poetry run pytest
+```
+
 
 ## Testing with OV or EV certificates
 The easiest way to test for OV or EV certificates is to use the `auth.override_cert` configuration setting in app.conf. However,
@@ -61,7 +178,7 @@ When you now specify a client certificate signed by the CA of the EV/OV cert, th
 view/interact with certain endpoints.
 
 
-# Docker container builds
+## Docker container builds
 
 There are two ways to build a docker container from this application. The first is the default mode created with:
 
@@ -96,9 +213,7 @@ docker run -ti --rm -p 6502:6502 \
   gfmodules-prs
 ```
 
-
-
-# OPRF Testing
+## OPRF Testing
 
 This system uses OPRF for pseudonym generation. To test this, there are some available endpoints:
 
@@ -219,9 +334,7 @@ To use this system:
     The `final_pseudonym` is the actual pseudonym that can be stored by the receiver. Note that this pseudonym is deterministic
     for the same input, organization and scope. However, it is not possible to reverse this into a BSN.
 
-
-
-# max-key-usage
+## max-key-usage
 
 The max-key-usage is a property that defines what kind of pseudonyms an organization can create and reverse.
 
@@ -236,3 +349,15 @@ but is not allowed to reverse them back to BSN itself.
 
 The "IRP" level is intended for organizations that only need to create irreversible pseudonyms, and do not have access to 
 BSN information at all.
+
+## Contribution
+
+As stated in the [Disclaimer](#disclaimer) this project and all associated code serve solely as documentation and
+demonstration purposes to illustrate potential system communication patterns and architectures.
+
+For that reason we will only accept contributions that fit this goal. We do appreciate any effort from the
+community, but because our time is limited it is possible that your PR or issue is closed without a full justification.
+
+If you plan to make non-trivial changes, we recommend to open an issue beforehand where we can discuss your planned changes. This increases the chance that we might be able to use your contribution (or it avoids doing work if there are reasons why we wouldn't be able to use it).
+
+Note that all commits should be signed using a gpg key.
