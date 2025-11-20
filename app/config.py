@@ -81,7 +81,7 @@ class ConfigOprf(BaseModel):
 
 
 class ConfigPseudonym(BaseModel):
-    master_key: str | None = Field(default=None)
+    master_key: str = Field(default="")
 
 class Config(BaseModel):
     app: ConfigApp

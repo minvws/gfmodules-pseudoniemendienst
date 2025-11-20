@@ -31,9 +31,5 @@ ssl_key_file = server.key
 server_key_file=
 
 [pseudonym]
-; Hmac secret key for temporary pseudonym hashing
-hmac_key=
-; AES key for pseudonym encryption
-aes_key=
-; AES key for rid encryption
-rid_aes_key=
+; Master key for hkdf
+master_key=
