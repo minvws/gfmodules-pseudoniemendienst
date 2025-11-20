@@ -148,7 +148,7 @@ Liboprf is used by the OPRF functionality of the Pseudoniemendienst.
 See the [installation instructions](https://github.com/stef/liboprf?tab=readme-ov-file#installation)
 how to install this library.
 
-After installing update the shared libary cache by running:
+After installing update the shared library cache by running:
 
 ```bash
 sudo ldconfig
