@@ -41,13 +41,15 @@ def container_config(binder: inject.Binder) -> None:
     binder.bind(OprfService, oprf_service)
 
     pseudonym_service = PseudonymService(
-        base64.urlsafe_b64decode(config.pseudonym.hmac_key or ""),
-        base64.urlsafe_b64decode(config.pseudonym.aes_key or ""),
+        # This should be done through an HSM
+        base64.urlsafe_b64decode(config.pseudonym.master_key or ""),
     )
     binder.bind(PseudonymService, pseudonym_service)
 
     rid_service = RidService(
-        base64.urlsafe_b64decode(config.pseudonym.rid_aes_key or ""),
+        # This should be done through an HSM
+        base64.urlsafe_b64decode(config.pseudonym.master_key or ""),
+        b"RID:v1",
     )
     binder.bind(RidService, rid_service)
 

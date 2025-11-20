@@ -1,29 +1,41 @@
 import base64
 
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
+
+from app.services.pseudonym_service import hkdf_derive
 
 
 class RidService:
-    def __init__(self, aes_key: bytes) -> None:
-        self.__aes_key = aes_key
+    def __init__(self, master_key: bytes, aad: bytes) -> None:
+        # Derive the necessary keys from the master key
+        self.__rid_aes_key = hkdf_derive(master_key, b"prs:rid", 32)
+        self.__aad = aad
 
 
     def encrypt_rid(self, rid: str) -> str:
-        message = f"{rid}".encode('utf-8')
+        message = rid.encode('utf-8')
 
-        iv = get_random_bytes(AES.block_size)
-        cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
-        ciphertext = cipher.encrypt(pad(message, AES.block_size))
+        nonce = get_random_bytes(12)
+        cipher = AES.new(self.__rid_aes_key, AES.MODE_GCM, nonce=nonce)
+        cipher.update(self.__aad)
 
-        return base64.urlsafe_b64encode(iv + ciphertext).decode('utf-8')
+        ciphertext, tag = cipher.encrypt_and_digest(message)
+
+        token = nonce + tag + ciphertext
+
+        return base64.urlsafe_b64encode(token).decode('utf-8')
 
 
     def decrypt_rid(self, enc_rid: str) -> str:
         data = base64.urlsafe_b64decode(enc_rid)
-        iv = data[:AES.block_size]
-        ciphertext = data[AES.block_size:]
-        cipher = AES.new(self.__aes_key, AES.MODE_GCM, iv)
 
-        return unpad(cipher.decrypt(ciphertext), AES.block_size).decode('utf-8')
+        nonce = data[:12]
+        tag = data[12:28]
+        ciphertext = data[28:]
+
+        cipher = AES.new(self.__rid_aes_key, AES.MODE_GCM, nonce=nonce)
+        cipher.update(self.__aad)
+
+        message = cipher.decrypt_and_verify(ciphertext, tag)
+        return message.decode('utf-8')
