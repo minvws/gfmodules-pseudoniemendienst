@@ -13,13 +13,9 @@ if [ -e $APP_PATH ]; then
 else
   cp $APP_CONFIG_TEMPLATE_PATH $APP_PATH
 
-  HMAC_KEY="$(openssl rand -base64 32)"
-  AES_KEY="$(openssl rand -base64 32)"
-  RID_AES_KEY="$(openssl rand -base64 32)"
+  MASTER_KEY="$(openssl rand -base64 32)"
 
-  sed -i "s|^\(hmac_key=\).*|\1$HMAC_KEY|" "$APP_PATH"
-  sed -i "s|^\(aes_key=\).*|\1$AES_KEY|" "$APP_PATH"
-  sed -i "s|^\(rid_aes_key=\).*|\1$RID_AES_KEY|" "$APP_PATH"
+  sed -i "s|^\(master_key=\).*|\1$MASTER_KEY|" "$APP_PATH"
 fi
 
 OPRF_SECRET_KEY_FILE="secrets/oprf-server.key"
