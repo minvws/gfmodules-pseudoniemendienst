@@ -39,38 +39,37 @@ RUN apt update && \
         postgresql-client-common \
         gettext-base \
         swig \
-        sed
-
-# We need to compile liboprf from source as the current distributed versions are outdated.
-RUN git clone https://github.com/stef/liboprf.git && cd liboprf/src && make
-
+        sed \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
     pip3 install poetry --no-cache-dir
 
-RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages/setup*
-RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages/pkg_resources*
-RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages/packaging*
-
-WORKDIR ${PROJECT_DIR}
-
 FROM base AS builder
 
+# Compile liboprf from source as the current distributed versions are outdated.
+WORKDIR /liboprf
+RUN git clone --depth 1 --branch v0.9.3 https://github.com/stef/liboprf.git . && cd src && make
+
+# Install python dependencies
+WORKDIR ${PROJECT_DIR}
 COPY ./pyproject.toml ./poetry.lock ./
 RUN --mount=type=cache,target=${POETRY_CACHE_DIR} poetry install --no-root --no-interaction
 
 FROM base AS final
 
-# We need to copy the compiled shared libraries from the builder stage to the correct location so they can be found.
-RUN mkdir -p /usr/lib/x86_64-linux-gnu/
-COPY --from=builder liboprf/src/noise_xk/lib*.so /usr/local/lib/
-COPY --from=builder liboprf/src/lib*.so /usr/local/lib/
+WORKDIR ${PROJECT_DIR}
+
+# Copy the compiled shared libraries from the builder stage to the correct location so they can be found.
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/noise_xk/lib*.so /usr/local/lib/
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/lib*.so /usr/local/lib/
 RUN ldconfig
 
-COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local /usr/local
-RUN chown -R ${APP_USER}:${APP_GROUP} /usr/local/lib/python3.11/site-packages
+# Copy installed python packages from the builder stage.
+COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy application source code.
 COPY --chown=${APP_USER}:${APP_GROUP} . /src
-RUN chown -R ${APP_USER}:${APP_GROUP} /src
 
 COPY ./docker/init-standalone.sh /usr/local/bin
 COPY ./docker/init.sh /usr/local/bin
