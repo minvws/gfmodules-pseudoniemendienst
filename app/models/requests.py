@@ -81,7 +81,6 @@ class InputRequest(BaseModel):
     @classmethod
     def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
         pid = data.get("personalId")
-        print(pid)
         if isinstance(pid, str):
             data["personalId"] = PersonalId.from_str(pid)
         if isinstance(pid, dict):
