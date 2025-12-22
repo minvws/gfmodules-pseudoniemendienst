@@ -131,7 +131,7 @@ jobs:
             - name: install liboprf
               run: |
                 sudo apt install -y libsodium-dev
-                git clone https://github.com/stef/liboprf.git
+                git clone --depth 1 --branch v0.9.3 https://github.com/stef/liboprf.git
                 cd liboprf/src
                 make
                 sudo make install
