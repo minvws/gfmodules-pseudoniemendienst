@@ -61,6 +61,7 @@ class MtlsService:
                 status_code=401,
                 detail="Missing client certificate",
             )
+        print(request.headers[self._SSL_CLIENT_CERT_HEADER_NAME])
         return request.headers[self._SSL_CLIENT_CERT_HEADER_NAME].encode("ascii")
 
     def get_mtls_pub_key(self, request: Request) -> str:
@@ -68,7 +69,8 @@ class MtlsService:
         Extract the public key from the client certificate
         """
         cert_bytes = self.get_mtls_cert(request)
-
+        formatted_cert = self._enforce_cert_newlines(cert_bytes)
+        print(formatted_cert)
         cert = x509.load_pem_x509_certificate(cert_bytes)
         public_key = cert.public_key()
         public_pem = public_key.public_bytes(
