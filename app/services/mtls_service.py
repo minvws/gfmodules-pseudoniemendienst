@@ -68,8 +68,8 @@ class MtlsService:
         Extract the public key from the client certificate
         """
         cert_bytes = self.get_mtls_cert(request)
-
-        cert = x509.load_pem_x509_certificate(cert_bytes)
+        formatted_cert = self._enforce_cert_newlines(cert_bytes)
+        cert = x509.load_pem_x509_certificate(formatted_cert.encode("ascii"))
         public_key = cert.public_key()
         public_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
