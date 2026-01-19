@@ -2,7 +2,7 @@ import logging
 
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 import uvicorn
 
 from app.routers.default import router as default_router
@@ -13,6 +13,7 @@ from app.routers.key import router as key_router
 from app.routers.org import router as org_router
 from app.routers.exchange import router as exchange_router
 from app.config import get_config
+from app.auth import get_auth_ctx
 
 
 def get_uvicorn_params() -> dict[str, Any]:
@@ -82,9 +83,16 @@ def setup_fastapi() -> FastAPI:
         )
     )
 
-    routers = [
+    # Non-OAuth routes
+    public_routers = [
         default_router,
         health_router,
+    ]
+    for router in public_routers:
+        fastapi.include_router(router)
+
+    # OAuth protected routes
+    routers = [
         oprf_router,
         key_router,
         exchange_router,
@@ -94,6 +102,6 @@ def setup_fastapi() -> FastAPI:
         routers.append(test_oprf_router)
 
     for router in routers:
-        fastapi.include_router(router)
+        fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])
 
     return fastapi

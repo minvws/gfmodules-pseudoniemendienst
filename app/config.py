@@ -83,12 +83,23 @@ class ConfigOprf(BaseModel):
 class ConfigPseudonym(BaseModel):
     master_key: str = Field(default="")
 
+class ConfigClientOAuth(BaseModel):
+    enabled: bool = Field(default=False)
+    override_ura_number: str | None = Field(default=None)
+    jwks_url: str
+    issuer: str
+    audience: str
+    mtls_cert: str | None = Field(default=None)
+    mtls_key: str | None = Field(default=None)
+    verify_ca: str | bool = Field(default=True)
+
 class Config(BaseModel):
     app: ConfigApp
     database: ConfigDatabase
     uvicorn: ConfigUvicorn
     oprf: ConfigOprf
     pseudonym: ConfigPseudonym
+    client_oauth: ConfigClientOAuth
 
 
 def read_ini_file(path: str) -> Any:

@@ -1,0 +1,2 @@
+class CertificateLoadingError(Exception):
+    pass

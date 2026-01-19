@@ -33,3 +33,14 @@ server_key_file=secrets/oprf-server.key
 [pseudonym]
 ; Master key for hkdf
 master_key=
+
+
+[client_oauth]
+enabled = True
+override_ura_number = 12345600
+audience = prs.service
+issuer = https://localhost:8443/
+jwks_url = https://localhost:8443/oauth/jwks.json
+mtls_cert = secrets/ssl/client_oauth.cert
+mtls_key =  secrets/ssl/client_oauth.key
+verify_ca = secrets/ssl/client_oauth_ca.cert
