@@ -61,7 +61,11 @@ class MtlsService:
                 status_code=401,
                 detail="Missing client certificate",
             )
-        return request.headers[self._SSL_CLIENT_CERT_HEADER_NAME].encode("ascii")
+        return (
+            request.headers[self._SSL_CLIENT_CERT_HEADER_NAME]
+            .split(",")[0]
+            .encode("ascii")
+        )
 
     def get_mtls_pub_key(self, request: Request) -> str:
         """
