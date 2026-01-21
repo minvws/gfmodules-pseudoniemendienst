@@ -11,6 +11,7 @@ from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService
 from app.services.rid_service import RidService
+from app.services.client_oauth import ClientOAuthService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,9 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(RidService, rid_service)
 
+    client_oauth_service = ClientOAuthService(config.client_oauth)
+    binder.bind(ClientOAuthService, client_oauth_service)
+
 
 def get_mtls_service() -> MtlsService:
     return inject.instance(MtlsService)
@@ -74,6 +78,9 @@ def get_oprf_service() -> OprfService:
 
 def get_database() -> Database:
     return inject.instance(Database)
+
+def get_client_oauth_service() -> ClientOAuthService:
+    return inject.instance(ClientOAuthService)
 
 if not inject.is_configured():
     inject.configure(container_config)
