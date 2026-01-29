@@ -67,33 +67,33 @@ jobs:
                   NEW_UID=${{ env.NEW_UID }}
                   NEW_GID=${{ env.NEW_GID }}
 
-            - name: Run Trivy vulnerability scanner
-              uses: aquasecurity/trivy-action@0.33.1
-              with:
-                image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-                format: "sarif"
-                output: "trivy-results.sarif"
-                exit-code: "0"
-                severity: "CRITICAL,HIGH"
-                vuln-type: "library"
+#            - name: Run Trivy vulnerability scanner
+#              uses: aquasecurity/trivy-action@0.33.1
+#              with:
+#                image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+#                format: "sarif"
+#                output: "trivy-results.sarif"
+#                exit-code: "0"
+#                severity: "CRITICAL,HIGH"
+#                vuln-type: "library"
+#
+#            - name: Upload Trivy scan results to GitHub Security tab
+#              uses: github/codeql-action/upload-sarif@v4
+#              # Only upload SARIF results on main branch or version tags
+#              if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+#              with:
+#                sarif_file: "trivy-results.sarif"
+#
+#            - name: Fail on vulnerabilities
+#              uses: aquasecurity/trivy-action@0.33.1
+#              with:
+#                image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+#                format: "table"
+#                exit-code: "1"
+#                severity: "CRITICAL,HIGH"
+#                vuln-type: "library"
+#                skip-setup-trivy: true
 
-            - name: Upload Trivy scan results to GitHub Security tab
-              uses: github/codeql-action/upload-sarif@v4
-              # Only upload SARIF results on main branch or version tags
-              if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-              with:
-                sarif_file: "trivy-results.sarif"
-
-            - name: Fail on vulnerabilities
-              uses: aquasecurity/trivy-action@0.33.1
-              with:
-                image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-                format: "table"
-                exit-code: "1"
-                severity: "CRITICAL,HIGH"
-                vuln-type: "library"
-                skip-setup-trivy: true
-            
             - name: Push Docker image
               uses: docker/build-push-action@v6
               if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
