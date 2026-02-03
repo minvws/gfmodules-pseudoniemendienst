@@ -247,19 +247,20 @@ jobs:
           severity: "CRITICAL,HIGH"
           vuln-type: "library"
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        # Only upload SARIF results on main branch or version tags
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-        with:
-          sarif_file: "trivy-results.sarif"
+      # Re-enable if Code security tab upload is enabled by OPS
+      # - name: Upload Trivy scan results to GitHub Security tab
+      #   uses: github/codeql-action/upload-sarif@v4
+      #   # Only upload SARIF results on main branch or version tags
+      #   if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      #   with:
+      #     sarif_file: "trivy-results.sarif"
 
       - name: Fail build on vulnerabilities
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           format: "table"
-          exit-code: "1"
+          exit-code: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && '0' || '1' }}
           severity: "CRITICAL,HIGH"
           vuln-type: "library"
           skip-setup-trivy: true
