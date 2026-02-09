@@ -1,5 +1,4 @@
 # syntax=docker/dockerfile:1
-# syntax directive is used to enable Docker BuildKit
 
 ARG PYTHON_VERSION=3.14
 
@@ -13,8 +12,7 @@ ARG NEW_GID=1000
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    POETRY_CACHE_DIR=/tmp/poetry-cache \
-    POETRY_VIRTUALENVS_CREATE=false
+    POETRY_VERSION=1.8.2
 
 # Create a non-privileged user that the app will run under.
 RUN groupadd --system ${APP_GROUP} --gid=${NEW_GID} && \
@@ -25,54 +23,75 @@ RUN groupadd --system ${APP_GROUP} --gid=${NEW_GID} && \
         --gid ${NEW_GID} \
         ${APP_USER}
 
-RUN apt update && \
-    apt install -y \
+# Builder stage for compilation and dependencies
+FROM base AS builder
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
         git \
-        gnupg2 \
         curl \
+        ca-certificates \
         pkg-config \
-        openssl \
         libssl-dev \
         libsodium-dev \
         build-essential \
-        postgresql-client \
-        postgresql-client-common \
-        gettext-base \
         swig \
-        sed \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip && \
-    pip3 install poetry --no-cache-dir
+# Install poetry
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install poetry==${POETRY_VERSION}
 
-FROM base AS builder
-
-# Compile liboprf from source as the current distributed versions are outdated.
+# Compile liboprf
 WORKDIR /liboprf
-RUN git clone --depth 1 --branch v0.9.3 https://github.com/stef/liboprf.git . && cd src && make
+RUN git clone --depth 1 --branch v0.9.3 https://github.com/stef/liboprf.git . && \
+    cd src && \
+    make
 
-# Install python dependencies
+# Install Python dependencies
 WORKDIR ${PROJECT_DIR}
 COPY ./pyproject.toml ./poetry.lock ./
-RUN --mount=type=cache,target=${POETRY_CACHE_DIR} poetry install --no-root --no-interaction
 
+ENV POETRY_CACHE_DIR=/root/.cache/poetry \
+    POETRY_VIRTUALENVS_CREATE=false
+
+RUN --mount=type=cache,target=/root/.cache/poetry \
+    poetry install --no-root --no-interaction --only main
+
+# Final stage
 FROM base AS final
+
+# Install only runtime dependencies
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        openssl \
+        libssl3 \
+        libsodium23 \
+        postgresql-client \
+        gettext-base \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR ${PROJECT_DIR}
 
-# Copy the compiled shared libraries from the builder stage to the correct location so they can be found.
+# Copy compiled libraries
 COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/noise_xk/lib*.so /usr/local/lib/
 COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/lib*.so /usr/local/lib/
 RUN ldconfig
 
-# Copy installed python packages from the builder stage.
-COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+# Copy Python packages
+COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python3.*/site-packages /usr/local/lib/python3.*/site-packages
 
-# Copy application source code.
-COPY --chown=${APP_USER}:${APP_GROUP} . /src
+# Copy application
+COPY --chown=${APP_USER}:${APP_GROUP} . ${PROJECT_DIR}
 
-COPY ./docker/init-standalone.sh /usr/local/bin
-COPY ./docker/init.sh /usr/local/bin
+# Copy and set permissions on entrypoint scripts
+COPY --chmod=755 ./docker/init-standalone.sh /usr/local/bin/
+COPY --chmod=755 ./docker/init.sh /usr/local/bin/
 
 ARG standalone=false
 
@@ -85,8 +104,10 @@ RUN if [ "$standalone" = "true" ] ; then \
 USER ${APP_USER}
 
 EXPOSE 6502
-WORKDIR ${PROJECT_DIR}
 
 ENV PYTHONPATH=${PROJECT_DIR}
 
-CMD ["/docker-entrypoint.sh"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:6502/health || exit 1
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
