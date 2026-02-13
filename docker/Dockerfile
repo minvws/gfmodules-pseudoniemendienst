@@ -64,12 +64,15 @@ RUN --mount=type=cache,target=/root/.cache/poetry \
 # Final stage
 FROM base AS final
 
+ARG PYTHON_VERSION
+
 # Install only runtime dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         openssl \
+        curl \
         libssl3 \
         libsodium23 \
         postgresql-client \
@@ -84,7 +87,7 @@ COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/lib*.so /usr/l
 RUN ldconfig
 
 # Copy Python packages
-COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python3.*/site-packages /usr/local/lib/python3.*/site-packages
+COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python${PYTHON_VERSION}/site-packages /usr/local/lib/python${PYTHON_VERSION}/site-packages
 
 # Copy application
 COPY --chown=${APP_USER}:${APP_GROUP} . ${PROJECT_DIR}
@@ -103,11 +106,6 @@ RUN if [ "$standalone" = "true" ] ; then \
 
 USER ${APP_USER}
 
-EXPOSE 6502
-
 ENV PYTHONPATH=${PROJECT_DIR}
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:6502/health || exit 1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
