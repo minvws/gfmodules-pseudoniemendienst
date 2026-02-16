@@ -57,14 +57,17 @@ def get_auth_ctx(
         return ctx
 
     if creds is None or creds.scheme.lower() != "bearer":
-        logger.error("Missing or invalid bearer token")
+        logger.error("missing or invalid bearer token")
         raise HTTPException(status_code=401, detail="Missing bearer token")
 
     try:
         claims = client_oauth_service.verify(request)
     except OAuthError as e:
-        logger.error(f"OAuth verification failed: {e.description}")
-        raise HTTPException(status_code=e.status_code, detail=e.description) from e
+        desc = getattr(e, "description", None) or str(e)
+        status = getattr(e, "status_code", None) or 401
+
+        logger.exception("oauth verification failed (status=%s): %r", status, desc)
+        raise HTTPException(status_code=status, detail="Invalid or unauthorized request") from e
 
     ctx = AuthContext(
         claims=claims,

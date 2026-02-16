@@ -19,6 +19,7 @@ def post_org(
 ) -> JSONResponse:
     org = org_service.get_by_ura(req.ura)
     if org is not None:
+        logger.error("organization with URA %r already exists", req.ura)
         raise HTTPException(status_code=409, detail="organization with this ura already exists")
     try:
         org_service.create(req.ura, req.name, req.max_key_usage)
@@ -35,6 +36,7 @@ def list_keys_for_org(
 ) -> JSONResponse:
     org = org_service.get_by_ura(ura)
     if org is None:
+        logger.warning("organization for URA %r not found", ura)
         raise HTTPException(status_code=404, detail="organization not found")
 
     return JSONResponse(status_code=200, content=org.to_dict())
@@ -49,14 +51,17 @@ def put_org(
 
     org = org_service.get_by_ura(ura)
     if org is None:
+        logger.warning("organization for URA %r not found", ura)
         raise HTTPException(status_code=404, detail="organization not found")
 
     if org.ura != req.ura:
+        logger.warning("attempt to change URA from %r to %r", org.ura, req.ura)
         raise HTTPException(status_code=404, detail="Ura cannot be changed")
 
     org_service.update(org.id, req.name, req.max_key_usage or RidUsage.IrreversiblePseudonym)
     updated_entry = org_service.get_by_ura(ura)
     if updated_entry is None:
+        logger.error("failed to retrieve updated org for URA %r", ura)
         raise HTTPException(status_code=500, detail="failed to retrieve updated org")
 
     return JSONResponse(status_code=200, content=updated_entry.to_dict())
@@ -71,10 +76,13 @@ def delete_org(
 
     org = org_service.get_by_ura(ura)
     if org is None:
+        logger.error(f"organization for URA {ura} not found")
         raise HTTPException(status_code=404, detail="organization not found")
 
     key_resolver.delete_by_org(org.id)  # Should be cascade, but just in case
     org_service.delete(org.id)
+
+    logger.log(logging.INFO, f"deleted organization with URA {ura} and all associated keys")
     return JSONResponse(status_code=200, content={"message": "org and keys deleted"})
 
 

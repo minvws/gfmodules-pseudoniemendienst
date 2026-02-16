@@ -38,6 +38,7 @@ class ClientOAuthService:
             or self.config.mtls_key is None
             or self.config.verify_ca is None
         ):
+            logger.error("mTLS certificate and key must be provided for Client OAuth2")
             raise ValueError(
                 "mTLS certificate and key must be provided for Client OAuth2"
             )
@@ -72,6 +73,7 @@ class ClientOAuthService:
         """
         auth_header = request.headers.get("authorization")
         if not auth_header or not auth_header.lower().startswith("bearer "):
+            logger.error("missing or invalid Authorization header")
             raise HTTPException(
                 status_code=401, detail="Missing or invalid Authorization header"
             )
@@ -105,7 +107,7 @@ class ClientOAuthService:
             )
 
         except Exception as e:
-            logger.debug("Failed to decode JWT: %s", e)
+            logger.error("failed to decode JWT: %s", e)
             raise HTTPException(status_code=401, detail="Invalid token")
 
         return claims
@@ -118,7 +120,7 @@ class ClientOAuthService:
 
         certs = ClientOAuthService.get_pem_from_request(request)
         if not certs:
-            logger.error("Client certificate not presented or verification failed")
+            logger.error("client certificate not presented or verification failed")
             raise HTTPException(
                 status_code=401,
                 detail="Client certificate not presented or verification failed",
@@ -156,7 +158,7 @@ class ClientOAuthService:
             SSL_CLIENT_CERT_HEADER_NAME not in request.headers
             or not request.headers.get(SSL_CLIENT_CERT_HEADER_NAME)
         ):
-            logger.debug("Client certificate not found or verification failed.")
+            logger.debug("client certificate not found or verification failed.")
             return []
 
         certs = request.headers.get(SSL_CLIENT_CERT_HEADER_NAME, "").split(",")

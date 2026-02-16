@@ -129,21 +129,21 @@ class DbSession:
             try:
                 return f(*args, **kwargs)
             except PendingRollbackError as e:
-                logger.warning("Retrying operation due to PendingRollbackError: %s", e)
+                logger.warning("retrying operation due to PendingRollbackError: %s", e)
                 self.session.rollback()
             except OperationalError as e:
-                logger.warning("Retrying operation due to OperationalError: %s", e)
+                logger.warning("retrying operation due to OperationalError: %s", e)
             except DatabaseError as e:
-                logger.warning("Retrying operation due to DatabaseError: %s", e)
+                logger.warning("retrying operation due to DatabaseError: %s", e)
                 raise e
             except Exception as e:
-                logger.warning("Generic Exception during operation: %s", e)
+                logger.warning("generic Exception during operation: %s", e)
                 raise e
 
             if len(backoff) == 0:
-                logger.error("Operation failed after all retries")
+                logger.error("operation failed after all retries")
                 raise DatabaseError("Operation failed after all retries", None, BaseException())
 
-            logger.info("Retrying operation in %s seconds", backoff[0])
+            logger.info("retrying operation in %s seconds", backoff[0])
             sleep(backoff[0] + random.uniform(0, 0.1))
             backoff = backoff[1:]
