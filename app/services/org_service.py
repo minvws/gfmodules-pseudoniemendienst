@@ -25,8 +25,8 @@ class OrgService:
                 session.commit()
             except Exception as e:
                 session.rollback()
-                logger.error(f"failed to create org: {e}")
-                raise e
+                logger.error("failed to create org (ura=%r): %s", ura, e)
+                raise
 
             return org
 
@@ -38,7 +38,8 @@ class OrgService:
                 session.commit()
             except Exception as e:
                 session.rollback()
-                raise e
+                logger.error("failed to update org with id %s: %s", org_id, e)
+                raise
             return org
 
     def delete(self, org_id: uuid.UUID) -> bool:
@@ -49,6 +50,7 @@ class OrgService:
                 session.commit()
             except Exception as e:
                 session.rollback()
-                raise e
+                logger.error("failed to delete org with id %s: %s", org_id, e)
+                raise
             return success
 

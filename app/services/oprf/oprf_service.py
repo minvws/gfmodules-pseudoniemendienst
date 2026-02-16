@@ -4,6 +4,9 @@ from jwcrypto import jwk
 from pydantic import BaseModel, Field, field_validator
 
 from app.services.oprf.jwe_token import BlindJwe
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BlindRequest(BaseModel):
@@ -17,6 +20,7 @@ class BlindRequest(BaseModel):
             pad = "=" * ((4 - len(v) % 4) % 4)
             base64.urlsafe_b64decode(v +pad)
         except Exception as e:
+            logger.error("invalid base64url string: %r", v)
             raise ValueError(f"must be base64url: {e}")
 
         return v
@@ -41,6 +45,7 @@ class OprfService:
             bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
             eval = pyoprf.evaluate(self.__server_key, bi)
         except Exception as e:
+            logger.error(f"unable to evaluate blind: {e}")
             raise ValueError(f"unable to evaluate blind: {e}")
 
         subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval).decode('utf-8')
@@ -51,6 +56,11 @@ class OprfService:
             pub_key=pub_key
         )
 
+        logger.info(
+            "evaluated blind for recipient %r with scope %r",
+            req.recipientOrganization,
+            req.recipientScope,
+        )
         return jwe
 
     @staticmethod
