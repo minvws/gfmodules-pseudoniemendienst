@@ -23,15 +23,15 @@ class Database:
             else:
                 self.engine = create_engine(dsn, echo=False)
         except BaseException as e:
-            logger.error("Error while connecting to database: %s", e)
+            logger.error("error while connecting to database: %s", e)
             raise e
 
     def generate_tables(self) -> None:
-        logger.info("Generating tables...")
+        logger.info("generating tables...")
         Base.metadata.create_all(self.engine)
 
     def truncate_tables(self) -> None:
-        logger.info("Truncating all tables...")
+        logger.info("truncating all tables...")
         try:
             metadata = MetaData()
             metadata.reflect(bind=self.engine)
@@ -39,9 +39,9 @@ class Database:
                 for table in reversed(metadata.sorted_tables):
                     session.execute(text(f"DELETE FROM {table.name}"))
                 session.commit()
-            logger.info("All tables truncated successfully.")
+            logger.info("all tables truncated successfully.")
         except Exception as e:
-            logger.error("Error while truncating tables: %s", e)
+            logger.error("error while truncating tables: %s", e)
             raise e
 
     def is_healthy(self) -> bool:
@@ -55,7 +55,7 @@ class Database:
                 session.execute(text("SELECT 1"))
             return True
         except Exception as e:
-            logger.info("Database is not healthy: %s", e)
+            logger.info("database is not healthy: %s", e)
             return False
 
     def get_db_session(self) -> DbSession:

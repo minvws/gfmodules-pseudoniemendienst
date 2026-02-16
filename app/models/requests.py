@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Literal, List
 
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
@@ -6,6 +7,7 @@ from app.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
 
+logger = logging.getLogger(__name__)
 
 class RegisterRequest(BaseModel):
     scope: List[str]
@@ -18,6 +20,7 @@ class OrgRequest(BaseModel):
     @field_validator("ura")
     def ura_must_be_numbers(cls, v: Any) -> Any:
         if not v.isdigit():
+            logger.warning("URA must contain only digits (got %s)", v)
             raise ValueError("URA must contain 8 digits")
         return v
 
@@ -100,6 +103,7 @@ class ReceiverRequest(BaseModel):
         # Check if JWE is actually a jwe token
         jwe_token = data.get("jwe")
         if not isinstance(jwe_token, str) or len(jwe_token.split('.')) != 5:
+            logger.warning("invalid JWE token format: %s", jwe_token)
             raise ValueError("Invalid JWE token")
         return data
 
@@ -108,6 +112,7 @@ class ReceiverRequest(BaseModel):
     def validate_priv_key_pem(cls, data: dict[str, Any]) -> dict[str, Any]:
         priv_key_pem = data.get("priv_key_pem")
         if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith("-----BEGIN PRIVATE KEY-----"):
+            logger.warning("invalid private key PEM format")
             raise ValueError("Invalid private key PEM format")
         return data
 
@@ -122,6 +127,7 @@ class JweReceiverRequest(BaseModel):
         # Check if JWE is actually a jwe token
         jwe_token = data.get("jwe")
         if not isinstance(jwe_token, str) or len(jwe_token.split('.')) != 5:
+            logger.warning("invalid JWE token format: %s", jwe_token)
             raise ValueError("Invalid JWE token")
         return data
 
@@ -130,5 +136,6 @@ class JweReceiverRequest(BaseModel):
     def validate_priv_key_pem(cls, data: dict[str, Any]) -> dict[str, Any]:
         priv_key_pem = data.get("priv_key_pem")
         if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith("-----BEGIN PRIVATE KEY-----"):
+            logger.warning("invalid private key PEM format")
             raise ValueError("Invalid private key PEM format")
         return data

@@ -29,10 +29,10 @@ def post_key(
     try:
         key_resolver.create(org.id, req.scope, mtls_pub_key)
     except AlreadyExistsError as e:
-        logger.error(f"failed to create key entry: {e}")
+        logger.error("failed to create key entry: %r", e)
         raise HTTPException(status_code=409, detail="key for this org/scope already exists")
     except Exception as e:
-        logger.error(f"failed to create key entry: {e}")
+        logger.error("failed to create key entry: %r", e)
         raise HTTPException(status_code=500, detail="failed to create key entry")
 
     return JSONResponse(status_code=201, content={"message": "Key created successfully"})
@@ -46,10 +46,12 @@ def list_keys_for_org(
 ) -> JSONResponse:
     org = org_service.get_by_ura(ura)
     if org is None:
+        logger.error("organization for URA %r not found", ura)
         raise HTTPException(status_code=400, detail="organization for this URA is not registered")
 
     entries = key_resolver.get_by_org(org.id)
     if entries is None:
+        logger.error("no keys found for organization %s", org.id)
         raise HTTPException(status_code=404, detail="no keys found")
 
     return JSONResponse(status_code=200, content=[e.to_dict() for e in entries])
@@ -65,15 +67,18 @@ def put_key(
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
+        logger.error("invalid key id: %r", key_id)
         raise HTTPException(status_code=400, detail="invalid key id")
 
     entry = key_resolver.get_by_id(key_uuid)
     if entry is None:
+        logger.error("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
     updated_entry = key_resolver.get_by_id(key_uuid)
     if updated_entry is None:
+        logger.error("failed to retrieve updated key with id %r", key_id)
         raise HTTPException(status_code=500, detail="failed to retrieve updated key")
 
     return JSONResponse(status_code=200, content=updated_entry.to_dict())
@@ -87,13 +92,16 @@ def delete_key(
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
+        logger.error("invalid key id: %r", key_id)
         raise HTTPException(status_code=400, detail="invalid key id")
 
     entry = key_resolver.get_by_id(key_uuid)
     if entry is None:
+        logger.error("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
     key_resolver.delete(entry.id)
+    logger.info("key with id %s deleted successfully", key_id)
     return JSONResponse(status_code=200, content={"message": "key deleted"})
 
 

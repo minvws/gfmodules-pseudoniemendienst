@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import logging
 from enum import Enum
 
 from Crypto.Cipher import AES
@@ -8,6 +9,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.personal_id import PersonalId
+
+logger = logging.getLogger(__name__)
+
 
 def hkdf_derive(master_key: bytes, info: bytes, length: int = 32) -> bytes:
     hkdf = HKDF(
@@ -62,8 +66,14 @@ class PseudonymService:
             subject = self._decrypt_data(reversible_pseudonym, recipient_organization)
             parts = subject.split('|')
             if len(parts) != 3:
+                logger.error(
+                    "invalid decoded subject format (parts=%d, len=%d)",
+                    len(parts),
+                    len(subject),
+                )
                 raise ValueError("Invalid encoded subject format")
         except ValueError as e:
+            logger.exception("failed to decode reversible pseudonym: %r", e)
             raise ValueError("Failed to decode reversible pseudonym") from e
 
         return {
@@ -83,6 +93,7 @@ class PseudonymService:
         Construct the subject string for pseudonym generation.
         """
         if '|' in recipient_organization or '|' in recipient_scope:
+            logger.error("invalid characters in recipient organization or scope")
             raise ValueError("Invalid characters in input")
 
         return f"{personal_id.as_str()}|{recipient_organization}|{recipient_scope}"
@@ -105,6 +116,7 @@ class PseudonymService:
             data = tag + ciphertext
             return base64.urlsafe_b64encode(data).decode('utf-8')
         except Exception as e:
+            logger.exception("failed to encrypt data: %r", e)
             raise ValueError("Failed to encrypt data") from e
 
 
@@ -116,6 +128,8 @@ class PseudonymService:
             key = self._derive_rp_key(recipient_organization)
 
             data = base64.urlsafe_b64decode(ciphertext)
+            if len(data) < 16:
+                raise ValueError("Ciphertext too short")
 
             tag = data[:16]
             ct = data[16:]
@@ -126,4 +140,10 @@ class PseudonymService:
             message = cipher.decrypt_and_verify(ct, tag)
             return message.decode('utf-8')
         except Exception as e:
+            logger.exception(
+                "failed to decrypt pseudonym (org=%r, ct_len=%d): %r",
+                recipient_organization,
+                len(ciphertext),
+                e,
+            )
             raise ValueError("Failed to decrypt pseudonym") from e

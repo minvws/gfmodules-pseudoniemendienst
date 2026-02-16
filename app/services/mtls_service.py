@@ -97,6 +97,11 @@ class MtlsService:
 
         data = self.get_mtls_uzi_data(request)
         if data["CardType"] != "S":
+            card_type = data.get("CardType")
+            logger.error(
+                "invalid client certificate type %r. Need an UZI S-type certificate.",
+                card_type,
+            )
             raise HTTPException(
                 status_code=401,
                 detail="Invalid client certificate. Need an UZI S-type certificate.",
@@ -105,6 +110,7 @@ class MtlsService:
         ura = data["SubscriberNumber"]
         org = self.org_service.get_by_ura(ura)
         if org is None:
+            logger.error("organization for URA %r is not registered", ura)
             raise HTTPException(
                 status_code=404, detail=f"organization for URA {ura} is not registered"
             )
