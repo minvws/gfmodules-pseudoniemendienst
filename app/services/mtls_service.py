@@ -106,13 +106,12 @@ class MtlsService:
                 status_code=401,
                 detail="Invalid client certificate. Need an UZI S-type certificate.",
             )
-
         ura = data["SubscriberNumber"]
         org = self.org_service.get_by_ura(ura)
         if org is None:
             logger.error("organization for URA %r is not registered", ura)
             raise HTTPException(
-                status_code=404, detail=f"organization for URA {ura} is not registered"
+                status_code=400, detail=f"organization for URA {ura} is not registered"
             )
 
         return org
