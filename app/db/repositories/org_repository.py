@@ -32,6 +32,7 @@ class OrgRepository(RepositoryBase):
         self.db_session.session.add(entry)
         self.db_session.session.flush()
 
+        logger.info("created organization with URA %s and name %r", ura, name)
         return entry
 
     def update(self, org_id: uuid.UUID, name: str, max_usage_level: str) -> Optional[Organization]:
@@ -40,6 +41,7 @@ class OrgRepository(RepositoryBase):
         """
         org = self.get_by_id(org_id)
         if org is None:
+            logger.error(f"organization with ID {org_id} does not exist")
             raise ValueError("Organization not found")
 
         org.name = name # type: ignore
@@ -53,6 +55,7 @@ class OrgRepository(RepositoryBase):
         """
         org = self.get_by_id(org_id)
         if org is None:
+            logger.error("organization with ID %s does not exist", org_id)
             return False
 
         self.db_session.session.delete(org)

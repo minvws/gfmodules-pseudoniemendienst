@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import List, Optional, Sequence
 
@@ -9,6 +10,8 @@ from app.db.entities.organization_key import OrganizationKey
 from app.db.repositories.org_key_repository import OrganizationKeyRepository
 from app.db.repositories.org_repository import OrgRepository
 from app.rid import RidUsage
+
+logger = logging.getLogger(__name__)
 
 
 class AlreadyExistsError(Exception):
@@ -28,9 +31,11 @@ class KeyRequest(BaseModel):
     @classmethod
     def validate_scope(cls, v: List[str]) -> List[str]:
         if not v:
+            logger.error("scope must contain at least one item")
             raise ValueError("scope must contain at least one item")
         norm = _normalize_scope(v)
         if not norm:
+            logger.error("scope contains only empty/invalid items")
             raise ValueError("scope contains only empty/invalid items")
         return norm
 
@@ -41,9 +46,11 @@ class KeyRequest(BaseModel):
             v = v.strip()
             key = jwk.JWK.from_pem(v.encode('ascii'))
         except Exception as e:
+            logger.error("invalid PEM encoded public key: %r", e)
             raise ValueError(f"must be a valid PEM encoded public key: {e}")
 
         if key.has_private:
+            logger.error("provided key is a private key, expected a public key")
             raise ValueError("must be a public key, not a private key")
 
         return v
@@ -87,6 +94,12 @@ class KeyResolver:
             try:
                 entry = session.get_repository(OrganizationKeyRepository).create(org_id, scope, key_data)
             except Exception as e:
+                logger.error(
+                    "failed to create key entry for org %s and scope %r: %r",
+                    org_id,
+                    scope,
+                    e,
+                )
                 raise AlreadyExistsError(f"key for org/scope already exists: {e}")
             session.commit()
             return entry
