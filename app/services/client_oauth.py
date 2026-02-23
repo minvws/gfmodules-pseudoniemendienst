@@ -110,7 +110,7 @@ class ClientOAuthService:
             logger.error("failed to decode JWT: %s", e)
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        return claims  # type: ignore
+        return claims
 
     @staticmethod
     def _verify_mtls(request: Request, claims: Dict[str, Any]) -> None:
