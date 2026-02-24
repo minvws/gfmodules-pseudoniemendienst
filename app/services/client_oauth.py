@@ -91,9 +91,9 @@ class ClientOAuthService:
         jwk_client = PyJWKClient(
             self.config.jwks_url, cache_keys=True, ssl_context=self._ssl_context
         )
-        signing_key = jwk_client.get_signing_key_from_jwt(token).key
 
         try:
+            signing_key = jwk_client.get_signing_key_from_jwt(token).key
             claims = jwt.decode(
                 token,
                 signing_key,
