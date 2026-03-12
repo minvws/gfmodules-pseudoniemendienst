@@ -1,12 +1,12 @@
 # GFModules Pseudoniemendienst
 
-This app is the 'Pseudoniemendienst' and is part of the 'Generieke Functies, lokalisatie en addressering' project of the 
-Ministry of Health, Welfare and Sport of the Dutch government. 
+This app is the 'Pseudoniemendienst' and is part of the 'Generieke Functies, lokalisatie en addressering' project of the
+Ministry of Health, Welfare and Sport of the Dutch government.
 
-The Pseudoniemendienst is a **Proof of Concept** application that explores the functionality and requirements of a 
+The Pseudoniemendienst is a **Proof of Concept** application that explores the functionality and requirements of a
 pseudonymization service for pseudonymizing the **Dutch citizen number (BSN)** in various healthcare applications.
 
-The Pseudoniemendienst is used in the [Nationale Verwijsindex](#nationale-verwijsindex--), by the
+The Pseudoniemendienst is used in the [Nationale Verwijsindex](https://github.com/minvws/gfmodules-nationale-verwijsindex), by the
 **Vertrouwde Authenticatie Dienst (VAD)** and in the
 [MedMij afsprakenstelsel](https://medmij.nl/medmij-afsprakenstelsel/).
 
@@ -31,17 +31,18 @@ risk and that the authors assume no liability for any consequences of its use.
 
 ## Development setup
 
-This project can be setup and tested either as a python application directly on an operating system or in a Docker 
-environment. 
+This project can be setup and tested either as a python application directly on an operating system or in a Docker
+environment.
 
 > **Quickstart**
-> 
+>
 > The easiest way is to start the docker-compose project by running:
-> 
+>
 > ```bash
 > docker compose up
 > ```
-> This will start the project on 'http://localhost:6502'
+>
+> This will start the project on '<http://localhost:6502>'
 >
 
 ### Docker development setup
@@ -54,44 +55,44 @@ You can start the services without the SSL offloading service by running:
 docker compose up
 ```
 
-This will start the project on 'http://localhost:6502'
+This will start the project on '<http://localhost:6502>'
 
 #### Using mTLS
 
 To use/test mTLS, you need to setup the following:
 
-first, the server is configured with server name "prs", meaning you need to add this to your /etc/hosts (or equivalent):
+Generate the required certificates.
 
-```
-  127.0.0.1 prs
+```bash
+./tools/generate_certs.sh
 ```
 
-Next, since the prs certificate is signed with our own development uzi ca cert, you need to import (temporarily) the uzi
+Next, since the PRS certificate is signed with our own development UZI ca cert, you need to import (temporarily) the UZI
 ca cert into your browser. Normally, this is done via pkcs12:
 
 ```bash
-openssl pkcs12 -export -out secrets/uzi-server-ca.p12 -inkey uzi-server-ca.key -in uzi-server-ca.crt
+openssl pkcs12 -export -out secrets/uzi-server-ca.p12 -inkey secrets/uzi-server-ca.key -in secrets/uzi-server-ca.crt
 ```
-It will ask for a password, you can use anything.
-Then import the uzi.p12 file into your browser. Again, the password is being asked.
 
-At this point, you would be able to load the mTLS version on https://prs:6503. The connection should be secure as the
+It will ask for a password, you can use anything.
+Then import the uzi-server-ca.p12 file into your browser. Again, the password is being asked.
+
+At this point, you would be able to load the mTLS version on <https://prs:6503>. The connection should be secure as the
 browser has the correct CA for the server certificate.
 
-You probably get asked for a client certificate. Here you can use a client certificate that is signed by the uzi ca. 
-For this you can use either `prs-client-1` or `prs-client-2` (same types). Note that you might need to import these 
+You probably get asked for a client certificate. Here you can use a client certificate that is signed by the UZI ca.
+For this you can use the `prs.local`. Note that you might need to import these
 into your browser through pkcs12 again:
 
 ```bash
-openssl pkcs12 -export -out secrets/prs-client-1.p12 -inkey prs-client-1.key -in prs-client-1.crt
-openssl pkcs12 -export -out secrets/prs-client-2.p12 -inkey prs-client-2.key -in prs-client-2.crt
+openssl pkcs12 -export -out secrets/prs.local.p12 -inkey secrets/prs.local.key -in secrets/prs.local.crt
 ```
 
-If you weren't asked for a client certificate, make sure the site is secured correctly (you should see a lock in the 
+If you weren't asked for a client certificate, make sure the site is secured correctly (you should see a lock in the
 url bar). If not, client certs are not asked by the browser.
 
-It's also possible that client certificates are disabled for this site. In firefox, go to:  tools | settings | privacy & security |
-certificates | view certificates | authentication decicions and delete the entry for the site. This will make the browser
+It's also possible that client certificates are disabled for this site. In Firefox, go to: tools | settings | privacy & security |
+certificates | view certificates | authentication decisions and delete the entry for the site. This will make the browser
 ask for a client certificate again.
 
 You can start the services now by running:
@@ -106,10 +107,10 @@ Sometimes it's required, or easier to run the application natively on an operati
 application on an operating system Poetry is used. Before you're able to install this project, the following
 requirements needs to be available:
 
-* [Poetry](#poetry)
-* [pkgconf](#pkgconf)
-* [libsodium-dev](#libsodium-dev)
-* [liboprf](#liboprf)
+- [Poetry](#poetry)
+- [pkgconf](#pkgconf)
+- [libsodium-dev](#libsodium-dev)
+- [liboprf](#liboprf)
 
 ### Poetry Development dependencies
 
@@ -157,26 +158,28 @@ sudo ldconfig
 ### Poetry pytest
 
 The tests have a dependency on a postgres database. You can easily setup a database with docker:
+
 ```bash
 docker compose up -d postgres
 ```
 
 Now you're able to run the pytest in poetry:
+
 ```bash
 poetry run pytest
 ```
 
+## Enabling/Disabling OAuth
 
-## Testing with OV or EV certificates
-The easiest way to test for OV or EV certificates is to use the `auth.override_cert` configuration setting in app.conf. However,
-if you want to test with apache, you must make sure that the CA for that OV or EV cert is inside the `SSLCACertificateFile` 
-setting of httpd-ssl.conf.
+OAuth can be disabled for testing purposes by setting the `enabled` flag to `False` in the `[client_oauth]` section of app.conf:
 
-To do that, concatenate the CA of the EV/OV file (including any intermediate certs) into the file pointed by `SSLCACertificateFile`.
+```ini
+[client_oauth]
+enabled = False
+```
 
-When you now specify a client certificate signed by the CA of the EV/OV cert, the browser should connect and you are only able to
-view/interact with certain endpoints.
-
+When OAuth is disabled, the `override_ura_number` configuration will be used instead. This allows you to test the application
+without requiring OAuth authentication.
 
 ## Docker container builds
 
@@ -190,6 +193,7 @@ docker build \
   -t gfmodules-prs \
   .
 ```
+
 This will build a docker container that will run its migrations to the database specified in app.conf.
 
 The second mode is a "standalone" mode, where it will not run migrations, and where you must explicitly specify
@@ -202,6 +206,7 @@ docker build \
   -t gfmodules-prs \
   .
 ```
+
 Both containers only differ in their init script and the default version usually will mount its own local src directory
 into the container's /src dir.
 
@@ -222,7 +227,7 @@ This system uses OPRF for pseudonym generation. To test this, there are some ava
 
 To use this system:
 
-1. You will need a generated UZI Server certificate (https://www.uziregister.nl/servercertificaat) or create a 
+1. You will need a generated UZI Server certificate (<https://www.uziregister.nl/servercertificaat>) or create a
    self-signed certificate for testing purposes.
 
    Since the system uses mTLS, you can either setup a mTLS setup (caddy, apache, etc), or enable the override in the
@@ -231,14 +236,16 @@ To use this system:
     ```
     [app]
     mtls_override_cert=./secrets/self-signed-uzi-server-cert.crt
+    ```
  
-2. Insert a new organization via a POST to `/orgs`. The organization ura should be the URA of the uzi certificate you 
+2. Insert a new organization via a POST to `/orgs`. The organization ura should be the URA of the uzi certificate you
+
    will be testing with.
 
-   Note: there is no mTLS check here. You can add multiple organizations with different URA values for testing. 
+   Note: there is no mTLS check here. You can add multiple organizations with different URA values for testing.
 
 3. Next, you will need to register your public key to the key services. You can do this by calling `/register/certificate` with a JSON body like:
-   
+
    ```shell
    POST /register/certificate
    {
@@ -247,9 +254,8 @@ To use this system:
      ]
    }
    ```
-   
-   This will take the public key from the uzi server certificate using in this mTLS connection, and register it for the given scope.
 
+   This will take the public key from the uzi server certificate using in this mTLS connection, and register it for the given scope.
 
 4. Emulate a client wanting to send a pseudonym over to a receiver by calling `/test/oprf/client` with a JSON body like:
 
@@ -269,8 +275,8 @@ To use this system:
    This returns the `blinded_input` that must be sent to the receiver, and the `blind_factor` that must be sent to the
    receiver after the server has evaluated the blinded input.
 
-4. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the organization name and scope:
-   
+5. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the organization name and scope:
+
       ```shell
       POST /oprf/eval
       {
@@ -284,13 +290,14 @@ To use this system:
         "jwe": "eyJraWQiOi....bJUqbbSUIjqiw"
       } 
       ```
-   
+
    At this point we will get back a JWE that contains the evaluated blinded input and
-   is encrypted with the public key of the organization. At this point, the client is 
+   is encrypted with the public key of the organization. At this point, the client is
    not able to decrypt this information. It can only forward this to the receiver.
 
-5. Now emulate the receiving party by calling `/test/oprf/receiver` with a JSON body like:
-   ```shell   
+6. Now emulate the receiving party by calling `/test/oprf/receiver` with a JSON body like:
+
+   ```shell
     POST /test/oprf/receiver
     {
       "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
@@ -298,8 +305,8 @@ To use this system:
       "priv_key_pem": "-----BEGIN RSA PRIVATE KEY----- MIICXAIB...oCfe0= -----END RSA PRIVATE KEY-----"
     }
    ```
-   
-    The blind factor is the one returned by the client, the JWE is the one returned by the prs evaluation, and 
+
+    The blind factor is the one returned by the client, the JWE is the one returned by the prs evaluation, and
     the private key is returned by the key generation step.
 
     At this point, it will return any diagnostic information about the OPRF process:
@@ -344,10 +351,10 @@ There are 3 levels of max_key_usage:
 - RP (Reversible Pseudonym) - can create reversible and irreversible pseudonyms, but cannot reverse any pseudonyms
 - IRP (Irreversible Pseudonym) - can only create irreversible pseudonyms, and cannot reverse any pseudonyms
 
-The "RP" level is mainly intended for organizations that need to create reversible pseudonyms for other organizations, 
+The "RP" level is mainly intended for organizations that need to create reversible pseudonyms for other organizations,
 but is not allowed to reverse them back to BSN itself.
 
-The "IRP" level is intended for organizations that only need to create irreversible pseudonyms, and do not have access to 
+The "IRP" level is intended for organizations that only need to create irreversible pseudonyms, and do not have access to
 BSN information at all.
 
 ## Contribution
