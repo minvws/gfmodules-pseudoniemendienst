@@ -1,6 +1,6 @@
 [app]
 loglevel=debug
-mtls_allow_override_cert=
+mtls_override_cert=
 # Enable the /test routes
 enable_test_routes=True
 
@@ -27,16 +27,17 @@ ssl_cert_file = server.cert
 ssl_key_file = server.key
 
 [oprf]
-; file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
+# file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
 server_key_file=secrets/oprf-server.key
 
 [pseudonym]
-; Master key for hkdf
+# Master key for hkdf
 master_key=
 
 
 [client_oauth]
-enabled = True
+enabled = False
+# When disabled, the override_ura_number MUST be set. This value will be used instead of an actual URA number from the token
 override_ura_number = 12345600
 audience = prs.service
 issuer = https://localhost:8443/
