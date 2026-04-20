@@ -14,13 +14,12 @@ services:
     ports:
       - 6502:6502
     depends_on:
-      redis:
-        condition: service_started
       postgres:
         condition: service_healthy
 
   app-ssl:
-    profiles: [ssl]
+    profiles:
+      - ssl
     image: httpd
     restart: no
     ports:
@@ -31,11 +30,6 @@ services:
       - ./docker/httpd-ssl.conf:/usr/local/apache2/conf/extra/httpd-ssl.conf
     depends_on:
       - app
-
-  redis:
-    image: redis:6.2
-    ports:
-      - 6379:6379
 
   postgres:
     image: postgres:15
