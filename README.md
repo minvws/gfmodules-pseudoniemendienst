@@ -190,7 +190,7 @@ docker build \
   --build-arg="NEW_UID=1000" \
   --build-arg="NEW_GID=1000" \
   -f docker/Dockerfile \
-  -t gfmodules-prs \
+  -t gfmodules-pseudoniemendienst \
   .
 ```
 
@@ -203,7 +203,7 @@ an app.conf mount.
 docker build \
   --build-arg="standalone=true" \
   -f docker/Dockerfile \
-  -t gfmodules-prs \
+  -t gfmodules-pseudoniemendienst \
   .
 ```
 
@@ -215,7 +215,7 @@ docker run -ti --rm -p 6502:6502 \
   --mount type=bind,source=./app.conf.example,target=/src/app.conf \
   --mount type=bind,source=./auth_cert.json.example,target=/src/auth_cert.json \
   --mount type=bind,source=./secrets,target=/src/secrets \
-  gfmodules-prs
+  gfmodules-pseudoniemendienst
 ```
 
 ## OPRF Testing
