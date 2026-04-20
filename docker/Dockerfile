@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# syntax directive is used to enable Docker BuildKit
 
 ARG PYTHON_VERSION=3.14
 
@@ -7,8 +8,8 @@ FROM python:${PYTHON_VERSION}-slim AS base
 ARG PROJECT_DIR="/src"
 ARG APP_USER="app"
 ARG APP_GROUP="app"
-ARG NEW_UID=1000
-ARG NEW_GID=1000
+ARG NEW_UID
+ARG NEW_GID
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -23,6 +24,17 @@ RUN groupadd --system ${APP_GROUP} --gid=${NEW_GID} && \
         --gid ${NEW_GID} \
         ${APP_USER}
 
+# Runtime-only system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        openssl \
+        libssl3 \
+        libsodium23 \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR ${PROJECT_DIR}
+
 # Builder stage for compilation and dependencies
 FROM base AS builder
 
@@ -31,7 +43,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
-        curl \
         ca-certificates \
         pkg-config \
         libssl-dev \
@@ -51,48 +62,40 @@ RUN git clone --depth 1 --branch v0.9.3 https://github.com/stef/liboprf.git . &&
     cd src && \
     make
 
-# Install Python dependencies
+# Install Python dependencies into a virtualenv
 WORKDIR ${PROJECT_DIR}
 COPY ./pyproject.toml ./poetry.lock ./
 
-ENV POETRY_CACHE_DIR=/root/.cache/poetry \
-    POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_CACHE_DIR=/tmp/poetry-cache \
+    POETRY_VIRTUALENVS_CREATE=true \
+    POETRY_VIRTUALENVS_IN_PROJECT=true
 
-RUN --mount=type=cache,target=/root/.cache/poetry \
+RUN --mount=type=cache,target=${POETRY_CACHE_DIR} \
     poetry install --no-root --no-interaction --only main
 
 # Final stage
 FROM base AS final
 
-ARG PYTHON_VERSION
-
-# Install only runtime dependencies
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        openssl \
-        curl \
-        libssl3 \
-        libsodium23 \
-        postgresql-client \
-        gettext-base \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR ${PROJECT_DIR}
-
 # Copy compiled libraries
-COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/noise_xk/lib*.so /usr/local/lib/
-COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /liboprf/src/lib*.so /usr/local/lib/
+COPY --from=builder /liboprf/src/noise_xk/lib*.so /usr/local/lib/
+COPY --from=builder /liboprf/src/lib*.so /usr/local/lib/
 RUN ldconfig
 
-# Copy Python packages
-COPY --chown=${APP_USER}:${APP_GROUP} --from=builder /usr/local/lib/python${PYTHON_VERSION}/site-packages /usr/local/lib/python${PYTHON_VERSION}/site-packages
+# Copy only the virtualenv — no pip, no poetry, no build tools
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /src/.venv /src/.venv
 
-# Copy application
-COPY --chown=${APP_USER}:${APP_GROUP} . ${PROJECT_DIR}
+# Copy only what the app needs at runtime (no tests, docs, CI artifacts, etc.)
+COPY --chown=${APP_USER}:${APP_GROUP} app/ /src/app/
+COPY --chown=${APP_USER}:${APP_GROUP} sql/ /src/sql/
+COPY --chown=${APP_USER}:${APP_GROUP} tools/ /src/tools/
+COPY --chown=${APP_USER}:${APP_GROUP} app.conf.example /src/
 
-# Copy and set permissions on entrypoint scripts
+# version.json is generated from build args so CI workspace artifacts never leak in
+ARG RELEASE_VERSION=dev
+ARG GIT_SHA=unknown
+RUN echo "{\"version\": \"${RELEASE_VERSION}\", \"git_ref\": \"${GIT_SHA}\"}" > /src/version.json \
+    && chown ${APP_USER}:${APP_GROUP} /src/version.json
+
 COPY --chmod=755 ./docker/init-standalone.sh /usr/local/bin/
 COPY --chmod=755 ./docker/init.sh /usr/local/bin/
 
@@ -106,6 +109,11 @@ RUN if [ "$standalone" = "true" ] ; then \
 
 USER ${APP_USER}
 
-ENV PYTHONPATH=${PROJECT_DIR}
+EXPOSE 6502
+WORKDIR ${PROJECT_DIR}
+
+ENV PYTHONPATH=${PROJECT_DIR} \
+    VIRTUAL_ENV=/src/.venv \
+    PATH="/src/.venv/bin:$PATH"
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

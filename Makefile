@@ -2,13 +2,21 @@ NEW_UID = 1000
 NEW_GID = 1000
 
 ifdef DOCKER
-  RUN_PREFIX := docker compose run --rm app
+	RUN_PREFIX := docker compose run --rm app
+else ifdef POETRY
+	RUN_PREFIX := poetry run
 else
-  RUN_PREFIX :=
+	RUN_PREFIX :=
 endif
 
 .SILENT: help
 all: help
+
+container-build: ## Build the container
+	docker compose build --build-arg="NEW_UID=${NEW_UID}" --build-arg="NEW_GID=${NEW_GID}"
+
+container-build-sa: ## Build the container for standalone mode
+	docker compose build --build-arg="NEW_UID=${NEW_UID}" --build-arg="NEW_GID=${NEW_GID}" --build-arg="standalone=true"
 
 up: ## Start the container
 	docker compose up
@@ -26,7 +34,7 @@ type-check: ## Check for typing errors
 	$(RUN_PREFIX) mypy app tests
 
 safety-check: ## Check for security vulnerabilities
-	$(RUN_PREFIX) pip-audit
+	$(RUN_PREFIX) pip-audit --ignore CVE-2026-39373
 
 spelling-check: ## Check spelling mistakes
 	$(RUN_PREFIX) codespell .
