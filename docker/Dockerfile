@@ -87,12 +87,14 @@ ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 # Copy only the virtualenv — no pip, no poetry, no build tools
 COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /src/.venv ${VIRTUAL_ENV}
+RUN mkdir /opt/app/config && chown ${APP_USER}:${APP_GROUP} /opt/app/config
 
 # Copy only what the app needs at runtime (no tests, docs, CI artifacts, etc.)
 COPY --chown=${APP_USER}:${APP_GROUP} app/ /src/app/
 COPY --chown=${APP_USER}:${APP_GROUP} sql/ /src/sql/
 COPY --chown=${APP_USER}:${APP_GROUP} tools/ /src/tools/
 COPY --chown=${APP_USER}:${APP_GROUP} app.conf.example /src/
+RUN mkdir /src/secrets && chown ${APP_USER}:${APP_GROUP} /src/secrets
 
 # version.json is generated from build args so CI workspace artifacts never leak in
 ARG RELEASE_VERSION=dev
