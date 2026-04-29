@@ -27,6 +27,7 @@ RUN groupadd --system ${APP_GROUP} --gid=${NEW_GID} && \
 # Runtime-only system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        curl \
         openssl \
         libssl3 \
         libsodium23 \
