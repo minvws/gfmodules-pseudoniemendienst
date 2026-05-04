@@ -2,11 +2,11 @@ import logging
 import textwrap
 
 
-
 logger = logging.getLogger(__name__)
 
 _CERT_START = "-----BEGIN CERTIFICATE-----"
 _CERT_END = "-----END CERTIFICATE-----"
+
 
 def enforce_cert_newlines(cert_data: str) -> str:
     cert_data = cert_data.split(_CERT_START)[-1].split(_CERT_END)[0].strip()

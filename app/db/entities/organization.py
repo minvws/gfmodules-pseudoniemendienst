@@ -12,9 +12,12 @@ class Organization(Base):
     """
     Represents an organization in the database.
     """
+
     __tablename__ = "organization"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     ura = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
     max_rid_usage = Column(String, nullable=False)

@@ -24,6 +24,7 @@ class ConfigApp(BaseModel):
     mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
 
+
 class ConfigDatabase(BaseModel):
     dsn: str
     create_tables: bool = Field(default=False)
@@ -61,6 +62,7 @@ class ConfigDatabase(BaseModel):
             return 3600
         return int(v)
 
+
 class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
     docs_url: str = Field(default="/docs")
@@ -83,6 +85,7 @@ class ConfigOprf(BaseModel):
 class ConfigPseudonym(BaseModel):
     master_key: str = Field(default="")
 
+
 class ConfigClientOAuth(BaseModel):
     enabled: bool = Field(default=False)
     override_ura_number: str | None = Field(default=None)
@@ -92,6 +95,7 @@ class ConfigClientOAuth(BaseModel):
     mtls_cert: str | None = Field(default=None)
     mtls_key: str | None = Field(default=None)
     verify_ca: str | bool = Field(default=True)
+
 
 class Config(BaseModel):
     app: ConfigApp

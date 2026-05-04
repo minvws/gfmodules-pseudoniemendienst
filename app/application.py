@@ -27,10 +27,11 @@ def get_uvicorn_params() -> dict[str, Any]:
         "reload_dirs": config.uvicorn.reload_dirs,
         "factory": True,
     }
-    if (config.uvicorn.use_ssl and
-            config.uvicorn.ssl_base_dir is not None and
-            config.uvicorn.ssl_cert_file is not None and
-            config.uvicorn.ssl_key_file is not None
+    if (
+        config.uvicorn.use_ssl
+        and config.uvicorn.ssl_base_dir is not None
+        and config.uvicorn.ssl_cert_file is not None
+        and config.uvicorn.ssl_key_file is not None
     ):
         kwargs["ssl_keyfile"] = (
             config.uvicorn.ssl_base_dir + "/" + config.uvicorn.ssl_key_file
@@ -47,6 +48,7 @@ def run() -> None:
 
 def application_init() -> None:
     setup_logging()
+
 
 def create_fastapi_app() -> FastAPI:
     application_init()
@@ -76,11 +78,9 @@ def setup_fastapi() -> FastAPI:
             title="Pseudoniemendienst API",
             summary="API for the Pseudoniemendienst",
             description="Provides endpoints for OPRF, key management, organization management, and RID exchange.",
-
-        ) if config.uvicorn.swagger_enabled else FastAPI(
-            docs_url=None,
-            redoc_url=None
         )
+        if config.uvicorn.swagger_enabled
+        else FastAPI(docs_url=None, redoc_url=None)
     )
 
     # Non-OAuth routes

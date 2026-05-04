@@ -12,10 +12,17 @@ class OrganizationKey(Base):
     """
     Represents a key associated with an organization in the database.
     """
+
     __tablename__ = "organization_key"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organization.id", ondelete="CASCADE"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organization.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     scope = Column(JSONB, nullable=False, server_default="{}")
     key_data = Column(Text, nullable=False)
 

@@ -16,6 +16,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
 
@@ -35,9 +36,13 @@ def container_config(binder: inject.Binder) -> None:
         with open(config.oprf.server_key_file, "r") as f:
             key = f.read().strip()
         if key == "":
-            raise ValueError("OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command.")
+            raise ValueError(
+                "OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command."
+            )
     except FileNotFoundError:
-        raise FileNotFoundError("OPRF server key file not found. Generate it using the 'make generate-oprf-key' command.")
+        raise FileNotFoundError(
+            "OPRF server key file not found. Generate it using the 'make generate-oprf-key' command."
+        )
     oprf_service = OprfService(key)
     binder.bind(OprfService, oprf_service)
 
@@ -61,26 +66,34 @@ def container_config(binder: inject.Binder) -> None:
 def get_mtls_service() -> MtlsService:
     return inject.instance(MtlsService)
 
+
 def get_org_service() -> OrgService:
     return inject.instance(OrgService)
+
 
 def get_rid_service() -> RidService:
     return inject.instance(RidService)
 
+
 def get_pseudonym_service() -> PseudonymService:
     return inject.instance(PseudonymService)
+
 
 def get_key_resolver() -> KeyResolver:
     return inject.instance(KeyResolver)
 
+
 def get_oprf_service() -> OprfService:
     return inject.instance(OprfService)
+
 
 def get_database() -> Database:
     return inject.instance(Database)
 
+
 def get_client_oauth_service() -> ClientOAuthService:
     return inject.instance(ClientOAuthService)
+
 
 if not inject.is_configured():
     inject.configure(container_config)

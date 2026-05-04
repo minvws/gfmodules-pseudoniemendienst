@@ -22,6 +22,7 @@ USAGE_RANK = {
     "Bsn": 3,
 }
 
+
 class RidUsage(str, Enum):
     Bsn = "bsn"
     ReversiblePseudonym = "rp"

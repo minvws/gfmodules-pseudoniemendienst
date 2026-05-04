@@ -142,7 +142,9 @@ class DbSession:
 
             if len(backoff) == 0:
                 logger.error("operation failed after all retries")
-                raise DatabaseError("Operation failed after all retries", None, BaseException())
+                raise DatabaseError(
+                    "Operation failed after all retries", None, BaseException()
+                )
 
             logger.info("retrying operation in %s seconds", backoff[0])
             sleep(backoff[0] + random.uniform(0, 0.1))

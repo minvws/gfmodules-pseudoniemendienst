@@ -7,6 +7,7 @@ from app.services.rid_service import RidService
 
 AES_KEY_SIZE = 32
 
+
 @pytest.fixture
 def aes_key() -> bytes:
     return get_random_bytes(AES_KEY_SIZE)

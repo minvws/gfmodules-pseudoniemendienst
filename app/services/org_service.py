@@ -8,11 +8,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class OrgService:
     def __init__(self, db: Database) -> None:
         self.__db = db
 
-    def get_by_ura(self, ura: str) -> Organization|None:
+    def get_by_ura(self, ura: str) -> Organization | None:
         with self.__db.get_db_session() as session:
             repo = session.get_repository(OrgRepository)
             return repo.get_by_ura(ura)
@@ -30,7 +31,9 @@ class OrgService:
 
             return org
 
-    def update(self, org_id: uuid.UUID, name: str, max_key_usage: RidUsage) -> Organization|None:
+    def update(
+        self, org_id: uuid.UUID, name: str, max_key_usage: RidUsage
+    ) -> Organization | None:
         with self.__db.get_db_session() as session:
             try:
                 repo = session.get_repository(OrgRepository)
@@ -53,4 +56,3 @@ class OrgService:
                 logger.error("failed to delete org with id %s: %s", org_id, e)
                 raise
             return success
-

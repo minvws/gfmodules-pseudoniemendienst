@@ -15,7 +15,7 @@ class Database:
             if "sqlite://" in dsn:
                 self.engine = create_engine(
                     dsn,
-                    connect_args={'check_same_thread': False},
+                    connect_args={"check_same_thread": False},
                     # This + static pool is needed for sqlite in-memory tables
                     poolclass=StaticPool,
                     echo=False,

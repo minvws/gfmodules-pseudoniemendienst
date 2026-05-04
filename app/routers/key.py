@@ -14,7 +14,12 @@ from app.services.org_service import OrgService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/register/certificate", summary="Insert public key information for an organization", tags=["Key Registration Services"])
+
+@router.post(
+    "/register/certificate",
+    summary="Insert public key information for an organization",
+    tags=["Key Registration Services"],
+)
 def post_key(
     req: RegisterRequest,
     request: Request,
@@ -30,15 +35,23 @@ def post_key(
         key_resolver.create(org.id, req.scope, mtls_pub_key)
     except AlreadyExistsError as e:
         logger.error("failed to create key entry: %r", e)
-        raise HTTPException(status_code=409, detail="key for this org/scope already exists")
+        raise HTTPException(
+            status_code=409, detail="key for this org/scope already exists"
+        )
     except Exception as e:
         logger.error("failed to create key entry: %r", e)
         raise HTTPException(status_code=500, detail="failed to create key entry")
 
-    return JSONResponse(status_code=201, content={"message": "Key created successfully"})
+    return JSONResponse(
+        status_code=201, content={"message": "Key created successfully"}
+    )
 
 
-@router.get("/keys/{ura}", summary="List public key information for an organization", tags=["Key Registration Services"])
+@router.get(
+    "/keys/{ura}",
+    summary="List public key information for an organization",
+    tags=["Key Registration Services"],
+)
 def list_keys_for_org(
     ura: str,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -47,7 +60,9 @@ def list_keys_for_org(
     org = org_service.get_by_ura(ura)
     if org is None:
         logger.error("organization for URA %r not found", ura)
-        raise HTTPException(status_code=400, detail="organization for this URA is not registered")
+        raise HTTPException(
+            status_code=400, detail="organization for this URA is not registered"
+        )
 
     entries = key_resolver.get_by_org(org.id)
     if entries is None:
@@ -57,7 +72,11 @@ def list_keys_for_org(
     return JSONResponse(status_code=200, content=[e.to_dict() for e in entries])
 
 
-@router.put("/keys/{key_id}", summary="Update specific key for key/scope", tags=["Key Registration Services"])
+@router.put(
+    "/keys/{key_id}",
+    summary="Update specific key for key/scope",
+    tags=["Key Registration Services"],
+)
 def put_key(
     key_id: str,
     req: KeyRequest,
@@ -84,7 +103,11 @@ def put_key(
     return JSONResponse(status_code=200, content=updated_entry.to_dict())
 
 
-@router.delete("/keys/{key_id}", summary="Delete specific key for key/scope", tags=["Key Registration Services"])
+@router.delete(
+    "/keys/{key_id}",
+    summary="Delete specific key for key/scope",
+    tags=["Key Registration Services"],
+)
 def delete_key(
     key_id: str,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
@@ -103,8 +126,3 @@ def delete_key(
     key_resolver.delete(entry.id)
     logger.info("key with id %s deleted successfully", key_id)
     return JSONResponse(status_code=200, content={"message": "key deleted"})
-
-
-
-
-

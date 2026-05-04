@@ -11,7 +11,11 @@ class UraNumber:
     """
 
     def __init__(self, value: Any) -> None:
-        if (isinstance(value, int) or isinstance(value, str)) and len(str(value)) <= 8 and str(value).isdigit():
+        if (
+            (isinstance(value, int) or isinstance(value, str))
+            and len(str(value)) <= 8
+            and str(value).isdigit()
+        ):
             self.value = str(value).zfill(8)
         else:
             raise ValueError("URA number must be 8 digits or less")

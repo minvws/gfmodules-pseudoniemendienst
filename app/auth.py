@@ -67,7 +67,9 @@ def get_auth_ctx(
         status = getattr(e, "status_code", None) or 401
 
         logger.exception("oauth verification failed (status=%s): %r", status, desc)
-        raise HTTPException(status_code=status, detail="Invalid or unauthorized request") from e
+        raise HTTPException(
+            status_code=status, detail="Invalid or unauthorized request"
+        ) from e
 
     ctx = AuthContext(
         claims=claims,
