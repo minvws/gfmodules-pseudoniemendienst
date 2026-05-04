@@ -12,8 +12,8 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-uvicorn = "^0.40.0"
-fastapi = "^0.129"
+uvicorn = ">=0.40,<0.47"
+fastapi = ">=0.129,<0.137"
 async-timeout = "5.0.1"
 pydantic-settings = "^2.13.0"
 inject = "^5.3.0"
