@@ -1,3 +1,4 @@
+import base64
 import logging
 from typing import Any, Literal, List
 
@@ -32,6 +33,23 @@ class RidReceiveRequest(BaseModel):
     recipientOrganization: str
     recipientScope: str
     pseudonymType: Literal["rp", "irp", "bsn"]
+
+
+class BlindRequest(BaseModel):
+    encryptedPersonalId: str = Field(..., min_length=2)
+    recipientOrganization: str = Field(..., min_length=2)
+    recipientScope: str = Field(..., min_length=2)
+
+    @field_validator("encryptedPersonalId")
+    def validate_base64(cls, v: str) -> str:
+        try:
+            pad = "=" * ((4 - len(v) % 4) % 4)
+            normalized = v + pad
+            base64.urlsafe_b64decode(normalized)
+        except Exception as e:
+            raise ValueError(f"must be base64url: {e}")
+
+        return normalized
 
 
 class RidExchangeRequest(BaseModel):
