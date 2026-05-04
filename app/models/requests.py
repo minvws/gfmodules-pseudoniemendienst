@@ -9,8 +9,10 @@ from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
 
+
 class RegisterRequest(BaseModel):
     scope: List[str]
+
 
 class OrgRequest(BaseModel):
     ura: str = Field(..., pattern=r"^\d{8}$")
@@ -24,11 +26,12 @@ class OrgRequest(BaseModel):
             raise ValueError("URA must contain 8 digits")
         return v
 
+
 class RidReceiveRequest(BaseModel):
     rid: str
     recipientOrganization: str
     recipientScope: str
-    pseudonymType: Literal['rp', 'irp', 'bsn']
+    pseudonymType: Literal["rp", "irp", "bsn"]
 
 
 class RidExchangeRequest(BaseModel):
@@ -102,7 +105,7 @@ class ReceiverRequest(BaseModel):
     def validate_jwe(cls, data: dict[str, Any]) -> dict[str, Any]:
         # Check if JWE is actually a jwe token
         jwe_token = data.get("jwe")
-        if not isinstance(jwe_token, str) or len(jwe_token.split('.')) != 5:
+        if not isinstance(jwe_token, str) or len(jwe_token.split(".")) != 5:
             logger.warning("invalid JWE token format: %s", jwe_token)
             raise ValueError("Invalid JWE token")
         return data
@@ -111,7 +114,9 @@ class ReceiverRequest(BaseModel):
     @classmethod
     def validate_priv_key_pem(cls, data: dict[str, Any]) -> dict[str, Any]:
         priv_key_pem = data.get("priv_key_pem")
-        if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith("-----BEGIN PRIVATE KEY-----"):
+        if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith(
+            "-----BEGIN PRIVATE KEY-----"
+        ):
             logger.warning("invalid private key PEM format")
             raise ValueError("Invalid private key PEM format")
         return data
@@ -126,7 +131,7 @@ class JweReceiverRequest(BaseModel):
     def validate_jwe(cls, data: dict[str, Any]) -> dict[str, Any]:
         # Check if JWE is actually a jwe token
         jwe_token = data.get("jwe")
-        if not isinstance(jwe_token, str) or len(jwe_token.split('.')) != 5:
+        if not isinstance(jwe_token, str) or len(jwe_token.split(".")) != 5:
             logger.warning("invalid JWE token format: %s", jwe_token)
             raise ValueError("Invalid JWE token")
         return data
@@ -135,7 +140,9 @@ class JweReceiverRequest(BaseModel):
     @classmethod
     def validate_priv_key_pem(cls, data: dict[str, Any]) -> dict[str, Any]:
         priv_key_pem = data.get("priv_key_pem")
-        if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith("-----BEGIN PRIVATE KEY-----"):
+        if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith(
+            "-----BEGIN PRIVATE KEY-----"
+        ):
             logger.warning("invalid private key PEM format")
             raise ValueError("Invalid private key PEM format")
         return data

@@ -17,9 +17,11 @@ logger = logging.getLogger(__name__)
 class AlreadyExistsError(Exception):
     pass
 
+
 def _normalize_scope(items: List[str]) -> List[str]:
     cleaned = [s.strip().lower() for s in items if s and s.strip()]
     return sorted(set(cleaned))
+
 
 class KeyRequest(BaseModel):
     organization: str = Field(..., min_length=2)
@@ -44,7 +46,7 @@ class KeyRequest(BaseModel):
     def validate_pub_key(cls, v: str) -> str:
         try:
             v = v.strip()
-            key = jwk.JWK.from_pem(v.encode('ascii'))
+            key = jwk.JWK.from_pem(v.encode("ascii"))
         except Exception as e:
             logger.error("invalid PEM encoded public key: %r", e)
             raise ValueError(f"must be a valid PEM encoded public key: {e}")
@@ -84,15 +86,19 @@ class KeyResolver:
         if entry is None:
             return None
 
-        return jwk.JWK.from_pem(entry.key_data.encode('ascii'))
+        return jwk.JWK.from_pem(entry.key_data.encode("ascii"))
 
-    def create(self, org_id: uuid.UUID, scope: list[str], key_data: str) -> OrganizationKey:
+    def create(
+        self, org_id: uuid.UUID, scope: list[str], key_data: str
+    ) -> OrganizationKey:
         scope = _normalize_scope(scope)
         key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
             try:
-                entry = session.get_repository(OrganizationKeyRepository).create(org_id, scope, key_data)
+                entry = session.get_repository(OrganizationKeyRepository).create(
+                    org_id, scope, key_data
+                )
             except Exception as e:
                 logger.error(
                     "failed to create key entry for org %s and scope %r: %r",
@@ -104,12 +110,16 @@ class KeyResolver:
             session.commit()
             return entry
 
-    def update(self, key_id: uuid.UUID, scope: list[str], key_data: str) -> Optional[OrganizationKey]:
+    def update(
+        self, key_id: uuid.UUID, scope: list[str], key_data: str
+    ) -> Optional[OrganizationKey]:
         scope = _normalize_scope(scope)
         key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).update(key_id, scope, key_data)
+            entry = session.get_repository(OrganizationKeyRepository).update(
+                key_id, scope, key_data
+            )
             session.commit()
             return entry
 
@@ -118,9 +128,11 @@ class KeyResolver:
             entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
         return entry
 
-    def get_by_org(self, org_id: uuid.UUID) -> Sequence[OrganizationKey]|None:
+    def get_by_org(self, org_id: uuid.UUID) -> Sequence[OrganizationKey] | None:
         with self.db.get_db_session() as session:
-            entries = session.get_repository(OrganizationKeyRepository).get_by_org(org_id)
+            entries = session.get_repository(OrganizationKeyRepository).get_by_org(
+                org_id
+            )
             return entries
 
     def delete(self, key_id: uuid.UUID) -> bool:
@@ -132,6 +144,8 @@ class KeyResolver:
 
     def delete_by_org(self, org_id: uuid.UUID) -> int:
         with self.db.get_db_session() as session:
-            count = session.get_repository(OrganizationKeyRepository).delete_by_org(org_id)
+            count = session.get_repository(OrganizationKeyRepository).delete_by_org(
+                org_id
+            )
             session.commit()
             return count

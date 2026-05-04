@@ -22,9 +22,11 @@ def hkdf_derive(master_key: bytes, info: bytes, length: int = 32) -> bytes:
     )
     return hkdf.derive(master_key)
 
+
 class PseudonymType(str, Enum):
     Irreversible = "irreversible"
     Reversible = "reversible"
+
 
 class PseudonymService:
     def __init__(self, master_key: bytes) -> None:
@@ -42,9 +44,13 @@ class PseudonymService:
         """
         Generate a deterministic irreversible pseudonym
         """
-        subject = self._get_subject(personal_id, recipient_organization, recipient_scope)
-        digest = hmac.new(self.__irp_hmac_key, subject.encode('utf-8'), hashlib.sha256).digest()
-        return base64.urlsafe_b64encode(digest).decode('utf-8')
+        subject = self._get_subject(
+            personal_id, recipient_organization, recipient_scope
+        )
+        digest = hmac.new(
+            self.__irp_hmac_key, subject.encode("utf-8"), hashlib.sha256
+        ).digest()
+        return base64.urlsafe_b64encode(digest).decode("utf-8")
 
     def generate_reversible_pseudonym(
         self,
@@ -55,16 +61,20 @@ class PseudonymService:
         """
         Generate a deterministic reversible pseudonym using AES-SIV
         """
-        subject = self._get_subject(personal_id, recipient_organization, recipient_scope)
+        subject = self._get_subject(
+            personal_id, recipient_organization, recipient_scope
+        )
         return self._encrypt_data(subject, recipient_organization)
 
-    def decrypt_reversible_pseudonym(self, reversible_pseudonym: str, recipient_organization: str) -> dict[str, str|PersonalId]:
+    def decrypt_reversible_pseudonym(
+        self, reversible_pseudonym: str, recipient_organization: str
+    ) -> dict[str, str | PersonalId]:
         """
         Decode a reversible pseudonym to retrieve the original personal ID and associated info.
         """
         try:
             subject = self._decrypt_data(reversible_pseudonym, recipient_organization)
-            parts = subject.split('|')
+            parts = subject.split("|")
             if len(parts) != 3:
                 logger.error(
                     "invalid decoded subject format (parts=%d, len=%d)",
@@ -77,11 +87,10 @@ class PseudonymService:
             raise ValueError("Failed to decode reversible pseudonym") from e
 
         return {
-            'personal_id': PersonalId.from_str(parts[0]),
-            'recipient_organization': parts[1],
-            'recipient_scope': parts[2],
+            "personal_id": PersonalId.from_str(parts[0]),
+            "recipient_organization": parts[1],
+            "recipient_scope": parts[2],
         }
-
 
     def _get_subject(
         self,
@@ -92,7 +101,7 @@ class PseudonymService:
         """
         Construct the subject string for pseudonym generation.
         """
-        if '|' in recipient_organization or '|' in recipient_scope:
+        if "|" in recipient_organization or "|" in recipient_scope:
             logger.error("invalid characters in recipient organization or scope")
             raise ValueError("Invalid characters in input")
 
@@ -102,7 +111,7 @@ class PseudonymService:
         """
         Derive the AES key for reversible pseudonyms for a specific recipient organization
         """
-        info = b"prs:rp:aes-siv:" + recipient_organization.encode('utf-8')
+        info = b"prs:rp:aes-siv:" + recipient_organization.encode("utf-8")
         return hkdf_derive(self.__master_key, info, 32)
 
     def _encrypt_data(self, message: str, recipient_organization: str) -> str:
@@ -112,13 +121,12 @@ class PseudonymService:
             cipher = AES.new(key, AES.MODE_SIV)
             cipher.update(self.__aad)
 
-            ciphertext, tag = cipher.encrypt_and_digest(message.encode('utf-8'))
+            ciphertext, tag = cipher.encrypt_and_digest(message.encode("utf-8"))
             data = tag + ciphertext
-            return base64.urlsafe_b64encode(data).decode('utf-8')
+            return base64.urlsafe_b64encode(data).decode("utf-8")
         except Exception as e:
             logger.exception("failed to encrypt data: %r", e)
             raise ValueError("Failed to encrypt data") from e
-
 
     def _decrypt_data(self, ciphertext: str, recipient_organization: str) -> str:
         """
@@ -138,7 +146,7 @@ class PseudonymService:
             cipher.update(self.__aad)
 
             message = cipher.decrypt_and_verify(ct, tag)
-            return message.decode('utf-8')
+            return message.decode("utf-8")
         except Exception as e:
             logger.exception(
                 "failed to decrypt pseudonym (org=%r, ct_len=%d): %r",

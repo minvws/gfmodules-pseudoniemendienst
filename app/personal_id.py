@@ -3,13 +3,16 @@ from typing import Any
 
 ALLOWED_ID_TYPES = {"bsn"}
 
+
 class PersonalId:
     def __init__(self, country_code: str, id_type: str, id_number: str) -> None:
         if not country_code or len(country_code) != 2 or not country_code.isalpha():
             raise ValueError("country_code must be a 2-letter ISO country code")
 
         if id_type.lower() not in ALLOWED_ID_TYPES:
-            raise ValueError(f"id_type must be one of: {', '.join(sorted(ALLOWED_ID_TYPES))}")
+            raise ValueError(
+                f"id_type must be one of: {', '.join(sorted(ALLOWED_ID_TYPES))}"
+            )
 
         self.__country_code = country_code.upper()
         self.__id_type = id_type.lower()
@@ -59,7 +62,7 @@ class PersonalId:
         return self.__id_number
 
     @classmethod
-    def from_str(cls, s: str) -> 'PersonalId':
+    def from_str(cls, s: str) -> "PersonalId":
         """
         Creates a PersonalId instance from a colon-separated string: "landCode:type:value"
         """
@@ -70,7 +73,7 @@ class PersonalId:
         return PersonalId(parts[0], parts[1], parts[2])
 
     @classmethod
-    def from_dict(cls, d: dict[str, str]) -> 'PersonalId':
+    def from_dict(cls, d: dict[str, str]) -> "PersonalId":
         """
         Creates a PersonalId instance from a dictionary
         """

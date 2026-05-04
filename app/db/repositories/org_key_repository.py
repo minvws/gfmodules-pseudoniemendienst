@@ -14,18 +14,20 @@ logger = logging.getLogger(__name__)
 
 @repository(OrganizationKey)
 class OrganizationKeyRepository(RepositoryBase):
-
     def get(self, org_id: uuid.UUID, scope: str) -> Optional[OrganizationKey]:
         """
         Fetches the key entry by organization and scope.
         If a key entry has scope *, it will match everything
         """
-        query = (select(OrganizationKey)
+        query = (
+            select(OrganizationKey)
             .where(OrganizationKey.organization_id == org_id)
-            .where(or_(
-                OrganizationKey.scope.contains(literal([scope], JSONB)),
-                OrganizationKey.scope.contains(literal(['*'], JSONB)),
-            ))
+            .where(
+                or_(
+                    OrganizationKey.scope.contains(literal([scope], JSONB)),
+                    OrganizationKey.scope.contains(literal(["*"], JSONB)),
+                )
+            )
         )
         return self.db_session.session.execute(query).scalars().first()
 
@@ -43,7 +45,9 @@ class OrganizationKeyRepository(RepositoryBase):
         query = select(OrganizationKey).where(OrganizationKey.organization_id == org_id)
         return self.db_session.session.execute(query).scalars().all()
 
-    def create(self, org_id: uuid.UUID, scope: list[str], key_data: str) -> OrganizationKey:
+    def create(
+        self, org_id: uuid.UUID, scope: list[str], key_data: str
+    ) -> OrganizationKey:
         """
         Creates a new key entry.
         """
@@ -57,7 +61,9 @@ class OrganizationKeyRepository(RepositoryBase):
 
         return entry
 
-    def update(self, key_id: uuid.UUID, scope: list[str], key_data: str) -> Optional[OrganizationKey]:
+    def update(
+        self, key_id: uuid.UUID, scope: list[str], key_data: str
+    ) -> Optional[OrganizationKey]:
         """
         Updates an existing key entry.
         """
@@ -65,8 +71,8 @@ class OrganizationKeyRepository(RepositoryBase):
         if entry is None:
             raise ValueError("Key entry not found")
 
-        entry.scope = scope # type: ignore
-        entry.key_data = key_data # type: ignore
+        entry.scope = scope  # type: ignore
+        entry.key_data = key_data  # type: ignore
         self.db_session.session.add(entry)
         return entry
 

@@ -1,6 +1,7 @@
 import enum
 from typing import Final, List
 
+
 class AllowedFilesExtenions(str, enum.Enum):
     PEM = "pem"
     CRT = "crt"
@@ -12,4 +13,6 @@ class AllowedFilesExtenions(str, enum.Enum):
         return [cls(value) for value in data]
 
 
-X509_FILE_EXTENSIONS: Final[List[AllowedFilesExtenions]] = AllowedFilesExtenions.from_list(["pem", "crt", "cert"])
+X509_FILE_EXTENSIONS: Final[List[AllowedFilesExtenions]] = (
+    AllowedFilesExtenions.from_list(["pem", "crt", "cert"])
+)

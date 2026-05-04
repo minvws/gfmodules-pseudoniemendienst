@@ -1,4 +1,3 @@
-
 from jwcrypto import jwk
 
 from app.rid import RidUsage
@@ -12,11 +11,18 @@ hvOXiM1EeTB7me9x2P6t6SznJA7+SQMLHpvD8oKUzbflMjlyW8fs21og2eQ1YNPi
 fRs2Wy5kQi1QlyTzAgMBAAE=
 -----END PUBLIC KEY-----"""
 
-def test_resolver_create_and_resolve_roundtrip(key_resolver: KeyResolver, org_service: OrgService) -> None:
-    org = org_service.create(ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym)
+
+def test_resolver_create_and_resolve_roundtrip(
+    key_resolver: KeyResolver, org_service: OrgService
+) -> None:
+    org = org_service.create(
+        ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+    )
 
     # create
-    req = KeyRequest(organization="ura:94252", scope=["NVI", " lmr "], pub_key=TEST_PUBKEY)
+    req = KeyRequest(
+        organization="ura:94252", scope=["NVI", " lmr "], pub_key=TEST_PUBKEY
+    )
     entry = key_resolver.create(org.id, req.scope, req.pub_key)
 
     assert entry.organization_id == org.id
@@ -26,8 +32,13 @@ def test_resolver_create_and_resolve_roundtrip(key_resolver: KeyResolver, org_se
     assert isinstance(key, jwk.JWK)
     assert not key.has_private
 
-def test_resolver_get_and_delete(key_resolver: KeyResolver, org_service: OrgService) -> None:
-    org = org_service.create(ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym)
+
+def test_resolver_get_and_delete(
+    key_resolver: KeyResolver, org_service: OrgService
+) -> None:
+    org = org_service.create(
+        ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+    )
 
     e = key_resolver.create(org.id, ["*"], TEST_PUBKEY)
 

@@ -12,9 +12,8 @@ class RidService:
         self.__rid_aes_key = hkdf_derive(master_key, b"prs:rid", 32)
         self.__aad = aad
 
-
     def encrypt_rid(self, rid: str) -> str:
-        message = rid.encode('utf-8')
+        message = rid.encode("utf-8")
 
         nonce = get_random_bytes(12)
         cipher = AES.new(self.__rid_aes_key, AES.MODE_GCM, nonce=nonce)
@@ -24,8 +23,7 @@ class RidService:
 
         token = nonce + tag + ciphertext
 
-        return base64.urlsafe_b64encode(token).decode('utf-8')
-
+        return base64.urlsafe_b64encode(token).decode("utf-8")
 
     def decrypt_rid(self, enc_rid: str) -> str:
         data = base64.urlsafe_b64decode(enc_rid)
@@ -38,4 +36,4 @@ class RidService:
         cipher.update(self.__aad)
 
         message = cipher.decrypt_and_verify(ciphertext, tag)
-        return message.decode('utf-8')
+        return message.decode("utf-8")

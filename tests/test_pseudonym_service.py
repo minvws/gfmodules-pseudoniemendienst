@@ -23,6 +23,7 @@ class SampleArgs(TypedDict):
     recipient_organization: str
     recipient_scope: str
 
+
 @pytest.fixture
 def sample_args() -> SampleArgs:
     return {
@@ -32,7 +33,9 @@ def sample_args() -> SampleArgs:
     }
 
 
-def test_irp_is_deterministic(service: PseudonymService, sample_args: SampleArgs) -> None:
+def test_irp_is_deterministic(
+    service: PseudonymService, sample_args: SampleArgs
+) -> None:
     p1 = service.generate_irreversible_pseudonym(**sample_args)
     p2 = service.generate_irreversible_pseudonym(**sample_args)
     assert p1 == p2
@@ -66,7 +69,9 @@ def test_irp_changes_with_org_or_scope(service: PseudonymService) -> None:
     assert p_org1 != p_scope
 
 
-def test_rp_is_deterministic(service: PseudonymService, sample_args: SampleArgs) -> None:
+def test_rp_is_deterministic(
+    service: PseudonymService, sample_args: SampleArgs
+) -> None:
     p1 = service.generate_reversible_pseudonym(**sample_args)
     p2 = service.generate_reversible_pseudonym(**sample_args)
     assert p1 == p2
@@ -113,7 +118,9 @@ def test_rp_roundtrip(service: PseudonymService, sample_args: SampleArgs) -> Non
     assert decoded["recipient_scope"] == sample_args["recipient_scope"]
 
 
-def test_rp_decrypt_with_wrong_org_fails(service: PseudonymService, sample_args: SampleArgs) -> None:
+def test_rp_decrypt_with_wrong_org_fails(
+    service: PseudonymService, sample_args: SampleArgs
+) -> None:
     rp = service.generate_reversible_pseudonym(**sample_args)
 
     # Decrypting with another org should fail (wrong key)
@@ -135,13 +142,12 @@ def test_rp_tampering_fails(service: PseudonymService, sample_args: SampleArgs) 
         )
 
 
-
 def test_pseudonym_service_exchange() -> None:
     svc = PseudonymService(b"super_secret_hmac_key_for_testing_purposes_only")
     pseudonym = svc.generate_irreversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:12345",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     assert isinstance(pseudonym, str)
     assert len(pseudonym) == 44
@@ -151,7 +157,7 @@ def test_pseudonym_service_exchange() -> None:
     pseudonym2 = svc.generate_irreversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:12345",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     assert pseudonym == pseudonym2
 
@@ -159,7 +165,7 @@ def test_pseudonym_service_exchange() -> None:
     pseudonym3 = svc.generate_irreversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:54321",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     assert pseudonym != pseudonym3
 
@@ -168,7 +174,7 @@ def test_pseudonym_service_exchange() -> None:
     pseudonym4 = svc.generate_irreversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:12345",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     assert pseudonym4 != pseudonym
 
@@ -178,16 +184,16 @@ def test_pseudonym_service_reversible() -> None:
     pseudonym = svc.generate_reversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:12345",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     assert isinstance(pseudonym, str)
     assert len(pseudonym) > 0
     assert pseudonym.find("|") == -1  # Should be encoded
 
     decoded = svc.decrypt_reversible_pseudonym(pseudonym, "ura:12345")
-    assert decoded['personal_id'].id_number() == "12345678901"   # type: ignore
-    assert decoded['recipient_organization'] == "ura:12345"
-    assert decoded['recipient_scope'] == "nvi"
+    assert decoded["personal_id"].id_number() == "12345678901"  # type: ignore
+    assert decoded["recipient_organization"] == "ura:12345"
+    assert decoded["recipient_scope"] == "nvi"
 
     try:
         decoded = svc.decrypt_reversible_pseudonym(pseudonym, "ura:99999")
@@ -195,12 +201,11 @@ def test_pseudonym_service_reversible() -> None:
     except ValueError as e:
         assert str(e).startswith("Failed to decode reversible pseudonym")
 
-
     # Consistency check
     pseudonym2 = svc.generate_reversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:12345",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     # Every time a pseudonym is created it should result in the same output
     assert pseudonym == pseudonym2
@@ -209,7 +214,6 @@ def test_pseudonym_service_reversible() -> None:
     pseudonym3 = svc.generate_reversible_pseudonym(
         personal_id=PersonalId("NL", "bsn", "12345678901"),
         recipient_organization="ura:54321",
-        recipient_scope="nvi"
+        recipient_scope="nvi",
     )
     assert pseudonym != pseudonym3
-

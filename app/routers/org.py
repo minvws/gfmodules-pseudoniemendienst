@@ -12,7 +12,10 @@ from app.services.org_service import OrgService
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/orgs", summary="Create new organization", tags=["Organizational Services"])
+
+@router.post(
+    "/orgs", summary="Create new organization", tags=["Organizational Services"]
+)
 def post_org(
     req: OrgRequest,
     org_service: OrgService = Depends(container.get_org_service),
@@ -20,13 +23,17 @@ def post_org(
     org = org_service.get_by_ura(req.ura)
     if org is not None:
         logger.error("organization with URA %r already exists", req.ura)
-        raise HTTPException(status_code=409, detail="organization with this ura already exists")
+        raise HTTPException(
+            status_code=409, detail="organization with this ura already exists"
+        )
     try:
         org_service.create(req.ura, req.name, req.max_key_usage)
     except Exception as e:
         logger.error(f"failed to create org: {e}")
         raise HTTPException(status_code=500, detail="failed to create organization")
-    return JSONResponse(status_code=201, content={"message": "Org created successfully"})
+    return JSONResponse(
+        status_code=201, content={"message": "Org created successfully"}
+    )
 
 
 @router.get("/org/{ura}", summary="List organization", tags=["Organizational Services"])
@@ -42,7 +49,9 @@ def list_keys_for_org(
     return JSONResponse(status_code=200, content=org.to_dict())
 
 
-@router.put("/org/{ura}", summary="Update specific org", tags=["Organizational Services"])
+@router.put(
+    "/org/{ura}", summary="Update specific org", tags=["Organizational Services"]
+)
 def put_org(
     ura: str,
     req: OrgRequest,
@@ -58,7 +67,9 @@ def put_org(
         logger.warning("attempt to change URA from %r to %r", org.ura, req.ura)
         raise HTTPException(status_code=404, detail="Ura cannot be changed")
 
-    org_service.update(org.id, req.name, req.max_key_usage or RidUsage.IrreversiblePseudonym)
+    org_service.update(
+        org.id, req.name, req.max_key_usage or RidUsage.IrreversiblePseudonym
+    )
     updated_entry = org_service.get_by_ura(ura)
     if updated_entry is None:
         logger.error("failed to retrieve updated org for URA %r", ura)
@@ -67,7 +78,9 @@ def put_org(
     return JSONResponse(status_code=200, content=updated_entry.to_dict())
 
 
-@router.delete("/org/{ura}", summary="Delete specific org", tags=["Organizational Services"])
+@router.delete(
+    "/org/{ura}", summary="Delete specific org", tags=["Organizational Services"]
+)
 def delete_org(
     ura: str,
     org_service: OrgService = Depends(container.get_org_service),
@@ -82,10 +95,7 @@ def delete_org(
     key_resolver.delete_by_org(org.id)  # Should be cascade, but just in case
     org_service.delete(org.id)
 
-    logger.log(logging.INFO, f"deleted organization with URA {ura} and all associated keys")
+    logger.log(
+        logging.INFO, f"deleted organization with URA {ura} and all associated keys"
+    )
     return JSONResponse(status_code=200, content={"message": "org and keys deleted"})
-
-
-
-
-

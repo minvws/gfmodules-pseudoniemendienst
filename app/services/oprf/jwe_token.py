@@ -1,12 +1,17 @@
-
 from jwcrypto import jwe, jwk
 import json
 import time
 
-class BlindJwe():
 
+class BlindJwe:
     @staticmethod
-    def build(audience: str, scope: str, subject: str, pub_key: jwk.JWK, extra_claims: dict[str, str] = {}) -> str:
+    def build(
+        audience: str,
+        scope: str,
+        subject: str,
+        pub_key: jwk.JWK,
+        extra_claims: dict[str, str] = {},
+    ) -> str:
         """
         Build a JWT token
         """

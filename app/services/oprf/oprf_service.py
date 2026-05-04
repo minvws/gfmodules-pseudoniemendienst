@@ -18,7 +18,7 @@ class BlindRequest(BaseModel):
     def validate_base64(cls, v: str) -> str:
         try:
             pad = "=" * ((4 - len(v) % 4) % 4)
-            base64.urlsafe_b64decode(v +pad)
+            base64.urlsafe_b64decode(v + pad)
         except Exception as e:
             logger.error("invalid base64url string: %r", v)
             raise ValueError(f"must be base64url: {e}")
@@ -35,7 +35,7 @@ class OprfService:
         """
         Returns a base64 encoded pyoprf server key for evaluation
         """
-        return base64.urlsafe_b64encode(pyoprf.keygen()).decode('ascii')
+        return base64.urlsafe_b64encode(pyoprf.keygen()).decode("ascii")
 
     def eval_blind(self, req: BlindRequest, pub_key: jwk.JWK) -> str:
         """
@@ -48,12 +48,12 @@ class OprfService:
             logger.error(f"unable to evaluate blind: {e}")
             raise ValueError(f"unable to evaluate blind: {e}")
 
-        subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval).decode('utf-8')
+        subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval).decode("utf-8")
         jwe = BlindJwe.build(
             audience=req.recipientOrganization,
             scope=req.recipientScope,
             subject=subject,
-            pub_key=pub_key
+            pub_key=pub_key,
         )
 
         logger.info(
@@ -68,12 +68,11 @@ class OprfService:
         """
         Blind an input and returns the blind factor and the blinded input
         """
-        blind_factor, blinded_input = pyoprf.blind(input.encode('utf-8'))
+        blind_factor, blinded_input = pyoprf.blind(input.encode("utf-8"))
         return {
-            'blind_factor': base64.urlsafe_b64encode(blind_factor).decode('ascii'),
-            'blinded_input': base64.urlsafe_b64encode(blinded_input).decode('ascii'),
+            "blind_factor": base64.urlsafe_b64encode(blind_factor).decode("ascii"),
+            "blinded_input": base64.urlsafe_b64encode(blinded_input).decode("ascii"),
         }
-
 
     @staticmethod
     def finalize(blind_factor: str, eval: str) -> str:
@@ -83,4 +82,4 @@ class OprfService:
         bf = base64.urlsafe_b64decode(blind_factor)
         ev = base64.urlsafe_b64decode(eval)
         final = pyoprf.unblind(bf, ev)
-        return base64.urlsafe_b64encode(final).decode('ascii')
+        return base64.urlsafe_b64encode(final).decode("ascii")
