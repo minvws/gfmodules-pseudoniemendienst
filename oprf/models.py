@@ -24,8 +24,9 @@ class BlindRequest(BaseModel):
     def validate_base64(cls, v: str) -> str:
         try:
             pad = "=" * ((4 - len(v) % 4) % 4)
-            base64.urlsafe_b64decode(v +pad)
+            normalized = v + pad
+            base64.urlsafe_b64decode(normalized)
         except Exception as e:
             raise ValueError(f"must be base64url: {e}")
 
-        return v
+        return normalized

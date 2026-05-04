@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends
 from starlette.responses import JSONResponse
 
 from app import container
+from app.models.requests import BlindRequest
 from app.services.key_resolver import KeyResolver
-from app.services.oprf.oprf_service import BlindRequest, OprfService
+from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
