@@ -222,8 +222,8 @@ docker run -ti --rm -p 6502:6502 \
 
 This system uses OPRF for pseudonym generation. To test this, there are some available endpoints:
 
-- '/test/oprf/oprf/client' - Emulates a client that generates OPRF information for a given input
-- '/test/oprf/oprf/receiver' - Emulates the receiver of the pseudonym and returns diagnostic information
+- '/test/oprf/client' - Emulates a client that generates OPRF information for a given input
+- '/test/oprf/receiver' - Emulates the receiver of the pseudonym and returns diagnostic information
 
 To use this system:
 
@@ -262,7 +262,11 @@ To use this system:
    ```shell
    POST /test/oprf/client
    {
-     "personalId": "nl:bsn:950000012"
+     "personalId": {
+       "landCode": "NL",
+       "type": "bsn",
+       "value": "950000012"
+     }
    }
    
    200 OK
@@ -275,6 +279,19 @@ To use this system:
    This returns the `blinded_input` that must be sent to the receiver, and the `blind_factor` that must be sent to the
    receiver after the server has evaluated the blinded input.
 
+   For the integration flow used by `/oprf/eval`, derive the OPRF input from personal identifier + recipient context:
+
+   ```python
+   info = f"{recipient_organization}|{recipient_scope}|v1".encode("utf-8")
+   hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
+   personal_id = json.dumps(personal_identifier, separators=(",", ":"))
+   derived_personal_id = hkdf.derive(personal_id.encode("utf-8"))
+   blind_factor, blinded_input = pyoprf.blind(derived_personal_id)
+   ```
+
+   JSON should be canonicalized with RFC8785 for interoperable cryptographic input.
+   Current implementation uses compact JSON (`separators=(",", ":")`), which is deterministic but not full RFC8785 canonicalization.
+
 5. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the organization name and scope:
 
       ```shell
@@ -282,7 +299,7 @@ To use this system:
       {
         "encryptedPersonalId": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
         "recipientOrganization": "ura:12345678",
-        "recipientScope": "test"
+        "recipientScope": "nvi"
       }
 
       200 OK
