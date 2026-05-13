@@ -89,13 +89,15 @@ def delete_org(
 
     org = org_service.get_by_ura(ura)
     if org is None:
-        logger.error(f"organization for URA {ura} not found")
+        logger.error("organization not found for delete request, requested_ura=%r", ura)
         raise HTTPException(status_code=404, detail="organization not found")
 
     key_resolver.delete_by_org(org.id)  # Should be cascade, but just in case
     org_service.delete(org.id)
 
-    logger.log(
-        logging.INFO, f"deleted organization with URA {ura} and all associated keys"
+    logger.info(
+        "deleted organization id=%s requested_ura=%r and all associated keys",
+        org.id,
+        ura,
     )
     return JSONResponse(status_code=200, content={"message": "org and keys deleted"})
