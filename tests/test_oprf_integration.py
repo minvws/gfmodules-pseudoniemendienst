@@ -10,9 +10,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from jwcrypto import jwe, jwk
 import pyoprf
 import pytest
+from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 from app.rid import RidUsage
+from app import container
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
 
@@ -66,13 +68,11 @@ def run_oprf_eval_and_unblind(
     recipient_organization: str,
     recipient_scope: str,
 ) -> str:
-    assert pyoprf is not None
-    info = f"{recipient_organization}|{recipient_scope}|v1".encode("utf-8")
-    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
-    personal_id = json.dumps(personal_identifier, separators=(",", ":"))
-    derived_personal_id = hkdf.derive(personal_id.encode("utf-8"))
-
-    blind_factor_raw, blinded_input_raw = pyoprf.blind(derived_personal_id)
+    blind_factor_raw, blinded_input_raw = derive_blind_factor_and_input(
+        personal_identifier=personal_identifier,
+        recipient_organization=recipient_organization,
+        recipient_scope=recipient_scope,
+    )
     blind_factor = base64.urlsafe_b64encode(blind_factor_raw).decode("ascii")
     blinded_input = base64.urlsafe_b64encode(blinded_input_raw).decode("ascii")
 
@@ -103,6 +103,19 @@ def run_oprf_eval_and_unblind(
     assert final_pseudonym
 
     return final_pseudonym
+
+
+def derive_blind_factor_and_input(
+    personal_identifier: Dict[str, str],
+    recipient_organization: str,
+    recipient_scope: str,
+) -> Tuple[bytes, bytes]:
+    info = f"{recipient_organization}|{recipient_scope}|v1".encode("utf-8")
+    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
+    personal_id = json.dumps(personal_identifier, separators=(",", ":"))
+    derived_personal_id = hkdf.derive(personal_id.encode("utf-8"))
+    blind_factor_raw, blinded_input_raw = pyoprf.blind(derived_personal_id)
+    return bytes(blind_factor_raw), bytes(blinded_input_raw)
 
 
 @pytest.fixture
@@ -158,15 +171,11 @@ def test_oprf_eval_invalid_scope_returns_not_found(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
 ) -> None:
-    assert pyoprf is not None
-    info = (
-        f"{oprf_context.recipient_organization}|{oprf_context.recipient_scope}|v1"
-    ).encode("utf-8")
-    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
-    personal_id = json.dumps(oprf_context.personal_identifier, separators=(",", ":"))
-    derived_personal_id = hkdf.derive(personal_id.encode("utf-8"))
-
-    _, blinded_input_raw = pyoprf.blind(derived_personal_id)
+    _, blinded_input_raw = derive_blind_factor_and_input(
+        personal_identifier=oprf_context.personal_identifier,
+        recipient_organization=oprf_context.recipient_organization,
+        recipient_scope=oprf_context.recipient_scope,
+    )
     blinded_input = base64.urlsafe_b64encode(blinded_input_raw).decode("ascii")
 
     eval_response = client.post(
@@ -182,3 +191,63 @@ def test_oprf_eval_invalid_scope_returns_not_found(
     assert eval_response.json() == {
         "error": "No public key found for this organization and/or scope"
     }
+
+
+def test_oprf_eval_invalid_recipient_organization_returns_bad_request(
+    client: TestClient,
+) -> None:
+    eval_response = client.post(
+        "/oprf/eval",
+        json={
+            "encryptedPersonalId": "Zm9v",
+            "recipientOrganization": "12345678",
+            "recipientScope": "nvi",
+        },
+    )
+
+    assert eval_response.status_code == 400
+    assert eval_response.json() == {
+        "error": "Invalid recipient organization. Format: ura:<ura_number>"
+    }
+
+
+def test_oprf_eval_unknown_ura_returns_not_found(
+    client: TestClient,
+) -> None:
+    eval_response = client.post(
+        "/oprf/eval",
+        json={
+            "encryptedPersonalId": "Zm9v",
+            "recipientOrganization": "ura:87654321",
+            "recipientScope": "nvi",
+        },
+    )
+
+    assert eval_response.status_code == 404
+    assert eval_response.json() == {"error": "No organization found for this ura"}
+
+
+def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
+    app: FastAPI,
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+) -> None:
+    class FailingOprfService:
+        def eval_blind(self, req: object, pub_key_jwk: object) -> str:
+            raise ValueError("invalid blinded input")
+
+    app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
+    try:
+        eval_response = client.post(
+            "/oprf/eval",
+            json={
+                "encryptedPersonalId": "Zm9v",
+                "recipientOrganization": oprf_context.recipient_organization,
+                "recipientScope": oprf_context.recipient_scope,
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(container.get_oprf_service, None)
+
+    assert eval_response.status_code == 400
+    assert eval_response.json() == {"error": "Unable to evaluate blind"}
