@@ -9,6 +9,7 @@ from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
+URA_PATTERN = r"^\d{8}$"
 
 
 class RegisterRequest(BaseModel):
@@ -16,7 +17,7 @@ class RegisterRequest(BaseModel):
 
 
 class OrgRequest(BaseModel):
-    ura: str = Field(..., pattern=r"^\d{8}$")
+    ura: str = Field(..., pattern=URA_PATTERN)
     name: str = Field(..., min_length=5, max_length=50)
     max_key_usage: RidUsage
 
