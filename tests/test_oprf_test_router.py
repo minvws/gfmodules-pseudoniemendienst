@@ -131,7 +131,6 @@ def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
 ) -> None:
-    assert pyoprf is not None
     info = (
         f"{oprf_test_router_context.recipient_organization}|"
         f"{oprf_test_router_context.recipient_scope}|v1"
