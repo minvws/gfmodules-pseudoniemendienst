@@ -30,8 +30,8 @@ def post_org(
         )
     try:
         org_service.create(req.ura, req.name, req.max_key_usage)
-    except Exception as e:
-        logger.error("failed to create org: %s", e)
+    except Exception:
+        logger.exception("failed to create organization")
         raise HTTPException(status_code=500, detail="failed to create organization")
     return JSONResponse(
         status_code=201, content={"message": "Org created successfully"}
