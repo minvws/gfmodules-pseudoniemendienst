@@ -18,10 +18,10 @@ else
   sed -i "s|^\(master_key=\).*|\1$MASTER_KEY|" "$APP_PATH"
 fi
 
-OPRF_SECRET_KEY_FILE="secrets/oprf-server.key"
-if [ ! -s $OPRF_SECRET_KEY_FILE ]; then
+OPRF_SECRET_KEY_PATH="${OPRF_SECRET_KEY_PATH:-secrets/oprf-server.key}"
+if [ ! -s $OPRF_SECRET_KEY_PATH ]; then
   echo "➡️ Generating OPRF secret key"
-  python app/generate-oprf-key.py >$OPRF_SECRET_KEY_FILE
+  python app/generate-oprf-key.py >$OPRF_SECRET_KEY_PATH
 else
   echo "⚠️ OPRF secret key already exists. Skipping."
 fi
