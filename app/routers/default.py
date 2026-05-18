@@ -3,6 +3,7 @@ import logging
 import json
 from pathlib import Path
 from fastapi import APIRouter, Response
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -26,20 +27,20 @@ def index() -> Response:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
             data = json.load(file)
             content += "\nVersion: %s\nCommit: %s" % (data["version"], data["git_ref"])
-    except BaseException as e:
+    except (OSError, json.JSONDecodeError, KeyError) as e:
         content += "\nNo version information found"
         logger.info("version info could not be loaded: %s" % e)
 
-    return Response(content)
+    return PlainTextResponse(content)
 
 
 @router.get("/version.json")
 def version_json() -> Response:
     try:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
-            content = file.read()
-    except BaseException as e:
+            content = json.load(file)
+    except (OSError, json.JSONDecodeError) as e:
         logger.info("version info could not be loaded: %s" % e)
         return Response(status_code=404)
 
-    return Response(content)
+    return JSONResponse(content)
