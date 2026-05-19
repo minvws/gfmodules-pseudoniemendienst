@@ -24,9 +24,9 @@ class OrgService:
                 repo = session.get_repository(OrgRepository)
                 org = repo.create(ura, name, max_key_usage)
                 session.commit()
-            except Exception as e:
+            except Exception:
                 session.rollback()
-                logger.error("failed to create org (ura=%r): %s", ura, e)
+                logger.exception("failed to create org (ura=%r)", ura)
                 raise
 
             return org
@@ -39,9 +39,9 @@ class OrgService:
                 repo = session.get_repository(OrgRepository)
                 org = repo.update(org_id, name, max_key_usage)
                 session.commit()
-            except Exception as e:
+            except Exception:
                 session.rollback()
-                logger.error("failed to update org with id %s: %s", org_id, e)
+                logger.exception("failed to update org with id %s", org_id)
                 raise
             return org
 
@@ -51,8 +51,8 @@ class OrgService:
                 repo = session.get_repository(OrgRepository)
                 success = repo.delete(org_id)
                 session.commit()
-            except Exception as e:
+            except Exception:
                 session.rollback()
-                logger.error("failed to delete org with id %s: %s", org_id, e)
+                logger.exception("failed to delete org with id %s", org_id)
                 raise
             return success

@@ -70,13 +70,13 @@ def receive(
             logger.error("decrypted RID is empty")
             raise Exception("Empty plaintext")
     except Exception:
-        logger.error("failed to decrypt RID: %s", rid, exc_info=True)
+        logger.exception("failed to decrypt RID: %s", rid)
         raise InvalidRID("Failed to decrypt RID")
 
     try:
         payload: Dict[str, Any] = json.loads(plaintext)
     except json.JSONDecodeError:
-        logger.error("failed to parse RID payload as JSON: %s", plaintext)
+        logger.exception("failed to parse RID payload as JSON: %s", plaintext)
         raise InvalidRID(message="Malformed RID payload")
 
     recipient_org = payload.get("recipient_organization")
@@ -154,10 +154,9 @@ def receive(
             logger.error("invalid personal_id format in RID payload: %s", pid)
             raise InvalidRID(message="Invalid personal_id format in RID payload")
     except Exception:
-        logger.error(
+        logger.exception(
             "failed to parse personal_id from RID payload: %s",
             payload.get("personal_id"),
-            exc_info=True,
         )
         raise InvalidRID(message="Invalid personal_id in RID payload")
 
