@@ -1,12 +1,13 @@
 import logging
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
-from app.models.requests import RegisterRequest
+from app.models.requests import RegisterRequest, URA_PATTERN
 from app.services.mtls_service import MtlsService
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
@@ -33,13 +34,15 @@ def post_key(
     # Create the key entry
     try:
         key_resolver.create(org.id, req.scope, mtls_pub_key)
-    except AlreadyExistsError as e:
-        logger.error("failed to create key entry: %r", e)
+    except AlreadyExistsError:
+        logger.warning("key already exists for org_id=%s scope=%r", org.id, req.scope)
         raise HTTPException(
             status_code=409, detail="key for this org/scope already exists"
         )
-    except Exception as e:
-        logger.error("failed to create key entry: %r", e)
+    except Exception:
+        logger.exception(
+            "failed to create key entry for org_id=%s scope=%r", org.id, req.scope
+        )
         raise HTTPException(status_code=500, detail="failed to create key entry")
 
     return JSONResponse(
@@ -53,20 +56,20 @@ def post_key(
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    ura: str,
+    ura: Annotated[str, Path(pattern=URA_PATTERN)],
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
     org = org_service.get_by_ura(ura)
     if org is None:
-        logger.error("organization for URA %r not found", ura)
+        logger.warning("organization for URA %r not found", ura)
         raise HTTPException(
             status_code=400, detail="organization for this URA is not registered"
         )
 
     entries = key_resolver.get_by_org(org.id)
     if entries is None:
-        logger.error("no keys found for organization %s", org.id)
+        logger.warning("no keys found for organization %s", org.id)
         raise HTTPException(status_code=404, detail="no keys found")
 
     return JSONResponse(status_code=200, content=[e.to_dict() for e in entries])
@@ -86,12 +89,12 @@ def put_key(
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
-        logger.error("invalid key id: %r", key_id)
+        logger.warning("invalid key id: %r", key_id)
         raise HTTPException(status_code=400, detail="invalid key id")
 
     entry = key_resolver.get_by_id(key_uuid)
     if entry is None:
-        logger.error("key with id %r not found", key_id)
+        logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
@@ -115,12 +118,12 @@ def delete_key(
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
-        logger.error("invalid key id: %r", key_id)
+        logger.warning("invalid key id: %r", key_id)
         raise HTTPException(status_code=400, detail="invalid key id")
 
     entry = key_resolver.get_by_id(key_uuid)
     if entry is None:
-        logger.error("key with id %r not found", key_id)
+        logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
     key_resolver.delete(entry.id)

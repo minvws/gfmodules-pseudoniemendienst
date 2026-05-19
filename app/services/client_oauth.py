@@ -106,8 +106,8 @@ class ClientOAuthService:
                 },
             )
 
-        except Exception as e:
-            logger.error("failed to decode JWT: %s", e)
+        except Exception:
+            logger.exception("failed to decode JWT")
             raise HTTPException(status_code=401, detail="Invalid token")
 
         return claims

@@ -23,7 +23,7 @@ class Database:
             else:
                 self.engine = create_engine(dsn, echo=False)
         except BaseException as e:
-            logger.error("error while connecting to database: %s", e)
+            logger.exception("error while connecting to database")
             raise e
 
     def generate_tables(self) -> None:
@@ -41,7 +41,7 @@ class Database:
                 session.commit()
             logger.info("all tables truncated successfully.")
         except Exception as e:
-            logger.error("error while truncating tables: %s", e)
+            logger.exception("error while truncating tables")
             raise e
 
     def is_healthy(self) -> bool:

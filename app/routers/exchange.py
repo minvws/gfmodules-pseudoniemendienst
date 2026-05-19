@@ -60,23 +60,23 @@ def receive(
     Receive and decrypt a RID, validate it, and return a pseudonym of the requested type if allowed.
     """
     if not req.rid.startswith("rid:"):
-        logger.error("received invalid RID: %s", req.rid)
+        logger.warning("received invalid RID: %s", req.rid)
         raise InvalidRID("Invalid RID. Should start with 'rid:'")
     rid = req.rid.removeprefix("rid:")
 
     try:
         plaintext = rid_service.decrypt_rid(rid)
         if not plaintext:
-            logger.error("decrypted RID is empty")
+            logger.warning("decrypted RID is empty")
             raise Exception("Empty plaintext")
     except Exception:
-        logger.error("failed to decrypt RID: %s", rid, exc_info=True)
+        logger.warning("failed to decrypt RID: %s", rid)
         raise InvalidRID("Failed to decrypt RID")
 
     try:
         payload: Dict[str, Any] = json.loads(plaintext)
     except json.JSONDecodeError:
-        logger.error("failed to parse RID payload as JSON: %s", plaintext)
+        logger.warning("failed to parse RID payload as JSON: %s", plaintext)
         raise InvalidRID(message="Malformed RID payload")
 
     recipient_org = payload.get("recipient_organization")
@@ -88,18 +88,22 @@ def receive(
         recipient_org != req.recipientOrganization
         or recipient_scope != req.recipientScope
     ):
-        logger.error(
+        logger.warning(
             "recipient organization/scope mismatch. Expected org: %s, scope: %s. Got org: %s, scope: %s",
+            req.recipientOrganization,
+            req.recipientScope,
+            recipient_org,
+            recipient_scope,
         )
         raise InvalidRID(message="Invalid recipient organization and/or scope")
 
     # Make sure we have got the correct permissions to exchange the requested pseudonym type
     if rid_usage not in ALLOWED_BY_RID_USAGE:
-        logger.error("unsupported RID usage: %s", rid_usage)
+        logger.warning("unsupported RID usage: %s", rid_usage)
         raise InvalidRID(message="Unsupported RID usage")
 
     if req.pseudonymType not in ALLOWED_BY_RID_USAGE[rid_usage]:
-        logger.error(
+        logger.warning(
             "requested pseudonym type '%s' not allowed by RID usage '%s'",
             req.pseudonymType,
             rid_usage,
@@ -107,14 +111,14 @@ def receive(
         raise InvalidRID(message="Requested pseudonym type not allowed by RID usage")
 
     if not req.recipientOrganization.startswith("ura:"):
-        logger.error("does not start with 'ura:': %s", req.recipientOrganization)
+        logger.warning("does not start with 'ura:': %s", req.recipientOrganization)
         raise InvalidURA(req.recipientOrganization)
 
     ura = req.recipientOrganization[4:]
 
     max_rid_usage = key_resolver.max_rid_usage(ura)
     if max_rid_usage is None:
-        logger.error("no RID usage permissions found for organization: %s", ura)
+        logger.warning("no RID usage permissions found for organization: %s", ura)
         raise HTTPException(
             status_code=400,
             detail="Organization / scope is not allowed to exchange RIDs",
@@ -122,11 +126,11 @@ def receive(
 
     required = REQUIRED_MIN_USAGE.get(req.pseudonymType)
     if required is None:
-        logger.error("unsupported pseudonym type requested: %s", req.pseudonymType)
+        logger.warning("unsupported pseudonym type requested: %s", req.pseudonymType)
         raise HTTPException(status_code=400, detail="Unsupported pseudonym type")
 
     if USAGE_RANK.get(max_rid_usage.name, 0) < USAGE_RANK[required]:
-        logger.error(
+        logger.warning(
             "organization '%s' with max RID usage '%s' is not allowed to exchange pseudonym type '%s' which requires minimum RID usage '%s'",
             ura,
             max_rid_usage.name,
@@ -151,13 +155,12 @@ def receive(
         elif isinstance(pid, dict):
             personal_id = PersonalId.from_dict(pid)
         else:
-            logger.error("invalid personal_id format in RID payload: %s", pid)
+            logger.warning("invalid personal_id format in RID payload: %s", pid)
             raise InvalidRID(message="Invalid personal_id format in RID payload")
     except Exception:
-        logger.error(
+        logger.warning(
             "failed to parse personal_id from RID payload: %s",
             payload.get("personal_id"),
-            exc_info=True,
         )
         raise InvalidRID(message="Invalid personal_id in RID payload")
 
@@ -212,7 +215,7 @@ def exchange_rid(
 
     pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
-        logger.error(
+        logger.warning(
             "no public key found for organization '%s' and scope '%s'",
             ura,
             req.recipientScope,
@@ -247,13 +250,13 @@ def exchange_pseudonym(
     mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> Response:
     if not req.recipientOrganization.startswith("ura:"):
-        logger.error("URA does not start with 'ura:': %s", req.recipientOrganization)
+        logger.warning("URA does not start with 'ura:': %s", req.recipientOrganization)
         raise InvalidURA(req.recipientOrganization)
     recipient_organization = req.recipientOrganization[4:]
 
     org = org_service.get_by_ura(recipient_organization)
     if org is None:
-        logger.error(
+        logger.warning(
             "recipient organization not found for URA: %s", recipient_organization
         )
         raise OrganizationNotFound(recipient_organization)
@@ -268,7 +271,7 @@ def exchange_pseudonym(
     elif req.pseudonymType == PseudonymType.Reversible:
         source_org = mtls_service.get_org_from_request(request)
         if source_org.max_rid_usage == RidUsage.IrreversiblePseudonym:
-            logger.error(
+            logger.warning(
                 "source organization '%s' is not allowed to exchange reversible pseudonyms due to insufficient RID usage permissions",
                 source_org.ura,
             )
@@ -284,7 +287,7 @@ def exchange_pseudonym(
         )
         subject = "pseudonym:reversible:" + res
     else:
-        logger.error("unsupported pseudonym type requested: %s", req.pseudonymType)
+        logger.warning("unsupported pseudonym type requested: %s", req.pseudonymType)
         raise HTTPException(status_code=400, detail="Unsupported pseudonym type")
 
     if subject is None:
@@ -299,7 +302,7 @@ def exchange_pseudonym(
 
     pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
-        logger.error(
+        logger.warning(
             "no public key found for organization '%s' and scope '%s'",
             recipient_organization,
             req.recipientScope,
