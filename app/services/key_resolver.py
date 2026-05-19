@@ -48,7 +48,7 @@ class KeyRequest(BaseModel):
             v = v.strip()
             key = jwk.JWK.from_pem(v.encode("ascii"))
         except Exception as e:
-            logger.error("invalid PEM encoded public key: %r", e)
+            logger.exception("invalid PEM encoded public key")
             raise ValueError(f"must be a valid PEM encoded public key: {e}")
 
         if key.has_private:
@@ -100,11 +100,10 @@ class KeyResolver:
                     org_id, scope, key_data
                 )
             except Exception as e:
-                logger.error(
-                    "failed to create key entry for org %s and scope %r: %r",
+                logger.exception(
+                    "failed to create key entry for org %s and scope %r",
                     org_id,
                     scope,
-                    e,
                 )
                 raise AlreadyExistsError(f"key for org/scope already exists: {e}")
             session.commit()

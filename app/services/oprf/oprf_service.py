@@ -28,7 +28,7 @@ class OprfService:
             bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
             eval = pyoprf.evaluate(self.__server_key, bi)
         except Exception as e:
-            logger.error(f"unable to evaluate blind: {e}")
+            logger.exception("unable to evaluate blind")
             raise ValueError(f"unable to evaluate blind: {e}")
 
         subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval).decode("utf-8")
