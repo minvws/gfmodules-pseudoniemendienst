@@ -17,38 +17,29 @@ intendedAudience:
 description:
   nl:
     shortDescription: >-
-      Proof-of-concept pseudoniemendienst voor het pseudonimiseren van het
+      Pseudoniemendienst voor het pseudonimiseren van het
       BSN in Nederlandse zorgtoepassingen.
     longDescription: |
       De Pseudoniemendienst is onderdeel van het 'Generieke Functies,
       lokalisatie en addressering' project van het Ministerie van
-      Volksgezondheid, Welzijn en Sport. De dienst is een proof-of-concept
+      Volksgezondheid, Welzijn en Sport. De dienst is een
       applicatie die de functionaliteit en vereisten van een
       pseudonimiseringsdienst voor het Burgerservicenummer (BSN) in
-      zorgtoepassingen verkent. De dienst ondersteunt wederzijdse TLS-
-      authenticatie en wordt gebruikt door de Nationale Verwijsindex, de
-      Vertrouwde Authenticatie Dienst (VAD) en het MedMij afsprakenstelsel.
+      zorgtoepassingen levert.
     features:
       - Pseudonimisering van het BSN voor zorgtoepassingen
-      - Ondersteuning voor wederzijdse TLS-authenticatie (mTLS)
-      - Integratie met NVI, VAD en MedMij afsprakenstelsel
   en:
     shortDescription: >-
-      Proof-of-concept pseudonymization service for pseudonymizing the BSN
+      Pseudonymization service for pseudonymizing the BSN
       in Dutch healthcare applications.
     longDescription: |
       The Pseudoniemendienst is part of the 'Generieke Functies, lokalisatie
       en addressering' project of the Ministry of Health, Welfare and Sport.
-      The service is a proof-of-concept application exploring the
-      functionality and requirements of a pseudonymization service for the
-      Dutch citizen number (BSN) in healthcare applications. The service
-      supports mutual TLS authentication and is used by the Nationale
-      Verwijsindex, the Vertrouwde Authenticatie Dienst (VAD), and the
-      MedMij afsprakenstelsel.
+      The service is an application that provides the functionality and
+      requirements of a pseudonymization service for the 
+      Dutch citizen number (BSN) in healthcare applications.
     features:
       - BSN pseudonymization for healthcare applications
-      - Support for mutual TLS authentication (mTLS)
-      - Integration with NVI, VAD, and MedMij afsprakenstelsel
 
 legal:
   license: EUPL-1.2
