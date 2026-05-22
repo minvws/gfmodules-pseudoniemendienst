@@ -32,18 +32,21 @@ def container_config(binder: inject.Binder) -> None:
     mtls_service = MtlsService(config.app.mtls_override_cert, org_service)
     binder.bind(MtlsService, mtls_service)
 
-    try:
-        with open(config.oprf.server_key_file, "r") as f:
-            key = f.read().strip()
-        if key == "":
-            raise ValueError(
-                "OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command."
+    if config.oprf.hsm_url:
+        oprf_service = OprfService(server_key=None, hsm_config=config.oprf)
+    else:
+        try:
+            with open(config.oprf.server_key_file, "r") as f:
+                key = f.read().strip()
+            if key == "":
+                raise ValueError(
+                    "OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command."
+                )
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "OPRF server key file not found. Generate it using the 'make generate-oprf-key' command."
             )
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            "OPRF server key file not found. Generate it using the 'make generate-oprf-key' command."
-        )
-    oprf_service = OprfService(key)
+        oprf_service = OprfService(server_key=key)
     binder.bind(OprfService, oprf_service)
 
     pseudonym_service = PseudonymService(

@@ -27,8 +27,15 @@ ssl_cert_file = server.cert
 ssl_key_file = server.key
 
 [oprf]
-# file with base64 server key for oprf evaluation (create with oprf_service.generate_key)
+# Local key fallback: file with base64 server key (used when hsm_url is not set)
 server_key_file=secrets/oprf-server.key
+# HSM API: when set, evaluation is delegated to the HSM API instead of the local key
+# hsm_url=https://localhost:8443
+# hsm_module=softhsm
+# hsm_slot=SoftHSMLabel
+# hsm_cert_file=secrets/prs-use.crt
+# hsm_key_file=secrets/prs-use.key
+# hsm_ca_cert_file=secrets/hsm-ca.crt
 
 [pseudonym]
 # Master key for hkdf
