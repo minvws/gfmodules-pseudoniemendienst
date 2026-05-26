@@ -60,6 +60,9 @@ class OprfService:
 
     def _eval_via_hsm(self, recipient_org: str, blinded_bytes: bytes) -> bytes:
         cfg = self.__hsm_config
+        if cfg is None:
+            raise ValueError("HSM configuration not found")
+
         url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}/oprf/evaluate"
         response = requests.post(
             url,
@@ -69,7 +72,7 @@ class OprfService:
             },
             timeout=10,
             verify=cfg.hsm_ca_cert_file or True,
-            cert=(cfg.hsm_cert_file, cfg.hsm_key_file) if cfg.hsm_key_file else None,
+            cert=(cfg.hsm_cert_file, cfg.hsm_key_file) if (cfg.hsm_cert_file and cfg.hsm_key_file) else None,
         )
         response.raise_for_status()
         return base64.b64decode(response.json()["result"])
