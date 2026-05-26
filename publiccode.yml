@@ -1,0 +1,62 @@
+publiccodeYmlVersion: "0.5"
+name: Generieke Functies Pseudoniemendienst
+url: https://github.com/minvws/gfmodules-pseudoniemendienst
+platforms:
+  - web
+categories:
+  - identity-management
+developmentStatus: development
+softwareType: standalone/backend
+intendedAudience:
+  countries:
+    - NL
+  scope:
+    - government
+    - healthcare
+
+description:
+  nl:
+    shortDescription: >-
+      Pseudoniemendienst voor het pseudonimiseren van het
+      BSN in Nederlandse zorgtoepassingen.
+    longDescription: |
+      De Pseudoniemendienst is onderdeel van het 'Generieke Functies,
+      lokalisatie en addressering' project van het Ministerie van
+      Volksgezondheid, Welzijn en Sport. De dienst is een
+      applicatie die de functionaliteit en vereisten van een
+      pseudonimiseringsdienst voor het Burgerservicenummer (BSN) in
+      zorgtoepassingen levert.
+    features:
+      - Pseudonimisering van het BSN voor zorgtoepassingen
+  en:
+    shortDescription: >-
+      Pseudonymization service for pseudonymizing the BSN
+      in Dutch healthcare applications.
+    longDescription: |
+      The Pseudoniemendienst is part of the 'Generieke Functies, lokalisatie
+      en addressering' project of the Ministry of Health, Welfare and Sport.
+      The service is an application that provides the functionality and
+      requirements of a pseudonymization service for the 
+      Dutch citizen number (BSN) in healthcare applications.
+    features:
+      - BSN pseudonymization for healthcare applications
+
+legal:
+  license: EUPL-1.2
+  mainCopyrightOwner: Ministerie van Volksgezondheid, Welzijn en Sport
+
+maintenance:
+  type: internal
+  contacts:
+    - name: iRealisatie - Team Generieke Functies
+      email: maintainer@irealisatie.nl
+      affiliation: Ministerie van Volksgezondheid, Welzijn en Sport
+
+organisation:
+  uri: https://www.rijksoverheid.nl/ministeries/ministerie-van-volksgezondheid-welzijn-en-sport
+  name: Ministerie van Volksgezondheid, Welzijn en Sport
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
