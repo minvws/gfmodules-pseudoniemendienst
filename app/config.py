@@ -80,6 +80,12 @@ class ConfigUvicorn(BaseModel):
 
 class ConfigOprf(BaseModel):
     server_key_file: str = Field(default="")
+    hsm_url: str | None = Field(default=None)
+    hsm_module: str = Field(default="softhsm")
+    hsm_slot: str = Field(default="SoftHSMLabel")
+    hsm_cert_file: str | None = Field(default=None)
+    hsm_key_file: str | None = Field(default=None)
+    hsm_ca_cert_file: str | None = Field(default=None)
 
 
 class ConfigPseudonym(BaseModel):
