@@ -7,6 +7,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
+from app.auth import AuthContext, get_auth_ctx
 from app.models.requests import RegisterRequest, URA_PATTERN
 from app.services.mtls_service import MtlsService
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
@@ -83,7 +84,9 @@ def list_keys_for_org(
 def put_key(
     key_id: str,
     req: KeyRequest,
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
 
     try:
@@ -96,6 +99,16 @@ def put_key(
     if entry is None:
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
+
+    caller_org = org_service.get_by_ura(str(auth_ctx.ura_number))
+    if caller_org is None or entry.organization_id != caller_org.id:
+        logger.warning(
+            "caller ura=%s attempted to update key %s owned by org %s",
+            auth_ctx.ura_number,
+            key_id,
+            entry.organization_id,
+        )
+        raise HTTPException(status_code=403, detail="forbidden")
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
     updated_entry = key_resolver.get_by_id(key_uuid)
@@ -113,7 +126,9 @@ def put_key(
 )
 def delete_key(
     key_id: str,
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
     try:
         key_uuid = uuid.UUID(key_id)
@@ -125,6 +140,16 @@ def delete_key(
     if entry is None:
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
+
+    caller_org = org_service.get_by_ura(str(auth_ctx.ura_number))
+    if caller_org is None or entry.organization_id != caller_org.id:
+        logger.warning(
+            "caller ura=%s attempted to delete key %s owned by org %s",
+            auth_ctx.ura_number,
+            key_id,
+            entry.organization_id,
+        )
+        raise HTTPException(status_code=403, detail="forbidden")
 
     key_resolver.delete(entry.id)
     logger.info("key with id %s deleted successfully", key_id)
