@@ -78,6 +78,7 @@ def setup_fastapi() -> FastAPI:
             title="Pseudoniemendienst API",
             summary="API for the Pseudoniemendienst",
             description="Provides endpoints for OPRF, key management, organization management, and RID exchange.",
+            root_path=config.uvicorn.root_path,
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None)

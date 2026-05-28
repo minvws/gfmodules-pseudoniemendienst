@@ -76,6 +76,7 @@ class ConfigUvicorn(BaseModel):
     ssl_base_dir: str | None = Field(default=None)
     ssl_cert_file: str | None = Field(default=None)
     ssl_key_file: str | None = Field(default=None)
+    root_path: str = Field(default="")
 
 
 class ConfigOprf(BaseModel):

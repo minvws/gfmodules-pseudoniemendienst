@@ -25,6 +25,8 @@ use_ssl = False
 ssl_base_dir = secrets/ssl
 ssl_cert_file = server.cert
 ssl_key_file = server.key
+# The root path if behind a proxy
+root_path =
 
 [oprf]
 # Local key fallback: file with base64 server key (used when hsm_url is not set)
