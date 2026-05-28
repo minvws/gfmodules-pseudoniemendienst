@@ -43,7 +43,9 @@ class OprfService:
             logger.exception("unable to evaluate blind")
             raise ValueError(f"unable to evaluate blind: {e}")
 
-        subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval_bytes).decode("utf-8")
+        subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval_bytes).decode(
+            "utf-8"
+        )
         jwe = BlindJwe.build(
             audience=req.recipientOrganization,
             scope=req.recipientScope,
@@ -72,7 +74,9 @@ class OprfService:
             },
             timeout=10,
             verify=cfg.hsm_ca_cert_file or True,
-            cert=(cfg.hsm_cert_file, cfg.hsm_key_file) if (cfg.hsm_cert_file and cfg.hsm_key_file) else None,
+            cert=(cfg.hsm_cert_file, cfg.hsm_key_file)
+            if (cfg.hsm_cert_file and cfg.hsm_key_file)
+            else None,
         )
         response.raise_for_status()
         return base64.b64decode(response.json()["result"])

@@ -155,7 +155,10 @@ def receive(
         elif isinstance(pid, dict):
             personal_id = PersonalId.from_dict(pid)
         else:
-            logger.warning("invalid personal_id format in RID payload: unexpected type %s", type(pid).__name__)
+            logger.warning(
+                "invalid personal_id format in RID payload: unexpected type %s",
+                type(pid).__name__,
+            )
             raise InvalidRID(message="Invalid personal_id format in RID payload")
     except Exception:
         logger.warning("failed to parse personal_id from RID payload")
