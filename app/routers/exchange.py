@@ -261,6 +261,8 @@ def exchange_pseudonym(
         )
         raise OrganizationNotFound(recipient_organization)
 
+    source_org = mtls_service.get_org_from_request(request)
+
     if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.generate_irreversible_pseudonym(
             personal_id=req.personalId,
@@ -269,7 +271,6 @@ def exchange_pseudonym(
         )
         subject = "pseudonym:irreversible:" + res
     elif req.pseudonymType == PseudonymType.Reversible:
-        source_org = mtls_service.get_org_from_request(request)
         if source_org.max_rid_usage == RidUsage.IrreversiblePseudonym:
             logger.warning(
                 "source organization '%s' is not allowed to exchange reversible pseudonyms due to insufficient RID usage permissions",
