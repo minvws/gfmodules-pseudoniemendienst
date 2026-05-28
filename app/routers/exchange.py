@@ -76,7 +76,7 @@ def receive(
     try:
         payload: Dict[str, Any] = json.loads(plaintext)
     except json.JSONDecodeError:
-        logger.warning("failed to parse RID payload as JSON: %s", plaintext)
+        logger.warning("failed to parse RID payload as JSON")
         raise InvalidRID(message="Malformed RID payload")
 
     recipient_org = payload.get("recipient_organization")
@@ -155,13 +155,10 @@ def receive(
         elif isinstance(pid, dict):
             personal_id = PersonalId.from_dict(pid)
         else:
-            logger.warning("invalid personal_id format in RID payload: %s", pid)
+            logger.warning("invalid personal_id format in RID payload: unexpected type %s", type(pid).__name__)
             raise InvalidRID(message="Invalid personal_id format in RID payload")
     except Exception:
-        logger.warning(
-            "failed to parse personal_id from RID payload: %s",
-            payload.get("personal_id"),
-        )
+        logger.warning("failed to parse personal_id from RID payload")
         raise InvalidRID(message="Invalid personal_id in RID payload")
 
     if req.pseudonymType == "bsn":
@@ -293,8 +290,7 @@ def exchange_pseudonym(
 
     if subject is None:
         logger.error(
-            "pseudonym generation failed for personal_id: %s, recipient_organization: %s, recipient_scope: %s, pseudonym_type: %s",
-            req.personalId.as_str(),
+            "pseudonym generation failed for recipient_organization: %s, recipient_scope: %s, pseudonym_type: %s",
             recipient_organization,
             req.recipientScope,
             req.pseudonymType,
