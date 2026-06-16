@@ -8,13 +8,19 @@ import pytest
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
+from app.db.entities.organization import Organization
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.oprf_service import OprfService
 
 
-def _add(db: Database, **kwargs: object) -> None:
+def _add(db: Database, ura: str, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        session.add(HsmKeyVersion(**kwargs))
+        org = session.query(Organization).filter(Organization.ura == ura).first()
+        if org is None:
+            org = Organization(ura=ura, name=f"org-{ura}", max_rid_usage="irp")
+            session.add(org)
+            session.session.flush()
+        session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
         session.commit()
 
 

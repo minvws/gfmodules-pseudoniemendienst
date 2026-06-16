@@ -19,13 +19,14 @@ class HsmKeyVersionService:
         self.__db = db
 
     def get_active_versions(
-        self, at: datetime | None = None
+        self, at: datetime | None = None, ura: str | None = None
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment (defaults to
-        the current date/time).
+        the current date/time), optionally restricted to a single organization's
+        URA.
         """
         at = at or datetime.now(timezone.utc)
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
-            return repo.get_active_versions(at)
+            return repo.get_active_versions(at, ura)

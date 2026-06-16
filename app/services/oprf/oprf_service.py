@@ -80,7 +80,9 @@ class OprfService:
         )
         return jwe
 
-    def _eval_via_hsm(self, recipient_org: str, blinded_bytes: bytes) -> dict[int, bytes]:
+    def _eval_via_hsm(
+        self, recipient_org: str, blinded_bytes: bytes
+    ) -> dict[int, bytes]:
         cfg = self.__hsm_config
         if cfg is None:
             raise ValueError("HSM configuration not found")
@@ -90,8 +92,8 @@ class OprfService:
 
         # The active key versions are stored in the database, keyed by URA number.
         ura = recipient_org[4:] if recipient_org.startswith("ura:") else recipient_org
-        active = self.__hsm_key_version_service.get_active_versions()
-        versions = sorted({int(v.version) for v in active if v.ura == ura})
+        active = self.__hsm_key_version_service.get_active_versions(ura=ura)
+        versions = sorted({int(v.version) for v in active})
         if not versions:
             raise ValueError(f"no active key version for ura {ura}")
 
