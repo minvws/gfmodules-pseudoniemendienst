@@ -6,6 +6,7 @@ from app.config import get_config
 from app.db.db import Database
 from app.services.mtls_service import MtlsService
 
+from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
@@ -32,8 +33,15 @@ def container_config(binder: inject.Binder) -> None:
     mtls_service = MtlsService(config.app.mtls_override_cert, org_service)
     binder.bind(MtlsService, mtls_service)
 
+    hsm_key_version_service = HsmKeyVersionService(db)
+    binder.bind(HsmKeyVersionService, hsm_key_version_service)
+
     if config.oprf.hsm_url:
-        oprf_service = OprfService(server_key=None, hsm_config=config.oprf)
+        oprf_service = OprfService(
+            server_key=None,
+            hsm_config=config.oprf,
+            hsm_key_version_service=hsm_key_version_service,
+        )
     else:
         try:
             with open(config.oprf.server_key_file, "r") as f:
@@ -96,6 +104,10 @@ def get_database() -> Database:
 
 def get_client_oauth_service() -> ClientOAuthService:
     return inject.instance(ClientOAuthService)
+
+
+def get_hsm_key_version_service() -> HsmKeyVersionService:
+    return inject.instance(HsmKeyVersionService)
 
 
 if not inject.is_configured():

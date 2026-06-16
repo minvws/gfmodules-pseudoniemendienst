@@ -6,6 +6,7 @@ import requests
 from jwcrypto import jwk
 
 from app.config import ConfigOprf
+from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.jwe_token import BlindJwe
 from app.models.requests import BlindRequest
 
@@ -13,9 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class OprfService:
-    def __init__(self, server_key: str | None, hsm_config: ConfigOprf | None = None):
+    def __init__(
+        self,
+        server_key: str | None,
+        hsm_config: ConfigOprf | None = None,
+        hsm_key_version_service: HsmKeyVersionService | None = None,
+    ):
         self.__server_key = base64.urlsafe_b64decode(server_key) if server_key else None
         self.__hsm_config = hsm_config
+        self.__hsm_key_version_service = hsm_key_version_service
 
         if hsm_config and hsm_config.hsm_url:
             logger.info("OPRF evaluation configured via HSM at %s", hsm_config.hsm_url)
@@ -36,21 +43,34 @@ class OprfService:
         try:
             bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
             if self.__hsm_config and self.__hsm_config.hsm_url:
-                eval_bytes = self._eval_via_hsm(req.recipientOrganization, bi)
+                evals = self._eval_via_hsm(req.recipientOrganization, bi)
             else:
-                eval_bytes = pyoprf.evaluate(self.__server_key, bi)
+                evals = {1: pyoprf.evaluate(self.__server_key, bi)}
         except Exception as e:
             logger.exception("unable to evaluate blind")
             raise ValueError(f"unable to evaluate blind: {e}")
 
-        subject = "pseudonym:eval:" + base64.urlsafe_b64encode(eval_bytes).decode(
+        # The subject always carries the latest key version in the original,
+        # backwards-compatible format so existing clients keep working unchanged.
+        latest = max(evals)
+        subject = "pseudonym:eval:" + base64.urlsafe_b64encode(evals[latest]).decode(
             "utf-8"
         )
+
+        # Any additional (older) key versions are stored as a separate claim, so
+        # newer clients can detect and finalize against older versions as well.
+        extra_versions = {
+            str(version): base64.urlsafe_b64encode(eval_bytes).decode("utf-8")
+            for version, eval_bytes in sorted(evals.items())
+            if version != latest
+        }
+
         jwe = BlindJwe.build(
             audience=req.recipientOrganization,
             scope=req.recipientScope,
             subject=subject,
             pub_key=pub_key,
+            extra_claims={"extra_versions": extra_versions},
         )
 
         logger.info(
@@ -60,7 +80,33 @@ class OprfService:
         )
         return jwe
 
-    def _eval_via_hsm(self, recipient_org: str, blinded_bytes: bytes) -> bytes:
+    def _eval_via_hsm(
+        self, recipient_org: str, blinded_bytes: bytes
+    ) -> dict[int, bytes]:
+        cfg = self.__hsm_config
+        if cfg is None:
+            raise ValueError("HSM configuration not found")
+
+        if self.__hsm_key_version_service is None:
+            raise ValueError("HSM key version service not configured")
+
+        # The active key versions are stored in the database, keyed by URA number.
+        ura = recipient_org[4:] if recipient_org.startswith("ura:") else recipient_org
+        active = self.__hsm_key_version_service.get_active_versions(ura=ura)
+        versions = sorted({int(v.version) for v in active})
+        if not versions:
+            raise ValueError(f"no active key version for ura {ura}")
+
+        # Evaluate the blind against every active key version, so the result holds
+        # one entry per version (e.g. during key rotation).
+        return {
+            version: self._evaluate_label(
+                f"ura-{recipient_org}-v{version}", blinded_bytes
+            )
+            for version in versions
+        }
+
+    def _evaluate_label(self, label: str, blinded_bytes: bytes) -> bytes:
         cfg = self.__hsm_config
         if cfg is None:
             raise ValueError("HSM configuration not found")
@@ -69,7 +115,7 @@ class OprfService:
         response = requests.post(
             url,
             json={
-                "label": f"ura-{recipient_org}",
+                "label": label,
                 "blinded_point": base64.b64encode(blinded_bytes).decode(),
             },
             timeout=10,

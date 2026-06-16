@@ -15,10 +15,11 @@ A RID consists of JSON data that contains a personal_id and recipient informatio
 A RID is encrypted with AES-256-GCM with the following properties:
 
     plaintext       JSON data
-    key             HKDF derived key from a master key
+    key             hkdf(master_key, info=b"prs:rid", length=32)
     iv/nonce        12 bytes secure random
     mode            AES-GCM
-    aad             b"prs:RID-v1"
+    aad             b"RID:v1"
+    layout          nonce || tag || ciphertext
     authentication  GCM tag included and verified on decryption
     
 A RID is NOT deterministic.
@@ -35,7 +36,7 @@ The reversible pseudonym is an encrypted representation of the combination of:
 
 it is encrypted through AES-SIV, with the key derived as following:
 
-    hkdf(master_key, info=b"prs:RP-v1", length=32) => <static_org_aes_key>
+    hkdf(master_key, info=b"prs:rp:aes-siv:" + <rcpt_org>, length=32) => <static_org_aes_key>
 
 This allows the RP to be deterministic per organization, while still being irreversible without the master key.
 
@@ -43,7 +44,7 @@ A RP is encrypted with AES-SIV (AEAD) with the following proeperties:
 
     plaintext     <personal_id> | <rcpt_org> | <rcpt_scope>
     key           <org_static_aes_key>  
-    aad           b"prs:RP-v1"
+    aad           b"PRS:Pseudonym:v1"
     layout        tag || ciphertext
     
 An RP is deterministic and only reversible by the PRS service using the organization key derived from the master key.
@@ -61,6 +62,6 @@ it is hashed through:
 
 where the static_hmac_key is derived as following:
 
-    hkdf(master_key, info=b"prs:IRP-v1", length=32) => <static_hmac_key>
+    hkdf(master_key, info=b"prs:irp:hmac", length=32) => <static_hmac_key>
 
 An IRP is deterministic.
