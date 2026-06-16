@@ -1,4 +1,5 @@
 from jwcrypto import jwe, jwk
+from typing import Any
 import json
 import time
 
@@ -10,7 +11,7 @@ class BlindJwe:
         scope: str,
         subject: str,
         pub_key: jwk.JWK,
-        extra_claims: dict[str, str] = {},
+        extra_claims: dict[str, Any] = {},
     ) -> str:
         """
         Build a JWT token
