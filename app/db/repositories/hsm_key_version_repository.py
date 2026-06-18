@@ -82,7 +82,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             .options(joinedload(HsmKeyVersion.organization))
             .where(HsmKeyVersion.id == version_id)
         )
-        return self.db_session.session.execute(query).scalars().first()
+        return self.db_session.execute(query).scalars().first()
 
     def update(
         self,
