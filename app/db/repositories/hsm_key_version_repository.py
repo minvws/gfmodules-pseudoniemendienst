@@ -36,7 +36,7 @@ class HsmKeyVersionRepository(RepositoryBase):
         )
         if ura is not None:
             query = query.join(Organization).where(Organization.ura == ura)
-        return self.db_session.session.execute(query).scalars().all()
+        return self.db_session.execute(query).scalars().all()
 
     def get_max_version(self, organization_id: uuid.UUID) -> int:
         """
