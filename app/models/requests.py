@@ -1,5 +1,6 @@
 import base64
 import logging
+from datetime import datetime
 from typing import Any, Literal, List
 
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
@@ -27,6 +28,17 @@ class OrgRequest(BaseModel):
             logger.warning("URA must contain only digits (got %s)", v)
             raise ValueError("URA must contain 8 digits")
         return v
+
+
+class HsmKeyVersionRequest(BaseModel):
+    ura: str = Field(..., pattern=URA_PATTERN)
+    from_dt: datetime | None = None
+    until_dt: datetime | None = None
+
+
+class HsmKeyVersionUpdateRequest(BaseModel):
+    until_dt: datetime | None = None
+    removed: bool = False
 
 
 class RidReceiveRequest(BaseModel):

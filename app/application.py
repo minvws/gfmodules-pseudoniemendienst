@@ -10,6 +10,7 @@ from app.routers.health import router as health_router
 from app.routers.oprf import router as oprf_router
 from app.routers.test_oprf import router as test_oprf_router
 from app.routers.key import router as key_router
+from app.routers.hsm_key_version import router as hsm_key_version_router
 from app.routers.org import router as org_router
 from app.routers.exchange import router as exchange_router
 from app.config import get_config
@@ -96,6 +97,7 @@ def setup_fastapi() -> FastAPI:
     routers = [
         oprf_router,
         key_router,
+        hsm_key_version_router,
         exchange_router,
         org_router,
     ]
