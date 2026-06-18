@@ -101,7 +101,7 @@ class HsmKeyVersionRepository(RepositoryBase):
 
         entry.until_dt = until_dt  # type: ignore
         entry.removed = removed  # type: ignore
-        self.db_session.session.add(entry)
+        self.db_session.add(entry)
         self.db_session.session.flush()
 
         logger.info("updated hsm key version %s", version_id)
