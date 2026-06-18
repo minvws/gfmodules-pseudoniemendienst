@@ -46,7 +46,7 @@ class HsmKeyVersionRepository(RepositoryBase):
         query = select(func.max(HsmKeyVersion.version)).where(
             HsmKeyVersion.organization_id == organization_id
         )
-        return self.db_session.session.execute(query).scalar() or 0
+        return self.db_session.execute(query).scalar() or 0
 
     def create(
         self,
