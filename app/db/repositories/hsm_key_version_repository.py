@@ -64,7 +64,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             from_dt=from_dt,
             until_dt=until_dt,
         )
-        self.db_session.session.add(entry)
+        self.db_session.add(entry)
         self.db_session.session.flush()
 
         logger.info(
