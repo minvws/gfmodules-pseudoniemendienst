@@ -53,6 +53,9 @@ fix: lint-fix spelling-fix ## Runs all fixers
 generate-oprf-key: ## Generate OPRF key
 	$(RUN_PREFIX) python app/generate-oprf-key.py
 
+cleanup: ## Remove expired HSM key versions (run periodically via cron)
+	$(RUN_PREFIX) python -m app.cleanup
+
 help: ## Display available commands
 	echo "Available make commands:"
 	echo

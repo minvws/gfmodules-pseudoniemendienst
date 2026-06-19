@@ -13,6 +13,14 @@ from app.models.requests import BlindRequest
 logger = logging.getLogger(__name__)
 
 
+def oprf_key_label(recipient_org: str, version: int) -> str:
+    """
+    The label under which an OPRF key version is stored in the HSM. Shared by
+    OPRF evaluation and the expired-key cleanup so both refer to the same key.
+    """
+    return f"ura-{recipient_org}-v{version}"
+
+
 class OprfService:
     def __init__(
         self,
@@ -101,7 +109,7 @@ class OprfService:
         # one entry per version (e.g. during key rotation).
         return {
             version: self._evaluate_label(
-                f"ura-{recipient_org}-v{version}", blinded_bytes
+                oprf_key_label(recipient_org, version), blinded_bytes
             )
             for version in versions
         }

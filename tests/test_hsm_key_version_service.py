@@ -19,7 +19,7 @@ def _add(db: Database, ura: str, **kwargs: object) -> None:
         if org is None:
             org = Organization(ura=ura, name=f"org-{ura}", max_rid_usage="irp")
             session.add(org)
-            session.session.flush()
+            session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
         session.commit()
 
@@ -142,6 +142,91 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
     # Older versions are carried separately so newer clients can detect them.
     assert body["extra_versions"] == {
         "2": base64.urlsafe_b64encode(b"eval-v2").decode()
+    }
+
+
+def test_eval_blind_jwe_contains_only_versions_active_at_date(
+    database: Database,
+) -> None:
+    from jwcrypto import jwe as jwelib
+    from jwcrypto import jwk
+
+    from app.models.requests import BlindRequest
+
+    now = datetime.now(timezone.utc)
+    # expired: ended yesterday -> excluded
+    _add(
+        database,
+        ura="12345678",
+        version=1,
+        from_dt=now - timedelta(days=10),
+        until_dt=now - timedelta(days=1),
+    )
+    # active: started, no end date
+    _add(
+        database,
+        ura="12345678",
+        version=3,
+        from_dt=now - timedelta(days=5),
+        until_dt=None,
+    )
+    # active: within window
+    _add(
+        database,
+        ura="12345678",
+        version=5,
+        from_dt=now - timedelta(days=2),
+        until_dt=now + timedelta(days=2),
+    )
+    # future: not started yet -> excluded
+    _add(
+        database,
+        ura="12345678",
+        version=8,
+        from_dt=now + timedelta(days=1),
+        until_dt=None,
+    )
+
+    service = OprfService(
+        server_key=None,
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=HsmKeyVersionService(database),
+    )
+
+    key = jwk.JWK.generate(kty="RSA", size=2048)
+    pub = jwk.JWK.from_json(key.export_public())
+
+    def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+        version = json["label"].rsplit("v", 1)[-1]
+        resp = MagicMock()
+        resp.json.return_value = {
+            "result": base64.b64encode(f"eval-v{version}".encode()).decode()
+        }
+        return resp
+
+    req = BlindRequest(
+        encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+        recipientOrganization="ura:12345678",
+        recipientScope="scope",
+    )
+
+    with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
+        token_str = service.eval_blind(req, pub)
+
+    token = jwelib.JWE()
+    token.deserialize(token_str)
+    token.decrypt(key)
+    body = json.loads(token.payload.decode("utf-8"))
+
+    # Only the versions active *now* are evaluated: v3 and v5. The expired (v1)
+    # and not-yet-started (v8) versions are excluded by date. The latest active
+    # version (v5) is the subject; older active versions are carried separately.
+    assert (
+        body["subject"]
+        == "pseudonym:eval:" + base64.urlsafe_b64encode(b"eval-v5").decode()
+    )
+    assert body["extra_versions"] == {
+        "3": base64.urlsafe_b64encode(b"eval-v3").decode()
     }
 
 

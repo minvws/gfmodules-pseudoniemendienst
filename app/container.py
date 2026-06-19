@@ -6,6 +6,7 @@ from app.config import get_config
 from app.db.db import Database
 from app.services.mtls_service import MtlsService
 
+from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
@@ -35,6 +36,9 @@ def container_config(binder: inject.Binder) -> None:
 
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
+
+    hsm_key_cleanup_service = HsmKeyCleanupService(config.oprf, hsm_key_version_service)
+    binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
 
     if config.oprf.hsm_url:
         oprf_service = OprfService(
@@ -108,6 +112,10 @@ def get_client_oauth_service() -> ClientOAuthService:
 
 def get_hsm_key_version_service() -> HsmKeyVersionService:
     return inject.instance(HsmKeyVersionService)
+
+
+def get_hsm_key_cleanup_service() -> HsmKeyCleanupService:
+    return inject.instance(HsmKeyCleanupService)
 
 
 if not inject.is_configured():
