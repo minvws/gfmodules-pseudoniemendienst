@@ -6,6 +6,7 @@ from typing import Any, Literal, List
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
 
 from app.personal_id import PersonalId
+from app.models.ura import UraNumber
 from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
 
@@ -18,22 +19,25 @@ class RegisterRequest(BaseModel):
 
 
 class OrgRequest(BaseModel):
-    ura: str = Field(..., pattern=URA_PATTERN)
+    ura: str
     name: str = Field(..., min_length=5, max_length=50)
     max_key_usage: RidUsage
 
     @field_validator("ura")
-    def ura_must_be_numbers(cls, v: Any) -> Any:
-        if not v.isdigit():
-            logger.warning("URA must contain only digits (got %s)", v)
-            raise ValueError("URA must contain 8 digits")
-        return v
+    def validate_ura(cls, v: Any) -> str:
+        # Reuse the URA validation/normalization from the UraNumber model.
+        return str(UraNumber(v))
 
 
 class HsmKeyVersionRequest(BaseModel):
-    ura: str = Field(..., pattern=URA_PATTERN)
+    ura: str
     from_dt: datetime | None = None
     until_dt: datetime | None = None
+
+    @field_validator("ura")
+    def validate_ura(cls, v: Any) -> str:
+        # Reuse the URA validation/normalization from the UraNumber model.
+        return str(UraNumber(v))
 
 
 class HsmKeyVersionUpdateRequest(BaseModel):

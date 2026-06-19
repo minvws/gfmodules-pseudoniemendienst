@@ -38,6 +38,20 @@ class HsmKeyVersionRepository(RepositoryBase):
             query = query.join(Organization).where(Organization.ura == ura)
         return self.db_session.execute(query).scalars().all()
 
+    def get_by_ura(self, ura: str) -> Sequence[HsmKeyVersion]:
+        """
+        Returns all key versions belonging to the organization with the given URA,
+        regardless of date or removed state, ordered by version number.
+        """
+        query = (
+            select(HsmKeyVersion)
+            .options(joinedload(HsmKeyVersion.organization))
+            .join(Organization)
+            .where(Organization.ura == ura)
+            .order_by(HsmKeyVersion.version)
+        )
+        return self.db_session.execute(query).scalars().all()
+
     def get_expired_versions(self, at: datetime) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that have passed their end date (until_dt is set

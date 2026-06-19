@@ -33,6 +33,15 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             return repo.get_active_versions(at, ura)
 
+    def get_versions_for_ura(self, ura: str) -> Sequence[HsmKeyVersion]:
+        """
+        Returns all key versions for the given organization URA, regardless of
+        date or removed state (for administrative listing).
+        """
+        with self.__db.get_db_session() as session:
+            repo = session.get_repository(HsmKeyVersionRepository)
+            return repo.get_by_ura(ura)
+
     def get_expired_versions(
         self, at: datetime | None = None
     ) -> Sequence[HsmKeyVersion]:

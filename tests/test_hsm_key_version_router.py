@@ -134,8 +134,58 @@ def test_update_unknown_version_returns_404(
     assert response.json() == {"detail": "key version not found"}
 
 
-def test_update_invalid_id_returns_400(client: TestClient, database: Database) -> None:
+def test_update_invalid_id_returns_422(client: TestClient, database: Database) -> None:
+    # FastAPI validates the UUID path param, so a malformed id is a 422.
     response = client.put("/key-versions/not-a-uuid", json={"removed": True})
 
-    assert response.status_code == 400
-    assert response.json() == {"detail": "invalid key version id"}
+    assert response.status_code == 422
+
+
+def test_list_versions_returns_all_for_org(
+    client: TestClient, database: Database, org_service: OrgService
+) -> None:
+    org_service.create("12345678", "MyOrg-12345678", RidUsage.IrreversiblePseudonym)
+    client.post("/key-versions", json={"ura": "12345678"})
+    client.post("/key-versions", json={"ura": "12345678"})
+
+    response = client.get("/key-versions/12345678")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [v["version"] for v in body] == [1, 2]
+    assert {v["ura"] for v in body} == {"12345678"}
+
+
+def test_list_versions_includes_removed(
+    client: TestClient, database: Database, org_service: OrgService
+) -> None:
+    org_service.create("12345678", "MyOrg-12345678", RidUsage.IrreversiblePseudonym)
+    created = client.post("/key-versions", json={"ura": "12345678"}).json()
+    client.put(f"/key-versions/{created['id']}", json={"removed": True})
+
+    response = client.get("/key-versions/12345678")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["removed"] is True
+
+
+def test_list_versions_empty_for_org_without_versions(
+    client: TestClient, database: Database, org_service: OrgService
+) -> None:
+    org_service.create("12345678", "MyOrg-12345678", RidUsage.IrreversiblePseudonym)
+
+    response = client.get("/key-versions/12345678")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_versions_unknown_org_returns_404(
+    client: TestClient, database: Database
+) -> None:
+    response = client.get("/key-versions/99999999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "organization not found"}
