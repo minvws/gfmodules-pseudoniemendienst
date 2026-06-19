@@ -33,6 +33,18 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             return repo.get_active_versions(at, ura)
 
+    def get_expired_versions(
+        self, at: datetime | None = None
+    ) -> Sequence[HsmKeyVersion]:
+        """
+        Returns all key versions that have expired (until_dt in the past) but are
+        not yet removed, at the given moment (defaults to the current date/time).
+        """
+        at = at or datetime.now(timezone.utc)
+        with self.__db.get_db_session() as session:
+            repo = session.get_repository(HsmKeyVersionRepository)
+            return repo.get_expired_versions(at)
+
     def create_version(
         self,
         ura: str,
@@ -88,6 +100,27 @@ class HsmKeyVersionService:
             except Exception:
                 session.rollback()
                 logger.exception("failed to update hsm key version %s", version_id)
+                raise
+
+            return entry
+
+    def mark_removed(self, version_id: uuid.UUID) -> HsmKeyVersion | None:
+        """
+        Flags a key version as removed (without touching its dates). Returns None
+        when no version exists for the given ID.
+        """
+        with self.__db.get_db_session() as session:
+            repo = session.get_repository(HsmKeyVersionRepository)
+            try:
+                entry = repo.mark_removed(version_id)
+                if entry is None:
+                    return None
+                session.commit()
+            except Exception:
+                session.rollback()
+                logger.exception(
+                    "failed to mark hsm key version %s as removed", version_id
+                )
                 raise
 
             return entry

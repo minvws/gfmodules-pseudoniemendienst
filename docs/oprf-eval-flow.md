@@ -8,6 +8,9 @@ date), the blind is evaluated against **every** active version, and the resultin
 JWE stays backwards compatible: the `subject` always carries the latest version,
 while older versions are added in a separate `extra_versions` claim.
 
+Expired key versions are removed from the HSM by a separate scheduled program;
+see [Expired HSM key cleanup](./hsm-key-cleanup.md).
+
 ```mermaid
 sequenceDiagram
     autonumber

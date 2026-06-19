@@ -3,7 +3,7 @@ import random
 from time import sleep
 from typing import Callable, Any, TypeVar, Type
 
-from sqlalchemy import Engine
+from sqlalchemy import Engine, Result
 from sqlalchemy.exc import OperationalError, DatabaseError, PendingRollbackError
 from sqlalchemy.orm import Session
 
@@ -77,6 +77,14 @@ class DbSession:
         # database cascading will take care of the rest
         self._retry(self.session.delete, entry)
 
+    def flush(self) -> None:
+        """
+        Flush pending changes to the database without committing the transaction
+
+        :return:
+        """
+        self._retry(self.session.flush)
+
     def commit(self) -> None:
         """
         Commits any pending work in the session to the database
@@ -102,7 +110,7 @@ class DbSession:
         """
         return self._retry(self.session.query, *entities)
 
-    def execute(self, stmt: Any) -> Any:
+    def execute(self, stmt: Any) -> Result[Any]:
         """
         Execute a statement in the current session
 

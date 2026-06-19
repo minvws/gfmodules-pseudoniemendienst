@@ -19,7 +19,7 @@ def _add(db: Database, ura: str, **kwargs: object) -> None:
         if org is None:
             org = Organization(ura=ura, name=f"org-{ura}", max_rid_usage="irp")
             session.add(org)
-            session.session.flush()
+            session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
         session.commit()
 

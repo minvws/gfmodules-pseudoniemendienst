@@ -38,6 +38,23 @@ class HsmKeyVersionRepository(RepositoryBase):
             query = query.join(Organization).where(Organization.ura == ura)
         return self.db_session.execute(query).scalars().all()
 
+    def get_expired_versions(self, at: datetime) -> Sequence[HsmKeyVersion]:
+        """
+        Returns all key versions that have passed their end date (until_dt is set
+        and in the past) but have not been removed yet. The organization is eagerly
+        loaded so its URA stays available after the session is closed.
+        """
+        query = (
+            select(HsmKeyVersion)
+            .options(joinedload(HsmKeyVersion.organization))
+            .where(
+                HsmKeyVersion.removed.is_(False),
+                HsmKeyVersion.until_dt.is_not(None),
+                HsmKeyVersion.until_dt < at,
+            )
+        )
+        return self.db_session.execute(query).scalars().all()
+
     def get_max_version(self, organization_id: uuid.UUID) -> int:
         """
         Returns the highest version number currently stored for the given
@@ -65,7 +82,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             until_dt=until_dt,
         )
         self.db_session.add(entry)
-        self.db_session.session.flush()
+        self.db_session.flush()
 
         logger.info(
             "created hsm key version %s for organization %s", version, organization_id
@@ -102,7 +119,24 @@ class HsmKeyVersionRepository(RepositoryBase):
         entry.until_dt = until_dt  # type: ignore
         entry.removed = removed  # type: ignore
         self.db_session.add(entry)
-        self.db_session.session.flush()
+        self.db_session.flush()
 
         logger.info("updated hsm key version %s", version_id)
+        return entry
+
+    def mark_removed(self, version_id: uuid.UUID) -> Optional[HsmKeyVersion]:
+        """
+        Flags an existing key version as removed, leaving its dates untouched.
+        Returns None when no version exists for the given ID.
+        """
+        entry = self.get_by_id(version_id)
+        if entry is None:
+            logger.warning("hsm key version with id %s does not exist", version_id)
+            return None
+
+        entry.removed = True  # type: ignore
+        self.db_session.add(entry)
+        self.db_session.flush()
+
+        logger.info("marked hsm key version %s as removed", version_id)
         return entry
