@@ -29,21 +29,21 @@ class OrganizationKeyRepository(RepositoryBase):
                 )
             )
         )
-        return self.db_session.session.execute(query).scalars().first()
+        return self.db_session.execute(query).scalars().first()
 
     def get_by_id(self, key_id: uuid.UUID) -> Optional[OrganizationKey]:
         """
         Fetches the key entry by its unique ID.
         """
         query = select(OrganizationKey).where(OrganizationKey.id == key_id)
-        return self.db_session.session.execute(query).scalars().first()
+        return self.db_session.execute(query).scalars().first()
 
     def get_by_org(self, org_id: uuid.UUID) -> Optional[Sequence[OrganizationKey]]:
         """
         Fetches all key entries for a given organization.
         """
         query = select(OrganizationKey).where(OrganizationKey.organization_id == org_id)
-        return self.db_session.session.execute(query).scalars().all()
+        return self.db_session.execute(query).scalars().all()
 
     def create(
         self, org_id: uuid.UUID, scope: list[str], key_data: str
@@ -56,8 +56,8 @@ class OrganizationKeyRepository(RepositoryBase):
             scope=scope,
             key_data=key_data,
         )
-        self.db_session.session.add(entry)
-        self.db_session.session.flush()
+        self.db_session.add(entry)
+        self.db_session.flush()
 
         return entry
 
@@ -73,7 +73,7 @@ class OrganizationKeyRepository(RepositoryBase):
 
         entry.scope = scope  # type: ignore
         entry.key_data = key_data  # type: ignore
-        self.db_session.session.add(entry)
+        self.db_session.add(entry)
         return entry
 
     def delete_by_org(self, org_id: uuid.UUID) -> int:
@@ -81,10 +81,10 @@ class OrganizationKeyRepository(RepositoryBase):
         Deletes all key entries for a given organization.
         """
         query = select(OrganizationKey).where(OrganizationKey.organization_id == org_id)
-        entries = self.db_session.session.execute(query).scalars().all()
+        entries = self.db_session.execute(query).scalars().all()
         count = len(entries)
 
         for entry in entries:
-            self.db_session.session.delete(entry)
+            self.db_session.delete(entry)
 
         return count

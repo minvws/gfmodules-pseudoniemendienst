@@ -137,7 +137,9 @@ class KeyResolver:
     def delete(self, key_id: uuid.UUID) -> bool:
         with self.db.get_db_session() as session:
             entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
-            session.session.delete(entry)
+            if entry is None:
+                return False
+            session.delete(entry)
             session.commit()
             return True
 

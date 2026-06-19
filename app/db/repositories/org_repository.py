@@ -17,7 +17,7 @@ class OrgRepository(RepositoryBase):
         Fetches the organization by its unique ID.
         """
         query = select(Organization).where(Organization.ura == ura)
-        return self.db_session.session.execute(query).scalars().first()
+        return self.db_session.execute(query).scalars().first()
 
     def create(self, ura: str, name: str, max_usage_level: str) -> Organization:
         """
@@ -28,8 +28,8 @@ class OrgRepository(RepositoryBase):
             name=name,
             max_rid_usage=max_usage_level,
         )
-        self.db_session.session.add(entry)
-        self.db_session.session.flush()
+        self.db_session.add(entry)
+        self.db_session.flush()
 
         logger.info("created organization with URA %s and name %r", ura, name)
         return entry
@@ -47,7 +47,7 @@ class OrgRepository(RepositoryBase):
 
         org.name = name  # type: ignore
         org.max_rid_usage = max_usage_level  # type: ignore
-        self.db_session.session.add(org)
+        self.db_session.add(org)
         return org
 
     def delete(self, org_id: uuid.UUID) -> bool:
@@ -59,7 +59,7 @@ class OrgRepository(RepositoryBase):
             logger.error("organization with ID %s does not exist", org_id)
             return False
 
-        self.db_session.session.delete(org)
+        self.db_session.delete(org)
         return True
 
     def get_by_id(self, org_id: uuid.UUID) -> Optional[Organization]:
@@ -67,4 +67,4 @@ class OrgRepository(RepositoryBase):
         Fetches the organization by its unique ID.
         """
         query = select(Organization).where(Organization.id == org_id)
-        return self.db_session.session.execute(query).scalars().first()
+        return self.db_session.execute(query).scalars().first()
