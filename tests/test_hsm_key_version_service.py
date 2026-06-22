@@ -13,11 +13,11 @@ from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.oprf_service import OprfService
 
 
-def _add(db: Database, ura: str, **kwargs: object) -> None:
+def _add(db: Database, oin: str, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        org = session.query(Organization).filter(Organization.ura == ura).first()
+        org = session.query(Organization).filter(Organization.oin == oin).first()
         if org is None:
-            org = Organization(ura=ura, name=f"org-{ura}", max_rid_usage="irp")
+            org = Organization(oin=oin, name=f"org-{oin}", max_rid_usage="irp")
             session.add(org)
             session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
@@ -27,21 +27,21 @@ def _add(db: Database, ura: str, **kwargs: object) -> None:
 def test_get_active_versions_filters_by_date_and_removed(database: Database) -> None:
     now = datetime.now(timezone.utc)
     # active: started, no end date
-    _add(database, ura="111", version=1, from_dt=now - timedelta(days=1), until_dt=None)
+    _add(database, oin="111", version=1, from_dt=now - timedelta(days=1), until_dt=None)
     # active: within window
     _add(
         database,
-        ura="222",
+        oin="222",
         version=2,
         from_dt=now - timedelta(days=1),
         until_dt=now + timedelta(days=1),
     )
     # inactive: not started yet
-    _add(database, ura="333", version=3, from_dt=now + timedelta(days=1), until_dt=None)
+    _add(database, oin="333", version=3, from_dt=now + timedelta(days=1), until_dt=None)
     # inactive: already ended
     _add(
         database,
-        ura="444",
+        oin="444",
         version=4,
         from_dt=now - timedelta(days=2),
         until_dt=now - timedelta(days=1),
@@ -49,7 +49,7 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
     # inactive: removed
     _add(
         database,
-        ura="555",
+        oin="555",
         version=5,
         from_dt=now - timedelta(days=1),
         until_dt=None,
@@ -57,19 +57,19 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
     )
 
     service = HsmKeyVersionService(database)
-    active = {v.ura for v in service.get_active_versions()}
+    active = {v.oin for v in service.get_active_versions()}
 
     assert active == {"111", "222"}
 
 
 def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> None:
     now = datetime.now(timezone.utc)
-    _add(database, ura="12345678", version=2, from_dt=now - timedelta(days=2))
-    _add(database, ura="12345678", version=7, from_dt=now - timedelta(days=1))
+    _add(database, oin="12345678", version=2, from_dt=now - timedelta(days=2))
+    _add(database, oin="12345678", version=7, from_dt=now - timedelta(days=1))
     # a removed version must be ignored
     _add(
         database,
-        ura="12345678",
+        oin="12345678",
         version=9,
         from_dt=now - timedelta(days=1),
         removed=True,
@@ -86,11 +86,11 @@ def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> No
     with patch(
         "app.services.oprf.oprf_service.requests.post", return_value=response
     ) as post:
-        result = service._eval_via_hsm("ura:12345678", b"blinded")
+        result = service._eval_via_hsm("oin:12345678", b"blinded")
 
     assert result == {2: b"evaluated", 7: b"evaluated"}
     labels = {call.kwargs["json"]["label"] for call in post.call_args_list}
-    assert labels == {"ura-ura:12345678-v2", "ura-ura:12345678-v7"}
+    assert labels == {"oin-oin:12345678-v2", "oin-oin:12345678-v7"}
 
 
 def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) -> None:
@@ -100,8 +100,8 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
     from app.models.requests import BlindRequest
 
     now = datetime.now(timezone.utc)
-    _add(database, ura="12345678", version=2, from_dt=now - timedelta(days=2))
-    _add(database, ura="12345678", version=7, from_dt=now - timedelta(days=1))
+    _add(database, oin="12345678", version=2, from_dt=now - timedelta(days=2))
+    _add(database, oin="12345678", version=7, from_dt=now - timedelta(days=1))
 
     service = OprfService(
         server_key=None,
@@ -122,7 +122,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
 
     req = BlindRequest(
         encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
-        recipientOrganization="ura:12345678",
+        recipientOrganization="oin:12345678",
         recipientScope="scope",
     )
 
@@ -157,7 +157,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # expired: ended yesterday -> excluded
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -165,7 +165,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # active: started, no end date
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=3,
         from_dt=now - timedelta(days=5),
         until_dt=None,
@@ -173,7 +173,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # active: within window
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=5,
         from_dt=now - timedelta(days=2),
         until_dt=now + timedelta(days=2),
@@ -181,7 +181,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # future: not started yet -> excluded
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=8,
         from_dt=now + timedelta(days=1),
         until_dt=None,
@@ -206,7 +206,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
 
     req = BlindRequest(
         encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
-        recipientOrganization="ura:12345678",
+        recipientOrganization="oin:00000099000000001000",
         recipientScope="scope",
     )
 
@@ -236,9 +236,9 @@ def test_eval_via_hsm_without_active_version_raises(database: Database) -> None:
         hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
         hsm_key_version_service=HsmKeyVersionService(database),
     )
-
-    with pytest.raises(ValueError, match="no active key version for ura"):
-        service._eval_via_hsm("ura:12345678", b"blinded")
+    target = "00000099000000001000"
+    with pytest.raises(ValueError, match=f"no active key version for oin {target}"):
+        service._eval_via_hsm(f"oin:{target}", b"blinded")
 
 
 def test_eval_via_hsm_without_service_raises() -> None:
@@ -247,4 +247,4 @@ def test_eval_via_hsm_without_service_raises() -> None:
     )
 
     with pytest.raises(ValueError, match="HSM key version service not configured"):
-        service._eval_via_hsm("ura:12345678", b"blinded")
+        service._eval_via_hsm("oin:12345678", b"blinded")

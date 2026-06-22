@@ -62,9 +62,9 @@ class KeyResolver:
     def __init__(self, db: Database):
         self.db = db
 
-    def max_rid_usage(self, ura: str) -> Optional[RidUsage]:
+    def max_rid_usage(self, oin: str) -> Optional[RidUsage]:
         with self.db.get_db_session() as session:
-            org = session.get_repository(OrgRepository).get_by_ura(ura)
+            org = session.get_repository(OrgRepository).get_by_oin(oin)
             if org is None:
                 return None
 

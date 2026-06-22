@@ -12,11 +12,11 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
 
-def _add(db: Database, ura: str, **kwargs: object) -> None:
+def _add(db: Database, oin: str, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        org = session.query(Organization).filter(Organization.ura == ura).first()
+        org = session.query(Organization).filter(Organization.oin == oin).first()
         if org is None:
-            org = Organization(ura=ura, name=f"org-{ura}", max_rid_usage="irp")
+            org = Organization(oin=oin, name=f"org-{oin}", max_rid_usage="irp")
             session.add(org)
             session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
@@ -34,7 +34,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # expired, not removed -> should be cleaned up
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -42,7 +42,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # expired for a different org -> should be cleaned up too
     _add(
         database,
-        ura="87654321",
+        oin="00000099000000001001",
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=2),
@@ -50,7 +50,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # active (no end date) -> must be left alone
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=2,
         from_dt=now - timedelta(days=1),
         until_dt=None,
@@ -58,7 +58,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # already removed -> must be ignored
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=3,
         from_dt=now - timedelta(days=5),
         until_dt=now - timedelta(days=1),
@@ -76,22 +76,25 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
 
     # The right keys are destroyed in the HSM, by their stored label.
     labels = {call.kwargs["json"]["label"] for call in post.call_args_list}
-    assert labels == {"ura-ura:12345678-v1", "ura-ura:87654321-v1"}
+    assert labels == {
+        "oin-oin:00000099000000001000-v1",
+        "oin-oin:00000099000000001001-v1",
+    }
     urls = {call.args[0] for call in post.call_args_list}
     assert urls == {"https://hsm.local/hsm/softhsm/SoftHSMLabel/destroy"}
 
     # Nothing expired remains, and the active version is still active.
     version_service = HsmKeyVersionService(database)
     assert version_service.get_expired_versions() == []
-    active = {(v.ura, int(v.version)) for v in version_service.get_active_versions()}
-    assert active == {("12345678", 2)}
+    active = {(v.oin, v.version) for v in version_service.get_active_versions()}
+    assert active == {("00000099000000001000", 2)}
 
 
 def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
     now = datetime.now(timezone.utc)
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -114,7 +117,7 @@ def test_cleanup_keeps_version_when_hsm_destroy_fails(database: Database) -> Non
     now = datetime.now(timezone.utc)
     _add(
         database,
-        ura="12345678",
+        oin="00000099000000001000",
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -139,24 +142,28 @@ def test_get_expired_versions_filters(database: Database) -> None:
     now = datetime.now(timezone.utc)
     _add(
         database,
-        ura="111",
+        oin="111",
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now - timedelta(days=1),
     )  # expired
     _add(
-        database, ura="222", version=1, from_dt=now - timedelta(days=2), until_dt=None
+        database,
+        oin="00000099000000001000",
+        version=1,
+        from_dt=now - timedelta(days=2),
+        until_dt=None,
     )  # active, no end
     _add(
         database,
-        ura="333",
+        oin="00000099000000001001",
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now + timedelta(days=1),
     )  # active, future end
     _add(
         database,
-        ura="444",
+        oin="00000099000000001003",
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now - timedelta(days=1),
@@ -164,7 +171,7 @@ def test_get_expired_versions_filters(database: Database) -> None:
     )  # expired but already removed
 
     expired = HsmKeyVersionService(database).get_expired_versions()
-    assert {v.ura for v in expired} == {"111"}
+    assert {v.oin for v in expired} == {"111"}
 
 
 @pytest.mark.parametrize("hsm_url", ["", None])

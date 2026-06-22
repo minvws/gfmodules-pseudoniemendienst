@@ -52,7 +52,7 @@ class DbSession:
         self, repository_class: Type["repository_base.TRepositoryBase"]
     ) -> "repository_base.TRepositoryBase":
         """
-        Returns an instantiated repository
+        Returns an instantiated repository for the given model class
         """
         if issubclass(repository_class, repository_base.RepositoryBase):
             return repository_class(self)

@@ -24,22 +24,20 @@ def post_eval(
     org_service: OrgService = Depends(container.get_org_service),
     oprf_service: OprfService = Depends(container.get_oprf_service),
 ) -> JSONResponse:
-
-    if not req.recipientOrganization.startswith("ura:"):
-        logger.warning("does not start with ura: %s" % req.recipientOrganization)
+    if not req.recipientOrganization.startswith("oin:"):
+        logger.warning("does not start with oin: %s" % req.recipientOrganization)
         return JSONResponse(
-            {"error": "Invalid recipient organization. Format: ura:<ura_number>"},
+            {"error": "Invalid recipient organization. Format: oin:<oin_number>"},
             status_code=400,
         )
-    ura = req.recipientOrganization[4:]
+    oin = req.recipientOrganization[4:]
 
-    org = org_service.get_by_ura(ura)
+    org = org_service.get_by_oin(oin)
     if org is None:
-        logger.warning("no organization found for URA %r", ura)
+        logger.warning("no organization found for OIN %r", oin)
         return JSONResponse(
-            {"error": "No organization found for this ura"}, status_code=404
+            {"error": "No organization found for this OIN"}, status_code=404
         )
-
     pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         logger.warning(

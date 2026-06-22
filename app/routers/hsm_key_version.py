@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 
 from app import container
 from app.models.requests import (
-    URA_PATTERN,
+    OIN_PATTERN,
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
 )
@@ -32,36 +32,36 @@ def post_key_version(
 ) -> JSONResponse:
     try:
         entry = hsm_key_version_service.create_version(
-            req.ura, req.from_dt, req.until_dt
+            req.oin, req.from_dt, req.until_dt
         )
     except ValueError as e:
         logger.warning("cannot create key version: %s", e)
         raise HTTPException(status_code=404, detail=str(e))
     except Exception:
-        logger.exception("failed to create key version for ura %s", req.ura)
+        logger.exception("failed to create key version for OIN %s", req.oin)
         raise HTTPException(status_code=500, detail="failed to create key version")
 
     return JSONResponse(status_code=201, content=jsonable_encoder(entry.to_dict()))
 
 
 @router.get(
-    "/key-versions/{ura}",
+    "/key-versions/{oin}",
     summary="List HSM key versions for an organization",
     tags=["Key Version Services"],
 )
 def list_key_versions(
-    ura: Annotated[str, Path(pattern=URA_PATTERN)],
+    oin: Annotated[str, Path(pattern=OIN_PATTERN)],
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_ura(ura)
+    org = org_service.get_by_oin(oin)
     if org is None:
-        logger.warning("organization for URA %r not found", ura)
+        logger.warning("organization for OIN %r not found", oin)
         raise HTTPException(status_code=404, detail="organization not found")
 
-    versions = hsm_key_version_service.get_versions_for_ura(ura)
+    versions = hsm_key_version_service.get_versions_for_oin(oin)
     return JSONResponse(
         status_code=200, content=jsonable_encoder([v.to_dict() for v in versions])
     )

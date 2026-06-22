@@ -5,13 +5,13 @@ from typing import Any, Literal, List
 
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
 
+from app.models.oin import Oin
 from app.personal_id import PersonalId
-from app.models.ura import UraNumber
 from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
-URA_PATTERN = r"^\d{8}$"
+OIN_PATTERN = r"^\d{8}(?:[A-Za-z0-9]{8}0{4}|[A-Za-z0-9]{9}0{3})$"
 
 
 class RegisterRequest(BaseModel):
@@ -19,25 +19,25 @@ class RegisterRequest(BaseModel):
 
 
 class OrgRequest(BaseModel):
-    ura: str
+    oin: str
     name: str = Field(..., min_length=5, max_length=50)
     max_key_usage: RidUsage
 
-    @field_validator("ura")
+    @field_validator("oin")
     def validate_ura(cls, v: Any) -> str:
         # Reuse the URA validation/normalization from the UraNumber model.
-        return str(UraNumber(v))
+        return str(Oin(v))
 
 
 class HsmKeyVersionRequest(BaseModel):
-    ura: str
+    oin: str
     from_dt: datetime | None = None
     until_dt: datetime | None = None
 
-    @field_validator("ura")
+    @field_validator("oin")
     def validate_ura(cls, v: Any) -> str:
         # Reuse the URA validation/normalization from the UraNumber model.
-        return str(UraNumber(v))
+        return str(Oin(v))
 
 
 class HsmKeyVersionUpdateRequest(BaseModel):

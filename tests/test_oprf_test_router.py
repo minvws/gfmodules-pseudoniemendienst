@@ -44,12 +44,12 @@ def generate_rsa_keypair() -> Tuple[str, str]:
 def setup_org_and_key(
     org_service: OrgService,
     key_resolver: KeyResolver,
-    ura: str,
+    oin: str,
     scope: str,
 ) -> str:
     org = org_service.create(
-        ura=ura,
-        name=f"Integration OPRF Test Router Org {ura}",
+        oin=oin,
+        name=f"Integration OPRF Test Router Org {oin}",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
     private_key_pem, public_key_pem = generate_rsa_keypair()
@@ -62,7 +62,7 @@ def oprf_test_router_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
 ) -> OprfTestRouterContext:
-    recipient_organization = "ura:12345678"
+    recipient_organization = "oin:00000099000000001000"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -72,7 +72,7 @@ def oprf_test_router_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        ura="12345678",
+        oin="00000099000000001000",
         scope=recipient_scope,
     )
     return OprfTestRouterContext(

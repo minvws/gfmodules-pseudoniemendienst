@@ -9,9 +9,9 @@ from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
 
 MOCK_ORGS = {
-    "ura:12345678": (["nvi"], "irp", "", ""),
-    "ura:87654321": (["nvi"], "rp", "", ""),
-    "ura:11223344": (["brp"], "bsn", "", ""),
+    "oin:12345678": (["nvi"], "irp", "", ""),
+    "oin:87654321": (["nvi"], "rp", "", ""),
+    "oin:11223344": (["brp"], "bsn", "", ""),
 }
 
 
@@ -44,15 +44,15 @@ def gen_rsa_key(bits: int = 1024) -> Tuple[str, str]:
 def create_mock_orgs(
     org_service: OrgService, key_resolver: KeyResolver, mock_orgs: Dict[str, Any]
 ) -> None:
-    for ura, org_data in mock_orgs.items():
-        stripped_ura = ura.replace("ura:", "")
-        org = org_service.create(stripped_ura, f"MyOrg-{ura}", org_data[1])
+    for oin, org_data in mock_orgs.items():
+        stripped_oin = oin.replace("oin:", "")
+        org = org_service.create(stripped_oin, f"MyOrg-{oin}", org_data[1])
         if org is None:
-            raise RuntimeError(f"Could not create mock org {ura}")
+            raise RuntimeError(f"Could not create mock org {oin}")
 
-        (priv_key, pub_key) = gen_rsa_key(1024)
+        priv_key, pub_key = gen_rsa_key(1024)
         generate_keys(key_resolver, org.id, org_data[0], org_data[1], pub_key)
-        mock_orgs[ura] = (org_data[0], org_data[1], priv_key, pub_key)
+        mock_orgs[oin] = (org_data[0], org_data[1], priv_key, pub_key)
 
 
 def decode_jwe(
@@ -82,7 +82,7 @@ def test_create_happy_path(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
@@ -102,7 +102,7 @@ def test_invalid_scope(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "invalid-scope",
             "ridUsage": "bsn",
         },
@@ -119,7 +119,7 @@ def test_invalid_scope(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:1234567823751735703297509312759013275097125",
+            "recipientOrganization": "oin:1234567823751735703297509312759013275097125",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
@@ -127,7 +127,7 @@ def test_invalid_scope(
 
     assert response.status_code == 404
     assert response.json() == {
-        "detail": "Organization with URA '1234567823751735703297509312759013275097125' not found"
+        "detail": "Organization with OIN '1234567823751735703297509312759013275097125' not found"
     }
     assert response.headers["Content-Type"] == "application/json"
 
@@ -141,20 +141,20 @@ def test_decode_as_receiver(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
     )
     jwe = response.content.decode("utf-8")
-    (headers, data) = decode_jwe(jwe, MOCK_ORGS["ura:12345678"][2])
+    headers, data = decode_jwe(jwe, MOCK_ORGS["oin:12345678"][2])
 
     assert headers["enc"] == "A256GCM"
     assert headers["alg"] == "RSA-OAEP-256"
     assert headers["kid"] is not None
 
     assert data["subject"].startswith("rid:")
-    assert data["aud"] == "ura:12345678"
+    assert data["aud"] == "oin:12345678"
     assert data["scope"] == "nvi"
     assert data["ridUsage"] == "bsn"
 
@@ -162,13 +162,13 @@ def test_decode_as_receiver(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
     )
     jwe = response.content.decode("utf-8")
-    (headers2, data2) = decode_jwe(jwe, MOCK_ORGS["ura:12345678"][2])
+    headers2, data2 = decode_jwe(jwe, MOCK_ORGS["oin:12345678"][2])
 
     # Make sure a new RID is generated each time
     assert data["subject"] != data2["subject"]
@@ -183,7 +183,7 @@ def test_receive_rids(
         "/receive",
         json={
             "rid": "foobar",
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
@@ -195,7 +195,7 @@ def test_receive_rids(
         "/receive",
         json={
             "rid": "rid:foobar",
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
@@ -213,13 +213,13 @@ def test_receive_incorrect_org(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
     )
     jwe = response.content.decode("utf-8")
-    (headers, data) = decode_jwe(jwe, MOCK_ORGS["ura:12345678"][2])
+    headers, data = decode_jwe(jwe, MOCK_ORGS["oin:12345678"][2])
     rid = data["subject"]
 
     # We should not be able to decrypt to incorrect organization
@@ -227,7 +227,7 @@ def test_receive_incorrect_org(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:32535632532512512",
+            "recipientOrganization": "oin:32535632532512512",
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
@@ -240,7 +240,7 @@ def test_receive_incorrect_org(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "incorrect-scope",
             "pseudonymType": "rp",
         },
@@ -253,7 +253,7 @@ def test_receive_incorrect_org(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
@@ -273,13 +273,13 @@ def test_receive_incorrect_usage(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "ridUsage": "irp",  # Can only be used to exchange for an IRP, not an RP or BSN
         },
     )
     jwe = response.content.decode("utf-8")
-    (headers, data) = decode_jwe(jwe, MOCK_ORGS["ura:12345678"][2])
+    headers, data = decode_jwe(jwe, MOCK_ORGS["oin:12345678"][2])
     rid = data["subject"]
 
     # We should not be able to decrypt to RP, even if we are allowed as an organisation
@@ -287,7 +287,7 @@ def test_receive_incorrect_usage(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
@@ -302,7 +302,7 @@ def test_receive_incorrect_usage(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
@@ -317,7 +317,7 @@ def test_receive_incorrect_usage(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:12345678",
+            "recipientOrganization": "oin:12345678",
             "recipientScope": "nvi",
             "pseudonymType": "irp",
         },
@@ -335,13 +335,13 @@ def test_min_usage_level(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "ura:87654321",
+            "recipientOrganization": "oin:87654321",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
     )
     jwe = response.content.decode("utf-8")
-    (headers, data) = decode_jwe(jwe, MOCK_ORGS["ura:87654321"][2])
+    headers, data = decode_jwe(jwe, MOCK_ORGS["oin:87654321"][2])
     rid = data["subject"]
 
     # Organization is allowed to retrieve an IRP
@@ -349,7 +349,7 @@ def test_min_usage_level(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:87654321",
+            "recipientOrganization": "oin:87654321",
             "recipientScope": "nvi",
             "pseudonymType": "irp",
         },
@@ -357,12 +357,13 @@ def test_min_usage_level(
     assert response.status_code == 200
     assert response.json()["type"] == "irp"
 
-    # Organization is allowed to retrieve an RP
+    # Organization is allow
+    # ed to retrieve an RP
     response = client.post(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:87654321",
+            "recipientOrganization": "oin:87654321",
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
@@ -375,7 +376,7 @@ def test_min_usage_level(
         "/receive",
         json={
             "rid": rid,
-            "recipientOrganization": "ura:87654321",
+            "recipientOrganization": "oin:87654321",
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },

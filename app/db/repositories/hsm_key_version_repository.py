@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 @repository(HsmKeyVersion)
 class HsmKeyVersionRepository(RepositoryBase):
     def get_active_versions(
-        self, at: datetime, ura: Optional[str] = None
+        self, at: datetime, oin: Optional[str] = None
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment, i.e. not
         removed, already started (from_dt <= at) and not yet ended (until_dt is
-        unset or still in the future). When a URA is supplied, only the versions
+        unset or still in the future). When a OIN is supplied, only the versions
         belonging to that organization are returned.
         """
         query = (
@@ -34,20 +34,20 @@ class HsmKeyVersionRepository(RepositoryBase):
                 or_(HsmKeyVersion.until_dt.is_(None), HsmKeyVersion.until_dt >= at),
             )
         )
-        if ura is not None:
-            query = query.join(Organization).where(Organization.ura == ura)
+        if oin is not None:
+            query = query.join(Organization).where(Organization.oin == oin)
         return self.db_session.execute(query).scalars().all()
 
-    def get_by_ura(self, ura: str) -> Sequence[HsmKeyVersion]:
+    def get_by_oin(self, oin: str) -> Sequence[HsmKeyVersion]:
         """
-        Returns all key versions belonging to the organization with the given URA,
+        Returns all key versions belonging to the organization with the given OIN,
         regardless of date or removed state, ordered by version number.
         """
         query = (
             select(HsmKeyVersion)
             .options(joinedload(HsmKeyVersion.organization))
             .join(Organization)
-            .where(Organization.ura == ura)
+            .where(Organization.oin == oin)
             .order_by(HsmKeyVersion.version)
         )
         return self.db_session.execute(query).scalars().all()
@@ -56,7 +56,7 @@ class HsmKeyVersionRepository(RepositoryBase):
         """
         Returns all key versions that have passed their end date (until_dt is set
         and in the past) but have not been removed yet. The organization is eagerly
-        loaded so its URA stays available after the session is closed.
+        loaded so its OIN stays available after the session is closed.
         """
         query = (
             select(HsmKeyVersion)
@@ -130,8 +130,8 @@ class HsmKeyVersionRepository(RepositoryBase):
             logger.warning("hsm key version with id %s does not exist", version_id)
             return None
 
-        entry.until_dt = until_dt  # type: ignore
-        entry.removed = removed  # type: ignore
+        entry.until_dt = until_dt
+        entry.removed = removed
         self.db_session.add(entry)
         self.db_session.flush()
 
@@ -148,7 +148,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             logger.warning("hsm key version with id %s does not exist", version_id)
             return None
 
-        entry.removed = True  # type: ignore
+        entry.removed = True
         self.db_session.add(entry)
         self.db_session.flush()
 

@@ -12,26 +12,26 @@ logger = logging.getLogger(__name__)
 
 @repository(Organization)
 class OrgRepository(RepositoryBase):
-    def get_by_ura(self, ura: str) -> Optional[Organization]:
+    def get_by_oin(self, oin: str) -> Optional[Organization]:
         """
         Fetches the organization by its unique ID.
         """
-        query = select(Organization).where(Organization.ura == ura)
+        query = select(Organization).where(Organization.oin == oin)
         return self.db_session.execute(query).scalars().first()
 
-    def create(self, ura: str, name: str, max_usage_level: str) -> Organization:
+    def create(self, oin: str, name: str, max_usage_level: str) -> Organization:
         """
         Creates a new org entry.
         """
         entry = Organization(
-            ura=ura,
+            oin=oin,
             name=name,
             max_rid_usage=max_usage_level,
         )
         self.db_session.add(entry)
         self.db_session.flush()
 
-        logger.info("created organization with URA %s and name %r", ura, name)
+        logger.info("created organization with OIN %s and name %r", oin, name)
         return entry
 
     def update(
@@ -45,8 +45,8 @@ class OrgRepository(RepositoryBase):
             logger.error(f"organization with ID {org_id} does not exist")
             raise ValueError("Organization not found")
 
-        org.name = name  # type: ignore
-        org.max_rid_usage = max_usage_level  # type: ignore
+        org.name = name
+        org.max_rid_usage = max_usage_level
         self.db_session.add(org)
         return org
 

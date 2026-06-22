@@ -192,7 +192,7 @@ def post_test_reversible_pseudonym(
 
     try:
         decoded = pseudonym_service.decrypt_reversible_pseudonym(
-            pseudonym, str(org.ura)
+            pseudonym, str(org.oin)
         )
     except Exception as e:
         return JSONResponse(

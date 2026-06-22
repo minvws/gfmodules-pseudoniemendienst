@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import Column, String
+from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,9 +18,9 @@ class Organization(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    ura = Column(String, unique=True, nullable=False)
-    name = Column(String, nullable=False)
-    max_rid_usage = Column(String, nullable=False)
+    oin: Mapped[str] = mapped_column("oin", String, unique=True)
+    name: Mapped[str] = mapped_column("name", String)
+    max_rid_usage: Mapped[str] = mapped_column("max_rid_usage", String)
 
     keys = relationship(
         "OrganizationKey",
@@ -30,7 +30,7 @@ class Organization(Base):
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "ura": self.ura,
+            "oin": self.oin,
             "name": self.name,
             "max_rid_usage": self.max_rid_usage,
         }

@@ -16,12 +16,16 @@ def test_resolver_create_and_resolve_roundtrip(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+        oin="ura:00000099000000001000",
+        name="test org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
     # create
     req = KeyRequest(
-        organization="ura:94252", scope=["NVI", " lmr "], pub_key=TEST_PUBKEY
+        organization="oin:00000099000000001000",
+        scope=["NVI", " lmr "],
+        pub_key=TEST_PUBKEY,
     )
     entry = key_resolver.create(org.id, req.scope, req.pub_key)
 
@@ -37,7 +41,9 @@ def test_resolver_get_and_delete(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        ura="ura:94252", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+        oin="oin:00000099000000001000",
+        name="test org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
     e = key_resolver.create(org.id, ["*"], TEST_PUBKEY)

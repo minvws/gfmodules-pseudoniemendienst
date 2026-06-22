@@ -18,7 +18,7 @@ def oprf_key_label(recipient_org: str, version: int) -> str:
     The label under which an OPRF key version is stored in the HSM. Shared by
     OPRF evaluation and the expired-key cleanup so both refer to the same key.
     """
-    return f"ura-{recipient_org}-v{version}"
+    return f"oin-{recipient_org}-v{version}"
 
 
 class OprfService:
@@ -98,12 +98,12 @@ class OprfService:
         if self.__hsm_key_version_service is None:
             raise ValueError("HSM key version service not configured")
 
-        # The active key versions are stored in the database, keyed by URA number.
-        ura = recipient_org[4:] if recipient_org.startswith("ura:") else recipient_org
-        active = self.__hsm_key_version_service.get_active_versions(ura=ura)
-        versions = sorted({int(v.version) for v in active})
+        # The active key versions are stored in the database, keyed by OIN number.
+        oin = recipient_org[4:] if recipient_org.startswith("oin:") else recipient_org
+        active = self.__hsm_key_version_service.get_active_versions(oin=oin)
+        versions = sorted({v.version for v in active})
         if not versions:
-            raise ValueError(f"no active key version for ura {ura}")
+            raise ValueError(f"no active key version for oin {oin}")
 
         # Evaluate the blind against every active key version, so the result holds
         # one entry per version (e.g. during key rotation).
@@ -128,9 +128,11 @@ class OprfService:
             },
             timeout=10,
             verify=cfg.hsm_ca_cert_file or True,
-            cert=(cfg.hsm_cert_file, cfg.hsm_key_file)
-            if (cfg.hsm_cert_file and cfg.hsm_key_file)
-            else None,
+            cert=(
+                (cfg.hsm_cert_file, cfg.hsm_key_file)
+                if (cfg.hsm_cert_file and cfg.hsm_key_file)
+                else None
+            ),
         )
         response.raise_for_status()
         return base64.b64decode(response.json()["result"])
