@@ -12,7 +12,11 @@ def ok_or_error(value: bool) -> str:
     return "ok" if value else "error"
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="Health check",
+    tags=["Service Information"],
+)
 def health() -> dict[str, Any]:
     return {
         "status": "ok",

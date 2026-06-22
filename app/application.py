@@ -17,6 +17,93 @@ from app.config import get_config
 from app.auth import get_auth_ctx
 
 
+API_DESCRIPTION = """
+The Pseudoniemendienst (PRS) lets parties exchange data about a person without
+sharing their BSN. Instead of a BSN, parties exchange **RIDs** and **pseudonyms**
+that are scoped to a recipient organization and scope.
+
+A recipient organization is always identified by a URA in the form
+`ura:<8 digits>` (e.g. `ura:90000036`).
+
+The endpoints are grouped into the sections below. Most sections are protected by
+mutual TLS (mTLS); the calling organization and, where relevant, its public key
+are derived from the client certificate.
+"""
+
+# Section (tag) metadata shown in the Swagger UI / OpenAPI schema. The order here
+# determines the order in which the sections are rendered.
+TAGS_METADATA = [
+    {
+        "name": "Service Information",
+        "description": (
+            "Public, unauthenticated endpoints reporting the service version and "
+            "health status. Useful for load balancers, monitoring, and smoke tests."
+        ),
+    },
+    {
+        "name": "Organizational Services",
+        "description": (
+            "Manage recipient organizations. An organization is identified by its "
+            "URA and has a `max_key_usage` (`bsn`, `rp`, or `irp`) that caps which "
+            "pseudonym types it is allowed to exchange."
+        ),
+    },
+    {
+        "name": "Key Registration Services",
+        "description": (
+            "Register and manage the public keys that pseudonyms and RIDs are "
+            "encrypted to. The organization and its public key are derived from the "
+            "mTLS client certificate, so they are not part of the request body."
+        ),
+    },
+    {
+        "name": "Key Version Services",
+        "description": (
+            "Manage the HSM key versions used to derive pseudonyms. Multiple "
+            "versions can be active at once to support key rotation, where older "
+            "versions remain available alongside the latest one."
+        ),
+    },
+    {
+        "name": "OPRF Services",
+        "description": (
+            "Evaluate a blinded personal identifier using the Oblivious "
+            "Pseudo-Random Function and return a JWE (encrypted to the recipient's "
+            "public key) containing the evaluation for the active key version(s)."
+        ),
+    },
+]
+
+# Section (tag) metadata for the exchange routes. Only included in the OpenAPI
+# schema when `enable_exchange_services_routes` is set, matching when these routes
+# are mounted.
+EXCHANGE_TAGS_METADATA = [
+    {
+        "name": "Exchange Services",
+        "description": (
+            "Exchange a personal ID for a pseudonym or RID targeted at a recipient "
+            "organization/scope, and redeem a previously issued RID for a pseudonym "
+            "(or the BSN, when permitted by both the RID usage and the "
+            "organization's `max_key_usage`)."
+        ),
+    },
+]
+
+# Section (tag) metadata for the test/helper routes. Only included in the OpenAPI
+# schema when `enable_test_routes` is set, matching when these routes are mounted.
+TEST_TAGS_METADATA = [
+    {
+        "name": "OPRF Testing Services",
+        "description": (
+            "Helper endpoints for testing and debugging the OPRF and JWE flows "
+            "(client-side blinding, receiver finalization, JWE decoding, pseudonym "
+            "reversal, and mTLS introspection). These are only mounted when "
+            "`enable_test_routes` is set and must not be enabled in production."
+        ),
+    },
+]
+
+
 def get_uvicorn_params() -> dict[str, Any]:
     config = get_config()
 
@@ -72,13 +159,20 @@ def setup_logging() -> None:
 def setup_fastapi() -> FastAPI:
     config = get_config()
 
+    openapi_tags = list(TAGS_METADATA)
+    if config.app.enable_exchange_services_routes:
+        openapi_tags += EXCHANGE_TAGS_METADATA
+    if config.app.enable_test_routes:
+        openapi_tags += TEST_TAGS_METADATA
+
     fastapi = (
         FastAPI(
             docs_url=config.uvicorn.docs_url,
             redoc_url=config.uvicorn.redoc_url,
             title="Pseudoniemendienst API",
             summary="API for the Pseudoniemendienst",
-            description="Provides endpoints for OPRF, key management, organization management, and RID exchange.",
+            description=API_DESCRIPTION,
+            openapi_tags=openapi_tags,
             root_path=config.uvicorn.root_path,
         )
         if config.uvicorn.swagger_enabled
@@ -98,9 +192,10 @@ def setup_fastapi() -> FastAPI:
         oprf_router,
         key_router,
         hsm_key_version_router,
-        exchange_router,
         org_router,
     ]
+    if config.app.enable_exchange_services_routes:
+        routers.append(exchange_router)
     if config.app.enable_test_routes:
         routers.append(test_oprf_router)
 
