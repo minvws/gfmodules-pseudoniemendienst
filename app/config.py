@@ -23,6 +23,7 @@ class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
     mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
+    enable_exchange_services_routes: bool = Field(default=True)
 
 
 class ConfigDatabase(BaseModel):

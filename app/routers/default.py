@@ -19,7 +19,11 @@ ____________  _____
 """
 
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="Service banner and version information",
+    tags=["Service Information"],
+)
 def index() -> Response:
     content = LOGO
 
@@ -34,7 +38,11 @@ def index() -> Response:
     return PlainTextResponse(content)
 
 
-@router.get("/version.json")
+@router.get(
+    "/version.json",
+    summary="Service version as JSON",
+    tags=["Service Information"],
+)
 def version_json() -> Response:
     try:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
