@@ -88,6 +88,10 @@ class ClientOAuthService:
         """
         Verify JWT token and return claims.
         """
+        if not self.config.allowed_audiences:
+            logger.error("client_oauth.allowed_audiences is not configured")
+            raise HTTPException(status_code=401, detail="Invalid token")
+
         jwk_client = PyJWKClient(
             self.config.jwks_url, cache_keys=True, ssl_context=self._ssl_context
         )
@@ -99,7 +103,7 @@ class ClientOAuthService:
                 signing_key,
                 leeway=30,
                 algorithms=["RS256"],
-                audience=self.config.audience,
+                audience=self.config.allowed_audiences,
                 issuer=self.config.issuer,
                 options={
                     "require": ["exp", "iat", "sub", "aud", "iss", "scope", "cnf"],

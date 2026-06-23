@@ -50,7 +50,8 @@ master_key=
 enabled = False
 # When disabled, the override_ura_number MUST be set. This value will be used instead of an actual URA number from the token
 override_ura_number = 12345600
-audience = prs.service
+# Space-separated list of accepted JWT audiences. A token is valid if its "aud" claim matches any of these.
+allowed_audiences = prs.service
 issuer = https://localhost:8443/
 jwks_url = https://localhost:8443/oauth/jwks.json
 mtls_cert = secrets/ssl/client_oauth.cert

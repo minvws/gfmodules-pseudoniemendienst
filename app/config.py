@@ -99,10 +99,18 @@ class ConfigClientOAuth(BaseModel):
     override_ura_number: str | None = Field(default=None)
     jwks_url: str
     issuer: str
-    audience: str
+    allowed_audiences: list[str]
     mtls_cert: str | None = Field(default=None)
     mtls_key: str | None = Field(default=None)
     verify_ca: str | bool = Field(default=True)
+
+    @field_validator("allowed_audiences", mode="before")
+    @classmethod
+    def split_allowed_audiences(cls, value: Any) -> Any:
+        """Allow a space-separated string from the config file to be parsed into a list."""
+        if isinstance(value, str):
+            return value.split()
+        return value
 
 
 class Config(BaseModel):
