@@ -99,11 +99,17 @@ class ConfigClientOAuth(BaseModel):
     override_ura_number: str | None = Field(default=None)
     jwks_url: str
     issuer: str
-    audience: str
+    allowed_audiences: list[str] | None = Field(default=None)
     mtls_cert: str | None = Field(default=None)
     mtls_key: str | None = Field(default=None)
     verify_ca: str | bool = Field(default=True)
 
+    @field_validator("allowed_audiences", mode="before")
+    @classmethod
+    def parse_space_separated(cls, v: Any) -> list[str] | None:
+        if isinstance(v, str):
+            return v.split() or None
+        return v if v is None or isinstance(v, list) else None
 
 class Config(BaseModel):
     app: ConfigApp
