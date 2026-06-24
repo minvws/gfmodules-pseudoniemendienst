@@ -4,13 +4,18 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from fastapi import HTTPException
 from starlette.requests import Request
-from uzireader.uziserver import UziServer
 import logging
 
 from app.db.entities.organization import Organization
 from app.services.org_service import OrgService
+from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
+
+
+class InvalidOinCertificate(HTTPException):
+    def __init__(self, msg: str = "Invalid OIN Certificate") -> None:
+        super().__init__(status_code=400, detail=msg)
 
 
 class MtlsService:
@@ -82,36 +87,33 @@ class MtlsService:
 
         return public_pem.decode("ascii")
 
-    def get_mtls_uzi_data(self, request: Request) -> UziServer:
-        """
-        Extract UZI data from the client certificate
-        """
-        cert_bytes = self.get_mtls_cert(request)
-        formatted_cert = self._enforce_cert_newlines(cert_bytes)
-        return UziServer(verify="SUCCESS", cert=formatted_cert)
+    def get_oin_cert(self, request: Request) -> x509.Certificate:
+        try:
+            cert_bytes = self.get_mtls_cert(request)
+            cert_pem = self._enforce_cert_newlines(cert_bytes)
+            return x509.load_pem_x509_certificate(cert_pem.encode())
+        except ValueError as e:
+            logger.warning(f"Unable to read certificate from header {e}")
+            raise InvalidOinCertificate()
+
+    def get_oin_from_cert(self, cert: x509.Certificate) -> str:
+        attr = cert.subject.get_attributes_for_oid(x509.oid.NameOID.SERIAL_NUMBER)
+        value = attr[0].value
+        try:
+            oin = Oin(value if isinstance(value, str) else value.decode())
+            return oin.value
+
+        except ValueError as e:
+            logger.warning(f"Invalid OIN in certificate {e}")
+            raise InvalidOinCertificate()
 
     def get_org_from_request(self, request: Request) -> Organization:
-        """
-        Extract the organization from the client certificate in the request
-        """
-
-        data = self.get_mtls_uzi_data(request)
-        if data["CardType"] != "S":
-            card_type = data.get("CardType")
-            logger.error(
-                "invalid client certificate type %r. Need an UZI S-type certificate.",
-                card_type,
-            )
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid client certificate. Need an UZI S-type certificate.",
-            )
-        ura = data["SubscriberNumber"]
-        org = self.org_service.get_by_oin(ura)
+        oin_cert = self.get_oin_cert(request)
+        oin = self.get_oin_from_cert(oin_cert)
+        org = self.org_service.get_by_oin(oin)
         if org is None:
-            logger.error("organization for URA %r is not registered", ura)
             raise HTTPException(
-                status_code=400, detail=f"organization for URA {ura} is not registered"
+                status_code=400, detail=f"organization for OIN {oin} is not registered"
             )
 
         return org
