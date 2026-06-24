@@ -34,7 +34,7 @@ def post_key(
 
     # Create the key entry
     try:
-        key_resolver.create(org.id, req.scope, mtls_pub_key)
+        key_resolver.create(org.id, req.scope, req.key_id, mtls_pub_key)
     except AlreadyExistsError:
         logger.warning("key already exists for org_id=%s scope=%r", org.id, req.scope)
         raise HTTPException(
