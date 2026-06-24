@@ -5,6 +5,7 @@ import inject
 from app.config import get_config
 from app.db.db import Database
 from app.services.mtls_service import MtlsService
+from app.services.auth.headers import AuthHeaderService
 
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -24,6 +25,11 @@ def container_config(binder: inject.Binder) -> None:
 
     db = Database(dsn=config.database.dsn)
     binder.bind(Database, db)
+
+    auth_headers_service = AuthHeaderService(
+        expected_audience=config.authorization_headers.expected_audience
+    )
+    binder.bind(AuthHeaderService, auth_headers_service)
 
     key_resolver = KeyResolver(db)
     binder.bind(KeyResolver, key_resolver)
@@ -116,6 +122,10 @@ def get_hsm_key_version_service() -> HsmKeyVersionService:
 
 def get_hsm_key_cleanup_service() -> HsmKeyCleanupService:
     return inject.instance(HsmKeyCleanupService)
+
+
+def get_auth_headers_service() -> AuthHeaderService:
+    return inject.instance(AuthHeaderService)
 
 
 if not inject.is_configured():

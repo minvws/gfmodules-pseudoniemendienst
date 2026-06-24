@@ -7,8 +7,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import AuthContext, get_auth_ctx
 from app.models.requests import RegisterRequest, OIN_PATTERN
+from app.models.auth.context import AuthContext
 from app.services.mtls_service import MtlsService
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
@@ -83,12 +83,12 @@ def list_keys_for_org(
 )
 def put_key(
     key_id: str,
-    req: KeyRequest,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    data: KeyRequest,
+    request: Request,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-
+    ctx: AuthContext = request.state.ctx
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
@@ -100,17 +100,17 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(str(auth_ctx.ura_number))
+    caller_org = org_service.get_by_oin(ctx.claims.oin)
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
             "caller ura=%s attempted to update key %s owned by org %s",
-            auth_ctx.ura_number,
+            ctx.claims.oin,
             key_id,
             entry.organization_id,
         )
         raise HTTPException(status_code=403, detail="forbidden")
 
-    key_resolver.update(entry.id, req.scope, req.pub_key)
+    key_resolver.update(entry.id, data.scope, data.pub_key)
     updated_entry = key_resolver.get_by_id(key_uuid)
     if updated_entry is None:
         logger.error("failed to retrieve updated key with id %r", key_id)
@@ -126,10 +126,11 @@ def put_key(
 )
 def delete_key(
     key_id: str,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    request: Request,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
+    ctx: AuthContext = request.state.auth
     try:
         key_uuid = uuid.UUID(key_id)
     except ValueError:
@@ -141,11 +142,11 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(str(auth_ctx.ura_number))
+    caller_org = org_service.get_by_oin(ctx.claims.oin)
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
-            "caller ura=%s attempted to delete key %s owned by org %s",
-            auth_ctx.ura_number,
+            "caller oin=%s attempted to delete key %s owned by org %s",
+            ctx.claims.oin,
             key_id,
             entry.organization_id,
         )

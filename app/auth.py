@@ -1,14 +1,12 @@
 import logging
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends
 from starlette.requests import Request
 
-from app.container import get_client_oauth_service
-from app.models.ura import UraNumber
-from app.services.client_oauth import ClientOAuthService
+from app import container
+from app.models.auth.context import AuthContext, AuthenticationClaims
+from app.models.auth.headers import AuthHeaders
+from app.services.auth.headers import AuthHeaderService
 
 logger = logging.getLogger(__name__)
 
@@ -25,56 +23,25 @@ class OAuthError(Exception):
         self.status_code = status_code
 
 
-@dataclass(frozen=True)
-class AuthContext:
-    """
-    Authentication context extracted from the bearer token. This can be used in the route handlers
-    """
-
-    # List of claims from the token
-    claims: Dict[str, Any]
-    # OAuth scope
-    scope: List[str]
-    # URA number of the authenticated user
-    ura_number: UraNumber
-
-
-bearer = HTTPBearer(auto_error=False)
-
-
 def get_auth_ctx(
     request: Request,
-    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    client_oauth_service: ClientOAuthService = Depends(get_client_oauth_service),
+    auth_headers_service: AuthHeaderService = Depends(
+        container.get_auth_headers_service
+    ),
 ) -> AuthContext:
-    if not client_oauth_service.enabled():
-        ctx = AuthContext(
-            claims={},
-            scope=[],
-            ura_number=client_oauth_service.override_ura_number(),
-        )
-        request.state.auth = ctx
-        return ctx
-
-    if creds is None or creds.scheme.lower() != "bearer":
-        logger.error("missing or invalid bearer token")
-        raise HTTPException(status_code=401, detail="Missing bearer token")
-
     try:
-        claims = client_oauth_service.verify(request)
-    except OAuthError as e:
-        desc = getattr(e, "description", None) or str(e)
-        status = getattr(e, "status_code", None) or 401
+        auth_headers = AuthHeaders.from_request(request)
+    except ValueError as e:
+        logger.exception("Failed to extract AuthHeaders")
+        raise ValueError(f"Inavalid Authorization Headers in request: {e}")
 
-        logger.exception("oauth verification failed (status=%s): %r", status, desc)
-        raise HTTPException(
-            status_code=status, detail="Invalid or unauthorized request"
-        ) from e
-
+    validated_auth_headers = auth_headers_service.validate(auth_headers)
+    claims = AuthenticationClaims(
+        oin=validated_auth_headers.oin,
+    )
     ctx = AuthContext(
         claims=claims,
-        scope=claims["scope"],
-        ura_number=UraNumber(claims["sub"]),
+        audience=validated_auth_headers.audience,
     )
     request.state.auth = ctx
     return ctx

@@ -66,7 +66,9 @@ def test_resolver_create_persists_key_id(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="oin:00000099000000001000", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+        oin="oin:00000099000000001000",
+        name="test org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
     entry = key_resolver.create(org.id, ["nvi"], "kid-2024", TEST_PUBKEY)
@@ -83,7 +85,9 @@ def test_resolver_create_without_key_id(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="oin:00000099000000001000", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+        oin="oin:00000099000000001000",
+        name="test org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
     entry = key_resolver.create(org.id, ["nvi"], None, TEST_PUBKEY)

@@ -9,9 +9,9 @@ from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
 
 MOCK_ORGS = {
-    "oin:12345678": (["nvi"], "irp", "", ""),
-    "oin:87654321": (["nvi"], "rp", "", ""),
-    "oin:11223344": (["brp"], "bsn", "", ""),
+    "oin:00000099000000001000": (["nvi"], "irp", "", ""),
+    "oin:00000099000000002000": (["nvi"], "rp", "", ""),
+    "oin:00000099000000003000": (["brp"], "bsn", "", ""),
 }
 
 
@@ -83,9 +83,13 @@ def test_create_happy_path(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "oin:12345678",
+            "recipientOrganization": "oin:00000099000000001000",
             "recipientScope": "nvi",
             "ridUsage": "bsn",
+        },
+        headers={
+            "x-gf-oin": "00000099000000001000",
+            "x-gf-audience": "prs.service",
         },
     )
     assert response.status_code == 201
@@ -103,15 +107,19 @@ def test_invalid_scope(
         "/exchange/rid",
         json={
             "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
-            "recipientOrganization": "oin:12345678",
+            "recipientOrganization": "oin:00000099000000001000",
             "recipientScope": "invalid-scope",
             "ridUsage": "bsn",
+        },
+        headers={
+            "x-gf-oin": "00000099000000001000",
+            "x-gf-audience": "prs.service",
         },
     )
 
     assert response.status_code == 404
     assert response.json() == {
-        "detail": "No public key found for organization '12345678' and scope 'invalid-scope'"
+        "detail": "No public key found for organization '00000099000000001000' and scope 'invalid-scope'"
     }
     assert response.headers["Content-Type"] == "application/json"
 
