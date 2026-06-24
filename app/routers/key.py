@@ -1,14 +1,14 @@
 import logging
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import AuthContext, get_auth_ctx
-from app.models.requests import RegisterRequest, OIN_PATTERN
+from app.models.requests import RegisterRequest
+from app.models.oin import Oin
 from app.services.mtls_service import MtlsService
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
@@ -52,20 +52,20 @@ def post_key(
 
 
 @router.get(
-    "/keys/{ura}",
+    "/keys/{oin}",
     summary="List public key information for an organization",
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    ura: Annotated[str, Path(pattern=OIN_PATTERN)],
+    oin: Oin,
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_oin(ura)
+    org = org_service.get_by_oin(oin.value)
     if org is None:
-        logger.warning("organization for URA %r not found", ura)
+        logger.warning("organization for OIN %r not found", oin)
         raise HTTPException(
-            status_code=400, detail="organization for this URA is not registered"
+            status_code=400, detail="organization for this OIN is not registered"
         )
 
     entries = key_resolver.get_by_org(org.id)
