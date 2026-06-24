@@ -29,6 +29,7 @@ def generate_keys(
     key_resolver.create(
         org_id,
         scope,
+        None,
         pub_key,
     )
 

@@ -1,7 +1,7 @@
 import base64
 import logging
 from datetime import datetime
-from typing import Any, Literal, List
+from typing import Any, Literal, List, Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
 
@@ -16,6 +16,7 @@ OIN_PATTERN = r"^\d{8}(?:[A-Za-z0-9]{8}0{4}|[A-Za-z0-9]{9}0{3})$"
 
 class RegisterRequest(BaseModel):
     scope: List[str]
+    key_id: Optional[str]
 
 
 class OrgRequest(BaseModel):

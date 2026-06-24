@@ -89,7 +89,7 @@ class KeyResolver:
         return jwk.JWK.from_pem(entry.key_data.encode("ascii"))
 
     def create(
-        self, org_id: uuid.UUID, scope: list[str], key_data: str
+        self, org_id: uuid.UUID, scope: list[str], key_id: Optional[str], key_data: str
     ) -> OrganizationKey:
         scope = _normalize_scope(scope)
         key_data = key_data.strip()
@@ -97,7 +97,7 @@ class KeyResolver:
         with self.db.get_db_session() as session:
             try:
                 entry = session.get_repository(OrganizationKeyRepository).create(
-                    org_id, scope, key_data
+                    org_id, scope, key_data, key_id
                 )
             except Exception as e:
                 logger.exception(

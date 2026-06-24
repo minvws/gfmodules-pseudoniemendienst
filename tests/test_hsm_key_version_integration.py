@@ -99,7 +99,7 @@ def test_new_key_version_is_added_to_jwe(
         oin=OIN, name=f"Org {OIN}", max_key_usage=RidUsage.ReversiblePseudonym
     )
     private_key_pem, public_key_pem = _generate_rsa_keypair()
-    key_resolver.create(org.id, [SCOPE], public_key_pem)
+    key_resolver.create(org.id, [SCOPE], None, public_key_pem)
 
     # Route OPRF evaluation through a (mocked) HSM that reads its active key
     # versions from the same database the endpoint writes to.
