@@ -28,6 +28,7 @@ class OrganizationKey(Base):
         "scope", JSONB, nullable=False, server_default="{}"
     )
     key_data: Mapped[str] = mapped_column("key_data", Text, nullable=False)
+    key_id: Mapped[str | None] = mapped_column("key_id", Text, nullable=True)
 
     organization = relationship("Organization", back_populates="keys")
 
@@ -37,4 +38,5 @@ class OrganizationKey(Base):
             # We omit organization_id since this is an internal detail.
             "scope": self.scope,
             "key_data": self.key_data,
+            "key_id": self.key_id or "",
         }

@@ -53,7 +53,7 @@ def setup_org_and_key(
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
     private_key_pem, public_key_pem = generate_rsa_keypair()
-    key_resolver.create(org.id, [scope], public_key_pem)
+    key_resolver.create(org.id, [scope], None, public_key_pem)
     return private_key_pem
 
 

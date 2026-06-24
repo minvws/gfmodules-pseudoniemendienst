@@ -16,7 +16,7 @@ def test_resolver_create_and_resolve_roundtrip(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="ura:00000099000000001000",
+        oin="oin:00000099000000001000",
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
@@ -27,7 +27,7 @@ def test_resolver_create_and_resolve_roundtrip(
         scope=["NVI", " lmr "],
         pub_key=TEST_PUBKEY,
     )
-    entry = key_resolver.create(org.id, req.scope, req.pub_key)
+    entry = key_resolver.create(org.id, req.scope, "my-key-id", req.pub_key)
 
     assert entry.organization_id == org.id
     assert sorted(entry.scope) == ["lmr", "nvi"]
@@ -46,7 +46,7 @@ def test_resolver_get_and_delete(
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    e = key_resolver.create(org.id, ["*"], TEST_PUBKEY)
+    e = key_resolver.create(org.id, ["*"], "my-key-id", TEST_PUBKEY)
 
     items = key_resolver.get_by_org(org.id) or []
     assert len(items) == 1
@@ -60,3 +60,37 @@ def test_resolver_get_and_delete(
 
     items2 = key_resolver.get_by_org(org.id)
     assert items2 == []
+
+
+def test_resolver_create_persists_key_id(
+    key_resolver: KeyResolver, org_service: OrgService
+) -> None:
+    org = org_service.create(
+        oin="oin:00000099000000001000", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+    )
+
+    entry = key_resolver.create(org.id, ["nvi"], "kid-2024", TEST_PUBKEY)
+    assert entry.key_id == "kid-2024"
+
+    # key_id survives a round-trip through the database
+    stored = key_resolver.get_by_id(entry.id)
+    assert stored is not None
+    assert stored.key_id == "kid-2024"
+    assert stored.to_dict()["key_id"] == "kid-2024"
+
+
+def test_resolver_create_without_key_id(
+    key_resolver: KeyResolver, org_service: OrgService
+) -> None:
+    org = org_service.create(
+        oin="oin:00000099000000001000", name="test org", max_key_usage=RidUsage.ReversiblePseudonym
+    )
+
+    entry = key_resolver.create(org.id, ["nvi"], None, TEST_PUBKEY)
+    assert entry.key_id is None
+
+    stored = key_resolver.get_by_id(entry.id)
+    assert stored is not None
+    assert stored.key_id is None
+    # to_dict() represents a missing key_id as an empty string
+    assert stored.to_dict()["key_id"] == ""

@@ -46,7 +46,7 @@ class OrganizationKeyRepository(RepositoryBase):
         return self.db_session.execute(query).scalars().all()
 
     def create(
-        self, org_id: uuid.UUID, scope: list[str], key_data: str
+        self, org_id: uuid.UUID, scope: list[str], key_data: str, key_id: Optional[str]
     ) -> OrganizationKey:
         """
         Creates a new key entry.
@@ -55,6 +55,7 @@ class OrganizationKeyRepository(RepositoryBase):
             organization_id=org_id,
             scope=scope,
             key_data=key_data,
+            key_id=key_id,
         )
         self.db_session.add(entry)
         self.db_session.flush()
