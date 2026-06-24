@@ -111,6 +111,7 @@ class ConfigClientOAuth(BaseModel):
             return v.split() or None
         return v if v is None or isinstance(v, list) else None
 
+
 class Config(BaseModel):
     app: ConfigApp
     database: ConfigDatabase

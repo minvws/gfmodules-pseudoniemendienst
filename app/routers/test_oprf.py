@@ -1,7 +1,6 @@
 import json
 import logging
 
-from cryptography import x509
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
@@ -230,7 +229,7 @@ def test_mtls(
     org = mtls_service.get_org_from_request(request)
 
     cert_pem = mtls_service.get_mtls_cert(request)
-    cert = x509.load_pem_x509_certificate(cert_pem)
+    cert = mtls_service.get_oin_cert(request)
 
     ret = {
         "cert_pem": cert_pem,
@@ -240,7 +239,7 @@ def test_mtls(
             "not_valid_before": cert.not_valid_before.isoformat(),
             "not_valid_after": cert.not_valid_after.isoformat(),
         },
-        "uzi": mtls_service.get_mtls_uzi_data(request),
+        "oin": mtls_service.get_oin_from_cert(cert),
     }
 
     if org:
