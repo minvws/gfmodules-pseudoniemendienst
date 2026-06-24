@@ -6,7 +6,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import AuthContext, get_auth_ctx
+from app.auth import get_auth_ctx
+from app.models.auth.context import AuthContext
 from app.models.requests import RegisterRequest
 from app.models.oin import Oin
 from app.services.mtls_service import MtlsService
@@ -100,11 +101,11 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(str(auth_ctx.ura_number))
+    caller_org = org_service.get_by_oin(auth_ctx.claims.oin)
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
-            "caller ura=%s attempted to update key %s owned by org %s",
-            auth_ctx.ura_number,
+            "caller oin=%s attempted to update key %s owned by org %s",
+            auth_ctx.claims.oin,
             key_id,
             entry.organization_id,
         )
@@ -141,11 +142,11 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(str(auth_ctx.ura_number))
+    caller_org = org_service.get_by_oin(auth_ctx.claims.oin)
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
-            "caller ura=%s attempted to delete key %s owned by org %s",
-            auth_ctx.ura_number,
+            "caller oin=%s attempted to delete key %s owned by org %s",
+            auth_ctx.claims.oin,
             key_id,
             entry.organization_id,
         )

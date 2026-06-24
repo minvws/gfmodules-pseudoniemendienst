@@ -84,6 +84,7 @@ def _eval(client: TestClient) -> Any:
             "recipientOrganization": RECIPIENT_ORG,
             "recipientScope": SCOPE,
         },
+        headers={"x-gf-oin": OIN, "x-gf-audience": "prs.service"},
     )
 
 
@@ -115,7 +116,11 @@ def test_new_key_version_is_added_to_jwe(
             "app.services.oprf.oprf_service.requests.post", side_effect=_fake_hsm_post
         ):
             # 2. Create version 1 of the HSM key.
-            resp = client.post("/key-versions", json={"oin": OIN})
+            resp = client.post(
+                "/key-versions",
+                json={"oin": OIN},
+                headers={"x-gf-oin": OIN, "x-gf-audience": "prs.service"},
+            )
             assert resp.status_code == 201
             assert resp.json()["version"] == 1
 
@@ -129,7 +134,11 @@ def test_new_key_version_is_added_to_jwe(
             assert body["extra_versions"] == {}
 
             # 4. Create version 2 of the HSM key.
-            resp = client.post("/key-versions", json={"oin": OIN})
+            resp = client.post(
+                "/key-versions",
+                json={"oin": OIN},
+                headers={"x-gf-oin": OIN, "x-gf-audience": "prs.service"},
+            )
             assert resp.status_code == 201
             assert resp.json()["version"] == 2
 
