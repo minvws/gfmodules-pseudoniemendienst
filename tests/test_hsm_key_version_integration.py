@@ -30,8 +30,8 @@ from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 
-URA = "12345678"
-RECIPIENT_ORG = f"ura:{URA}"
+OIN = "00000099000000001000"
+RECIPIENT_ORG = f"oin:{OIN}"
 SCOPE = "nvi"
 
 
@@ -96,7 +96,7 @@ def test_new_key_version_is_added_to_jwe(
 ) -> None:
     # 1. Register an organization with a public key.
     org = org_service.create(
-        ura=URA, name=f"Org {URA}", max_key_usage=RidUsage.ReversiblePseudonym
+        oin=OIN, name=f"Org {OIN}", max_key_usage=RidUsage.ReversiblePseudonym
     )
     private_key_pem, public_key_pem = _generate_rsa_keypair()
     key_resolver.create(org.id, [SCOPE], public_key_pem)
@@ -115,7 +115,7 @@ def test_new_key_version_is_added_to_jwe(
             "app.services.oprf.oprf_service.requests.post", side_effect=_fake_hsm_post
         ):
             # 2. Create version 1 of the HSM key.
-            resp = client.post("/key-versions", json={"ura": URA})
+            resp = client.post("/key-versions", json={"oin": OIN})
             assert resp.status_code == 201
             assert resp.json()["version"] == 1
 
@@ -129,7 +129,7 @@ def test_new_key_version_is_added_to_jwe(
             assert body["extra_versions"] == {}
 
             # 4. Create version 2 of the HSM key.
-            resp = client.post("/key-versions", json={"ura": URA})
+            resp = client.post("/key-versions", json={"oin": OIN})
             assert resp.status_code == 201
             assert resp.json()["version"] == 2
 

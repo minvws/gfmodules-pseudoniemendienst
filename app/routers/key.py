@@ -8,7 +8,7 @@ from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import AuthContext, get_auth_ctx
-from app.models.requests import RegisterRequest, URA_PATTERN
+from app.models.requests import RegisterRequest, OIN_PATTERN
 from app.services.mtls_service import MtlsService
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
@@ -57,11 +57,11 @@ def post_key(
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    ura: Annotated[str, Path(pattern=URA_PATTERN)],
+    ura: Annotated[str, Path(pattern=OIN_PATTERN)],
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_ura(ura)
+    org = org_service.get_by_oin(ura)
     if org is None:
         logger.warning("organization for URA %r not found", ura)
         raise HTTPException(
@@ -100,7 +100,7 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_ura(str(auth_ctx.ura_number))
+    caller_org = org_service.get_by_oin(str(auth_ctx.ura_number))
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
             "caller ura=%s attempted to update key %s owned by org %s",
@@ -141,7 +141,7 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_ura(str(auth_ctx.ura_number))
+    caller_org = org_service.get_by_oin(str(auth_ctx.ura_number))
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
             "caller ura=%s attempted to delete key %s owned by org %s",

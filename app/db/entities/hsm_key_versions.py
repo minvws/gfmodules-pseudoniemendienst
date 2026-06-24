@@ -1,7 +1,8 @@
+from datetime import datetime
 import uuid
-from typing import Any
+from typing import Any, Optional
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,22 +25,25 @@ class HsmKeyVersion(Base):
         ForeignKey("organization.id", ondelete="CASCADE"),
         nullable=False,
     )
-    version = Column(Integer, nullable=False)
-    from_dt = Column(DateTime(timezone=True), nullable=False)
-    until_dt = Column(DateTime(timezone=True), nullable=True)
-    removed = Column(Boolean, nullable=False, server_default="false")
+    version: Mapped[int] = mapped_column("version", Integer, nullable=False)
+    from_dt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    until_dt: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    removed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
     organization: Mapped[Organization] = relationship("Organization")
 
     @property
-    def ura(self) -> str:
-        """Convenience accessor exposing the organization's URA."""
-        return str(self.organization.ura)
+    def oin(self) -> str:
+        return self.organization.oin
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
-            "ura": self.ura,
+            "oin": self.oin,
             "version": self.version,
             "from_dt": self.from_dt,
             "until_dt": self.until_dt,

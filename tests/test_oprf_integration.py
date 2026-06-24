@@ -47,12 +47,12 @@ def generate_rsa_keypair() -> Tuple[str, str]:
 def setup_org_and_key(
     org_service: OrgService,
     key_resolver: KeyResolver,
-    ura: str,
+    oin: str,
     scope: str,
 ) -> str:
     org = org_service.create(
-        ura=ura,
-        name=f"Integration OPRF Org {ura}",
+        oin=oin,
+        name=f"Integration OPRF Org {oin}",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
     private_key_pem, public_key_pem = generate_rsa_keypair()
@@ -123,7 +123,7 @@ def oprf_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
 ) -> OprfIntegrationContext:
-    recipient_organization = "ura:12345678"
+    recipient_organization = "oin:00000099000000001000"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -133,7 +133,7 @@ def oprf_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        ura="12345678",
+        oin="00000099000000001000",
         scope=recipient_scope,
     )
     return OprfIntegrationContext(
@@ -207,24 +207,24 @@ def test_oprf_eval_invalid_recipient_organization_returns_bad_request(
 
     assert eval_response.status_code == 400
     assert eval_response.json() == {
-        "error": "Invalid recipient organization. Format: ura:<ura_number>"
+        "error": "Invalid recipient organization. Format: oin:<oin_number>"
     }
 
 
-def test_oprf_eval_unknown_ura_returns_not_found(
+def test_oprf_eval_unknown_oin_returns_not_found(
     client: TestClient,
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
         json={
             "encryptedPersonalId": "Zm9v",
-            "recipientOrganization": "ura:87654321",
+            "recipientOrganization": "oin:00000099000000001001",
             "recipientScope": "nvi",
         },
     )
 
     assert eval_response.status_code == 404
-    assert eval_response.json() == {"error": "No organization found for this ura"}
+    assert eval_response.json() == {"error": "No organization found for this OIN"}
 
 
 def test_oprf_eval_when_service_rejects_blind_returns_bad_request(

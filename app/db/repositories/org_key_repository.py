@@ -71,8 +71,8 @@ class OrganizationKeyRepository(RepositoryBase):
         if entry is None:
             raise ValueError("Key entry not found")
 
-        entry.scope = scope  # type: ignore
-        entry.key_data = key_data  # type: ignore
+        entry.scope = scope
+        entry.key_data = key_data
         self.db_session.add(entry)
         return entry
 

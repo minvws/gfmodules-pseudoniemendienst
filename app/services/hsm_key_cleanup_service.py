@@ -37,7 +37,7 @@ class HsmKeyCleanupService:
         expired = self.__version_service.get_expired_versions()
         cleaned = 0
         for version in expired:
-            label = oprf_key_label(f"ura:{version.ura}", int(version.version))
+            label = oprf_key_label(f"oin:{version.oin}", version.version)
             try:
                 self._destroy_key(label)
             except Exception:
@@ -61,8 +61,10 @@ class HsmKeyCleanupService:
             json={"label": label},
             timeout=10,
             verify=cfg.hsm_ca_cert_file or True,
-            cert=(cfg.hsm_cert_file, cfg.hsm_key_file)
-            if (cfg.hsm_cert_file and cfg.hsm_key_file)
-            else None,
+            cert=(
+                (cfg.hsm_cert_file, cfg.hsm_key_file)
+                if (cfg.hsm_cert_file and cfg.hsm_key_file)
+                else None
+            ),
         )
         response.raise_for_status()

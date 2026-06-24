@@ -22,9 +22,9 @@ router = APIRouter()
 
 
 class OrganizationNotFound(HTTPException):
-    def __init__(self, ura: str) -> None:
+    def __init__(self, oin: str) -> None:
         super().__init__(
-            status_code=404, detail=f"Organization with URA '{ura}' not found"
+            status_code=404, detail=f"Organization with OIN '{oin}' not found"
         )
 
 
@@ -33,19 +33,19 @@ class InvalidRID(HTTPException):
         super().__init__(status_code=400, detail=message)
 
 
-class InvalidURA(HTTPException):
-    def __init__(self, ura: str) -> None:
+class InvalidOin(HTTPException):
+    def __init__(self, oin: str) -> None:
         super().__init__(
             status_code=400,
-            detail=f"Invalid organization URA '{ura}'. Must start with 'ura:'",
+            detail=f"Invalid organization OIN '{oin}'. Must start with 'oin:'",
         )
 
 
 class PubKeyNotFound(HTTPException):
-    def __init__(self, ura: str, scope: str) -> None:
+    def __init__(self, oin: str, scope: str) -> None:
         super().__init__(
             status_code=404,
-            detail=f"No public key found for organization '{ura}' and scope '{scope}'",
+            detail=f"No public key found for organization '{oin}' and scope '{scope}'",
         )
 
 
@@ -110,15 +110,15 @@ def receive(
         )
         raise InvalidRID(message="Requested pseudonym type not allowed by RID usage")
 
-    if not req.recipientOrganization.startswith("ura:"):
-        logger.warning("does not start with 'ura:': %s", req.recipientOrganization)
-        raise InvalidURA(req.recipientOrganization)
+    if not req.recipientOrganization.startswith("oin:"):
+        logger.warning("does not start with 'oin:': %s", req.recipientOrganization)
+        raise InvalidOin(req.recipientOrganization)
 
-    ura = req.recipientOrganization[4:]
+    oin = req.recipientOrganization[4:]
 
-    max_rid_usage = key_resolver.max_rid_usage(ura)
+    max_rid_usage = key_resolver.max_rid_usage(oin)
     if max_rid_usage is None:
-        logger.warning("no RID usage permissions found for organization: %s", ura)
+        logger.warning("no RID usage permissions found for organization: %s", oin)
         raise HTTPException(
             status_code=400,
             detail="Organization / scope is not allowed to exchange RIDs",
@@ -132,7 +132,7 @@ def receive(
     if USAGE_RANK.get(max_rid_usage.name, 0) < USAGE_RANK[required]:
         logger.warning(
             "organization '%s' with max RID usage '%s' is not allowed to exchange pseudonym type '%s' which requires minimum RID usage '%s'",
-            ura,
+            oin,
             max_rid_usage.name,
             req.pseudonymType,
             required,
@@ -205,22 +205,22 @@ def exchange_rid(
     rid_str = json.dumps(rid_data)
     rid = rid_service.encrypt_rid(rid_str)
 
-    if not req.recipientOrganization.startswith("ura:"):
-        raise InvalidURA(req.recipientOrganization)
-    ura = req.recipientOrganization[4:]
+    if not req.recipientOrganization.startswith("oin:"):
+        raise InvalidOin(req.recipientOrganization)
+    oin = req.recipientOrganization[4:]
 
-    org = org_service.get_by_ura(ura)
+    org = org_service.get_by_oin(oin)
     if org is None:
-        raise OrganizationNotFound(ura)
+        raise OrganizationNotFound(oin)
 
     pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         logger.warning(
             "no public key found for organization '%s' and scope '%s'",
-            ura,
+            oin,
             req.recipientScope,
         )
-        raise PubKeyNotFound(ura, req.recipientScope)
+        raise PubKeyNotFound(oin, req.recipientScope)
 
     # Create a blind JWE token containing the RID
     jwe = BlindJwe.build(
@@ -249,15 +249,15 @@ def exchange_pseudonym(
     org_service: OrgService = Depends(container.get_org_service),
     mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> Response:
-    if not req.recipientOrganization.startswith("ura:"):
-        logger.warning("URA does not start with 'ura:': %s", req.recipientOrganization)
-        raise InvalidURA(req.recipientOrganization)
+    if not req.recipientOrganization.startswith("oin:"):
+        logger.warning("OIN does not start with 'oin:': %s", req.recipientOrganization)
+        raise InvalidOin(req.recipientOrganization)
     recipient_organization = req.recipientOrganization[4:]
 
-    org = org_service.get_by_ura(recipient_organization)
+    org = org_service.get_by_oin(recipient_organization)
     if org is None:
         logger.warning(
-            "recipient organization not found for URA: %s", recipient_organization
+            "recipient organization not found for OIN: %s", recipient_organization
         )
         raise OrganizationNotFound(recipient_organization)
 
@@ -274,7 +274,7 @@ def exchange_pseudonym(
         if source_org.max_rid_usage == RidUsage.IrreversiblePseudonym:
             logger.warning(
                 "source organization '%s' is not allowed to exchange reversible pseudonyms due to insufficient RID usage permissions",
-                source_org.ura,
+                source_org.oin,
             )
             raise HTTPException(
                 status_code=400,
@@ -307,7 +307,7 @@ def exchange_pseudonym(
             recipient_organization,
             req.recipientScope,
         )
-        raise PubKeyNotFound(str(org.ura), req.recipientScope)
+        raise PubKeyNotFound(str(org.oin), req.recipientScope)
 
     jwe = BlindJwe.build(
         audience=recipient_organization,

@@ -107,7 +107,7 @@ class MtlsService:
                 detail="Invalid client certificate. Need an UZI S-type certificate.",
             )
         ura = data["SubscriberNumber"]
-        org = self.org_service.get_by_ura(ura)
+        org = self.org_service.get_by_oin(ura)
         if org is None:
             logger.error("organization for URA %r is not registered", ura)
             raise HTTPException(

@@ -21,26 +21,26 @@ class HsmKeyVersionService:
         self.__db = db
 
     def get_active_versions(
-        self, at: datetime | None = None, ura: str | None = None
+        self, at: datetime | None = None, oin: str | None = None
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment (defaults to
         the current date/time), optionally restricted to a single organization's
-        URA.
+        OIN.
         """
         at = at or datetime.now(timezone.utc)
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
-            return repo.get_active_versions(at, ura)
+            return repo.get_active_versions(at, oin)
 
-    def get_versions_for_ura(self, ura: str) -> Sequence[HsmKeyVersion]:
+    def get_versions_for_oin(self, oin: str) -> Sequence[HsmKeyVersion]:
         """
-        Returns all key versions for the given organization URA, regardless of
+        Returns all key versions for the given organization OIN, regardless of
         date or removed state (for administrative listing).
         """
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
-            return repo.get_by_ura(ura)
+            return repo.get_by_oin(oin)
 
     def get_expired_versions(
         self, at: datetime | None = None
@@ -56,23 +56,23 @@ class HsmKeyVersionService:
 
     def create_version(
         self,
-        ura: str,
+        oin: str,
         from_dt: datetime | None = None,
         until_dt: datetime | None = None,
     ) -> HsmKeyVersion:
         """
         Creates a new key version for the organization identified by the given
-        URA. The version number is automatically derived from the highest
+        OIN. The version number is automatically derived from the highest
         existing version for that organization. When no start moment is given,
         the version becomes active immediately.
 
-        Raises a ValueError when no organization exists for the given URA.
+        Raises a ValueError when no organization exists for the given OIN.
         """
         from_dt = from_dt or datetime.now(timezone.utc)
         with self.__db.get_db_session() as session:
-            org = session.get_repository(OrgRepository).get_by_ura(ura)
+            org = session.get_repository(OrgRepository).get_by_oin(oin)
             if org is None:
-                raise ValueError(f"organization with ura {ura} not found")
+                raise ValueError(f"organization with oin {oin} not found")
 
             repo = session.get_repository(HsmKeyVersionRepository)
             try:
@@ -84,7 +84,7 @@ class HsmKeyVersionService:
                 session.commit()
             except Exception:
                 session.rollback()
-                logger.exception("failed to create hsm key version for ura %s", ura)
+                logger.exception("failed to create hsm key version for oin %s", oin)
                 raise
 
             return entry
