@@ -83,6 +83,7 @@ def run_oprf_eval_and_unblind(
             "recipientOrganization": recipient_organization,
             "recipientScope": recipient_scope,
         },
+        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
     )
     assert eval_response.status_code == 200
     token = jwe.JWE()
@@ -185,6 +186,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
             "recipientOrganization": oprf_context.recipient_organization,
             "recipientScope": "invalid-scope",
         },
+        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
     )
 
     assert eval_response.status_code == 404
@@ -203,6 +205,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_bad_request(
             "recipientOrganization": "12345678",
             "recipientScope": "nvi",
         },
+        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
     )
 
     assert eval_response.status_code == 400
@@ -218,9 +221,10 @@ def test_oprf_eval_unknown_oin_returns_not_found(
         "/oprf/eval",
         json={
             "encryptedPersonalId": "Zm9v",
-            "recipientOrganization": "oin:00000099000000001001",
+            "recipientOrganization": "oin:00000099000000003000",
             "recipientScope": "nvi",
         },
+        headers={"x-gf-oin": "00000099000000003000", "x-gf-audience": "prs.service"},
     )
 
     assert eval_response.status_code == 404
@@ -244,6 +248,10 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
                 "encryptedPersonalId": "Zm9v",
                 "recipientOrganization": oprf_context.recipient_organization,
                 "recipientScope": oprf_context.recipient_scope,
+            },
+            headers={
+                "x-gf-oin": "00000099000000001000",
+                "x-gf-audience": "prs.service",
             },
         )
     finally:

@@ -30,7 +30,6 @@ pyoprf = "^0.9.3"
 jwcrypto = "^1.5.7"
 sqlalchemy = "^2.0.46"
 psycopg = "^3.3.2"
-puzi = { git = "https://github.com/minvws/puzi-python" }
 pyjwt = "^2.11.0"
 
 [tool.poetry.group.dev.dependencies]

@@ -112,6 +112,10 @@ class ConfigClientOAuth(BaseModel):
         return v if v is None or isinstance(v, list) else None
 
 
+class ConfigAuthorizationHeaders(BaseModel):
+    expected_audience: str
+
+
 class Config(BaseModel):
     app: ConfigApp
     database: ConfigDatabase
@@ -119,6 +123,7 @@ class Config(BaseModel):
     oprf: ConfigOprf
     pseudonym: ConfigPseudonym
     client_oauth: ConfigClientOAuth
+    authorization_headers: ConfigAuthorizationHeaders
 
 
 def read_ini_file(path: str) -> Any:

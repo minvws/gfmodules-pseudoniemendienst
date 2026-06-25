@@ -4,6 +4,7 @@ import inject
 
 from app.config import get_config
 from app.db.db import Database
+from app.services.auth.header import AuthHeaderService
 from app.services.mtls_service import MtlsService
 
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
@@ -39,6 +40,11 @@ def container_config(binder: inject.Binder) -> None:
 
     hsm_key_cleanup_service = HsmKeyCleanupService(config.oprf, hsm_key_version_service)
     binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
+
+    auth_header_service = AuthHeaderService(
+        expected_audience=config.authorization_headers.expected_audience
+    )
+    binder.bind(AuthHeaderService, auth_header_service)
 
     if config.oprf.hsm_url:
         oprf_service = OprfService(
@@ -116,6 +122,10 @@ def get_hsm_key_version_service() -> HsmKeyVersionService:
 
 def get_hsm_key_cleanup_service() -> HsmKeyCleanupService:
     return inject.instance(HsmKeyCleanupService)
+
+
+def get_auth_headers_service() -> AuthHeaderService:
+    return inject.instance(AuthHeaderService)
 
 
 if not inject.is_configured():
