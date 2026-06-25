@@ -25,8 +25,7 @@ class OrgRequest(BaseModel):
     max_key_usage: RidUsage
 
     @field_validator("oin")
-    def validate_ura(cls, v: Any) -> str:
-        # Reuse the URA validation/normalization from the UraNumber model.
+    def validate_oin(cls, v: Any) -> str:
         return str(Oin(v))
 
 
@@ -36,8 +35,7 @@ class HsmKeyVersionRequest(BaseModel):
     until_dt: datetime | None = None
 
     @field_validator("oin")
-    def validate_ura(cls, v: Any) -> str:
-        # Reuse the URA validation/normalization from the UraNumber model.
+    def validate_oin(cls, v: Any) -> str:
         return str(Oin(v))
 
 

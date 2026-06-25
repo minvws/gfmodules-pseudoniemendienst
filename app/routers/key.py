@@ -101,7 +101,7 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(auth_ctx.claims.oin)
+    caller_org = org_service.get_by_oin(auth_ctx.claims.oin.value)
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
             "caller oin=%s attempted to update key %s owned by org %s",
@@ -142,7 +142,7 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(auth_ctx.claims.oin)
+    caller_org = org_service.get_by_oin(auth_ctx.claims.oin.value)
     if caller_org is None or entry.organization_id != caller_org.id:
         logger.warning(
             "caller oin=%s attempted to delete key %s owned by org %s",

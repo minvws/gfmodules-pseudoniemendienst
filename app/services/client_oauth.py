@@ -12,7 +12,6 @@ from fastapi import HTTPException, Request
 from jwt import PyJWKClient
 
 from app.config import ConfigClientOAuth
-from app.models.ura import UraNumber
 
 SSL_CLIENT_CERT_HEADER_NAME = "x-forwarded-tls-client-cert"  # "x-proxy-ssl_client_cert"
 
@@ -60,12 +59,6 @@ class ClientOAuthService:
         Check if client OAuth2 is enabled.
         """
         return self.config.enabled
-
-    def override_ura_number(self) -> UraNumber:
-        """
-        Get the override URA number when OAuth2 is disabled.
-        """
-        return UraNumber(self.config.override_ura_number)
 
     def verify(self, request: Request) -> Dict[str, Any]:
         """

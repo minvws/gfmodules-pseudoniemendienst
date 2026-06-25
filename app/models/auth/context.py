@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
+from app.models.oin import Oin
+
 
 @dataclass(frozen=True)
 class AuthenticationClaims:
-    oin: str
+    oin: Oin
 
 
 @dataclass(frozen=True)
