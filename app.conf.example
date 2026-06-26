@@ -60,6 +60,6 @@ verify_ca = secrets/ssl/client_oauth_ca.cert
 
 
 [authorization_headers]
-# expected audience in the authorization authorization header
-# usually the app itself
-expected_audience = prs.service
+# space separated list of expected audiences, one should be present in the authorization authorization header
+# usually the value is the domain of the running application 
+expected_audiences = https://localhost:6502

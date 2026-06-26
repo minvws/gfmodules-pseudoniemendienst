@@ -42,7 +42,7 @@ def container_config(binder: inject.Binder) -> None:
     binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
 
     auth_header_service = AuthHeaderService(
-        expected_audience=config.authorization_headers.expected_audience
+        expected_audiences=config.authorization_headers.expected_audiences
     )
     binder.bind(AuthHeaderService, auth_header_service)
 
