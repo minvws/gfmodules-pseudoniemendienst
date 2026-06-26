@@ -1,12 +1,14 @@
 import uuid
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from pyoprf import List
 from sqlalchemy import Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import mapped_column, Mapped, relationship
-
 from app.db.entities.base import Base
+
+if TYPE_CHECKING:
+    from app.db.entities.organization import Organization
 
 
 class OrganizationKey(Base):
@@ -30,7 +32,9 @@ class OrganizationKey(Base):
     key_data: Mapped[str] = mapped_column("key_data", Text, nullable=False)
     key_id: Mapped[str | None] = mapped_column("key_id", Text, nullable=True)
 
-    organization = relationship("Organization", back_populates="keys")
+    organization: Mapped["Organization"] = relationship(
+        "Organization", back_populates="keys"
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

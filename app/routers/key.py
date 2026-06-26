@@ -59,7 +59,6 @@ def post_key(
 )
 def list_keys_for_org(
     oin: Oin,
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
     org = org_service.get_by_oin(oin.value)
@@ -69,12 +68,11 @@ def list_keys_for_org(
             status_code=400, detail="organization for this OIN is not registered"
         )
 
-    entries = key_resolver.get_by_org(org.id)
-    if entries is None:
+    if org.keys is None:
         logger.warning("no keys found for organization %s", org.id)
         raise HTTPException(status_code=404, detail="no keys found")
 
-    return JSONResponse(status_code=200, content=[e.to_dict() for e in entries])
+    return JSONResponse(status_code=200, content=[k.to_dict() for k in org.keys])
 
 
 @router.put(
@@ -87,7 +85,6 @@ def put_key(
     req: KeyRequest,
     auth_ctx: AuthContext = Depends(get_auth_ctx),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
 
     try:
@@ -101,15 +98,8 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(auth_ctx.claims.oin.value)
-    if caller_org is None or entry.organization_id != caller_org.id:
-        logger.warning(
-            "caller oin=%s attempted to update key %s owned by org %s",
-            auth_ctx.claims.oin,
-            key_id,
-            entry.organization_id,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
+    if entry.organization.oin != auth_ctx.claims.oin.value:
+        raise HTTPException(status_code=403)
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
     updated_entry = key_resolver.get_by_id(key_uuid)
@@ -129,7 +119,6 @@ def delete_key(
     key_id: str,
     auth_ctx: AuthContext = Depends(get_auth_ctx),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
     try:
         key_uuid = uuid.UUID(key_id)
@@ -142,8 +131,7 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    caller_org = org_service.get_by_oin(auth_ctx.claims.oin.value)
-    if caller_org is None or entry.organization_id != caller_org.id:
+    if entry.organization.oin != auth_ctx.claims.oin.value:
         logger.warning(
             "caller oin=%s attempted to delete key %s owned by org %s",
             auth_ctx.claims.oin,
