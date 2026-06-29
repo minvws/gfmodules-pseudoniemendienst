@@ -6,19 +6,20 @@ import requests
 from jwcrypto import jwk
 
 from app.config import ConfigOprf
+from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.jwe_token import BlindJwe
 from app.models.requests import BlindRequest
 
 logger = logging.getLogger(__name__)
 
+class HsmKeyLabel:
+    def __init__(self, oin: Oin, version: int):
+        self.oin = oin
+        self.version = version
 
-def oprf_key_label(recipient_org: str, version: int) -> str:
-    """
-    The label under which an OPRF key version is stored in the HSM. Shared by
-    OPRF evaluation and the expired-key cleanup so both refer to the same key.
-    """
-    return f"oin-{recipient_org}-v{version}"
+    def __str__(self):
+        return f"oin-{self.oin}-v{self.version}"
 
 
 class OprfService:
@@ -97,9 +98,12 @@ class OprfService:
 
         if self.__hsm_key_version_service is None:
             raise ValueError("HSM key version service not configured")
-
         # The active key versions are stored in the database, keyed by OIN number.
-        oin = recipient_org[4:] if recipient_org.startswith("oin:") else recipient_org
+        try:
+            oin = Oin(recipient_org[4:] if recipient_org.startswith("oin:") else recipient_org)
+        except ValueError as e:
+            raise ValueError("Incorrect OIN: %r", e)
+
         active = self.__hsm_key_version_service.get_active_versions(oin=oin)
         versions = sorted({v.version for v in active})
         if not versions:
@@ -107,14 +111,67 @@ class OprfService:
 
         # Evaluate the blind against every active key version, so the result holds
         # one entry per version (e.g. during key rotation).
-        return {
-            version: self._evaluate_label(
-                oprf_key_label(recipient_org, version), blinded_bytes
-            )
-            for version in versions
-        }
+        ret: dict[int, bytes] = {}
+        for version in versions:
+            label = HsmKeyLabel(oin, version)
+            if not self._label_exists(label):
+                self._generate_key(label)
 
-    def _evaluate_label(self, label: str, blinded_bytes: bytes) -> bytes:
+            ret[version] = self._evaluate_label(label, blinded_bytes)
+
+        return ret
+
+    def _generate_key(self, label: HsmKeyLabel) -> None:
+        cfg = self.__hsm_config
+        if cfg is None:
+            raise ValueError("HSM configuration not found")
+
+        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}/generate/oprf"
+        response = requests.post(
+            url,
+            json={
+                "label": str(label),
+            },
+            timeout=10,
+            verify=cfg.hsm_ca_cert_file or True,
+            cert=(
+                (cfg.hsm_cert_file, cfg.hsm_key_file)
+                if (cfg.hsm_cert_file and cfg.hsm_key_file)
+                else None
+            ),
+        )
+        response.raise_for_status()
+
+        if not 'result' in response.json():
+            raise ValueError("HSM configuration not found")
+
+    def _label_exists(self, label: HsmKeyLabel) -> bool:
+        cfg = self.__hsm_config
+        if cfg is None:
+            raise ValueError("HSM configuration not found")
+
+        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}"
+        response = requests.post(
+            url,
+            json={
+                "label": str(label),
+                "objtype": "SECRET_KEY",
+            },
+            timeout=10,
+            verify=cfg.hsm_ca_cert_file or True,
+            cert=(
+                (cfg.hsm_cert_file, cfg.hsm_key_file)
+                if (cfg.hsm_cert_file and cfg.hsm_key_file)
+                else None
+            ),
+        )
+        response.raise_for_status()
+
+        result = response.json()['objects'] or []
+        return len(result) > 0
+
+
+    def _evaluate_label(self, label: HsmKeyLabel, blinded_bytes: bytes) -> bytes:
         cfg = self.__hsm_config
         if cfg is None:
             raise ValueError("HSM configuration not found")
@@ -123,7 +180,7 @@ class OprfService:
         response = requests.post(
             url,
             json={
-                "label": label,
+                "label": str(label),
                 "blinded_point": base64.b64encode(blinded_bytes).decode(),
             },
             timeout=10,

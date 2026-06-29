@@ -7,6 +7,7 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
+from app.models.oin import Oin
 from app.models.requests import (
     OIN_PATTERN,
     HsmKeyVersionRequest,
@@ -50,15 +51,15 @@ def post_key_version(
     tags=["Key Version Services"],
 )
 def list_key_versions(
-    oin: Annotated[str, Path(pattern=OIN_PATTERN)],
+    oin: Oin,
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_oin(oin)
+    org = org_service.get_by_oin(oin.value)
     if org is None:
-        logger.warning("organization for OIN %r not found", oin)
+        logger.warning("organization for OIN %r not found", oin.value)
         raise HTTPException(status_code=404, detail="organization not found")
 
     versions = hsm_key_version_service.get_versions_for_oin(oin)

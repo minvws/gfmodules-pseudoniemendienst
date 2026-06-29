@@ -7,6 +7,7 @@ from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
 from app.db.repositories.org_repository import OrgRepository
+from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class HsmKeyVersionService:
         self.__db = db
 
     def get_active_versions(
-        self, at: datetime | None = None, oin: str | None = None
+        self, at: datetime | None = None, oin: Oin|None = None
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment (defaults to
@@ -33,7 +34,7 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             return repo.get_active_versions(at, oin)
 
-    def get_versions_for_oin(self, oin: str) -> Sequence[HsmKeyVersion]:
+    def get_versions_for_oin(self, oin: Oin) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions for the given organization OIN, regardless of
         date or removed state (for administrative listing).

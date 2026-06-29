@@ -3,8 +3,9 @@ import logging
 import requests
 
 from app.config import ConfigOprf
+from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.oprf_service import oprf_key_label
+from app.services.oprf.oprf_service import HsmKeyLabel
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,12 @@ class HsmKeyCleanupService:
         expired = self.__version_service.get_expired_versions()
         cleaned = 0
         for version in expired:
-            label = oprf_key_label(f"oin:{version.oin}", version.version)
+            try:
+                label = HsmKeyLabel(Oin(version.oin), version.version)
+            except ValueError:
+                logger.exception("Value %r is not a correct OIN number", version.oin)
+                continue
+
             try:
                 self._destroy_key(label)
             except Exception:
@@ -53,12 +59,12 @@ class HsmKeyCleanupService:
             logger.info("cleaned up %d expired HSM key version(s)", cleaned)
         return cleaned
 
-    def _destroy_key(self, label: str) -> None:
+    def _destroy_key(self, label: HsmKeyLabel) -> None:
         cfg = self.__hsm_config
         url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}/destroy"
         response = requests.post(
             url,
-            json={"label": label},
+            json={"label": str(label)},
             timeout=10,
             verify=cfg.hsm_ca_cert_file or True,
             cert=(

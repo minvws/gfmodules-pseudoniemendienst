@@ -55,6 +55,15 @@ def _generate_rsa_keypair() -> tuple[str, str]:
 
 def _fake_hsm_post(url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
     """Return a distinct evaluation per key version, derived from the label."""
+
+    # Return slot info when asked
+    if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
+        resp = MagicMock()
+        resp.json.return_value = {
+            "objects": ["foobar"],
+        }
+        return resp
+
     version = json["label"].rsplit("v", 1)[-1]
     resp = MagicMock()
     resp.json.return_value = {
