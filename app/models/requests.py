@@ -1,7 +1,7 @@
 import base64
 import logging
 from datetime import datetime
-from typing import Any, Literal, List, Optional
+from typing import Any, Literal, List
 
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
 
@@ -15,27 +15,19 @@ logger = logging.getLogger(__name__)
 
 class RegisterRequest(BaseModel):
     scope: List[str]
-    key_id: Optional[str]
+    key_id: str | None
 
 
 class OrgRequest(BaseModel):
-    oin: str
+    oin: Oin
     name: str = Field(..., min_length=5, max_length=50)
     max_key_usage: RidUsage
 
-    @field_validator("oin")
-    def validate_oin(cls, v: Any) -> str:
-        return str(Oin(v))
-
 
 class HsmKeyVersionRequest(BaseModel):
-    oin: str
+    oin: Oin
     from_dt: datetime | None = None
     until_dt: datetime | None = None
-
-    @field_validator("oin")
-    def validate_oin(cls, v: Any) -> str:
-        return str(Oin(v))
 
 
 class HsmKeyVersionUpdateRequest(BaseModel):

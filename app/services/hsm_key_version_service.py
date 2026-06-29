@@ -22,7 +22,7 @@ class HsmKeyVersionService:
         self.__db = db
 
     def get_active_versions(
-        self, at: datetime | None = None, oin: Oin|None = None
+        self, at: datetime | None = None, oin: Oin | None = None
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment (defaults to
@@ -57,7 +57,7 @@ class HsmKeyVersionService:
 
     def create_version(
         self,
-        oin: str,
+        oin: Oin,
         from_dt: datetime | None = None,
         until_dt: datetime | None = None,
     ) -> HsmKeyVersion:

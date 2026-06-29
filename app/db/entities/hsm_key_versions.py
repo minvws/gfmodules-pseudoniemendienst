@@ -38,7 +38,7 @@ class HsmKeyVersion(Base):
 
     @property
     def oin(self) -> str:
-        return self.organization.oin
+        return str(self.organization.oin)
 
     def to_dict(self) -> dict[str, Any]:
         return {

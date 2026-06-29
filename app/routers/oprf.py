@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from starlette.responses import JSONResponse
 
 from app import container
+from app.models.oin import Oin
 from app.models.requests import BlindRequest
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
@@ -30,7 +31,7 @@ def post_eval(
             {"error": "Invalid recipient organization. Format: oin:<oin_number>"},
             status_code=400,
         )
-    oin = req.recipientOrganization[4:]
+    oin = Oin(req.recipientOrganization[4:])
 
     org = org_service.get_by_oin(oin)
     if org is None:

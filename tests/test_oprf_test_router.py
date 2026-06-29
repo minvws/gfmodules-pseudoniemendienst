@@ -11,6 +11,7 @@ import pyoprf
 import pytest
 from starlette.testclient import TestClient
 
+from app.models.oin import Oin
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
@@ -22,6 +23,10 @@ class OprfTestRouterContext:
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
+
+
+TEST_OIN = Oin("00000099000000001000")
+TEST_OIN_STR = str(TEST_OIN)
 
 
 def generate_rsa_keypair() -> Tuple[str, str]:
@@ -44,7 +49,7 @@ def generate_rsa_keypair() -> Tuple[str, str]:
 def setup_org_and_key(
     org_service: OrgService,
     key_resolver: KeyResolver,
-    oin: str,
+    oin: Oin,
     scope: str,
 ) -> str:
     org = org_service.create(
@@ -62,7 +67,7 @@ def oprf_test_router_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
 ) -> OprfTestRouterContext:
-    recipient_organization = "oin:00000099000000001000"
+    recipient_organization = f"oin:{TEST_OIN}"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -72,7 +77,7 @@ def oprf_test_router_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        oin="00000099000000001000",
+        oin=TEST_OIN,
         scope=recipient_scope,
     )
     return OprfTestRouterContext(
@@ -90,7 +95,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
     client_response = client.post(
         "/test/oprf/client",
         json={"personalId": oprf_test_router_context.personal_identifier},
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
     assert client_response.status_code == 200
 
@@ -104,7 +109,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
     assert eval_response.status_code == 200
     jwe_token = eval_response.json()["jwe"]
@@ -116,7 +121,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "jwe": jwe_token,
             "priv_key_pem": oprf_test_router_context.private_key_pem,
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
     assert receiver_response.status_code == 200
 
@@ -155,7 +160,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
     assert eval_response.status_code == 200
 
@@ -166,7 +171,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "jwe": eval_response.json()["jwe"],
             "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
     assert receiver_response.status_code == 200
     assert receiver_response.json()["jwe"]["decrypted"].startswith(

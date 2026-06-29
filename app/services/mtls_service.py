@@ -96,12 +96,11 @@ class MtlsService:
             logger.warning(f"Unable to read certificate from header {e}")
             raise InvalidOinCertificate()
 
-    def get_oin_from_cert(self, cert: x509.Certificate) -> str:
+    def get_oin_from_cert(self, cert: x509.Certificate) -> Oin:
         attr = cert.subject.get_attributes_for_oid(x509.oid.NameOID.SERIAL_NUMBER)
         value = attr[0].value
         try:
-            oin = Oin(value if isinstance(value, str) else value.decode())
-            return oin.value
+            return Oin(value if isinstance(value, str) else value.decode())
 
         except ValueError as e:
             logger.warning(f"Invalid OIN in certificate {e}")
@@ -113,7 +112,8 @@ class MtlsService:
         org = self.org_service.get_by_oin(oin)
         if org is None:
             raise HTTPException(
-                status_code=400, detail=f"organization for OIN {oin} is not registered"
+                status_code=400,
+                detail=f"organization for OIN {oin.value} is not registered",
             )
 
         return org

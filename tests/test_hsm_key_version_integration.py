@@ -25,13 +25,14 @@ from app import container
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.rid import RidUsage
+from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 
-OIN = "00000099000000001000"
-RECIPIENT_ORG = f"oin:{OIN}"
+TEST_OIN = Oin("00000099000000001000")
+RECIPIENT_ORG = f"oin:{TEST_OIN}"
 SCOPE = "nvi"
 
 
@@ -93,7 +94,7 @@ def _eval(client: TestClient) -> Any:
             "recipientOrganization": RECIPIENT_ORG,
             "recipientScope": SCOPE,
         },
-        headers={"x-gf-oin": OIN, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
     )
 
 
@@ -106,7 +107,7 @@ def test_new_key_version_is_added_to_jwe(
 ) -> None:
     # 1. Register an organization with a public key.
     org = org_service.create(
-        oin=OIN, name=f"Org {OIN}", max_key_usage=RidUsage.ReversiblePseudonym
+        oin=TEST_OIN, name=f"Org {TEST_OIN}", max_key_usage=RidUsage.ReversiblePseudonym
     )
     private_key_pem, public_key_pem = _generate_rsa_keypair()
     key_resolver.create(org.id, [SCOPE], None, public_key_pem)
@@ -127,8 +128,8 @@ def test_new_key_version_is_added_to_jwe(
             # 2. Create version 1 of the HSM key.
             resp = client.post(
                 "/key-versions",
-                json={"oin": OIN},
-                headers={"x-gf-oin": OIN, "x-gf-audience": "prs.service"},
+                json={"oin": str(TEST_OIN)},
+                headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
             )
             assert resp.status_code == 201
             assert resp.json()["version"] == 1
@@ -145,8 +146,8 @@ def test_new_key_version_is_added_to_jwe(
             # 4. Create version 2 of the HSM key.
             resp = client.post(
                 "/key-versions",
-                json={"oin": OIN},
-                headers={"x-gf-oin": OIN, "x-gf-audience": "prs.service"},
+                json={"oin": str(TEST_OIN)},
+                headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
             )
             assert resp.status_code == 201
             assert resp.json()["version"] == 2

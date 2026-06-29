@@ -36,7 +36,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             )
         )
         if oin is not None:
-            query = query.join(Organization).where(Organization.oin == oin.value)
+            query = query.join(Organization).where(Organization.oin == oin)
         return self.db_session.execute(query).scalars().all()
 
     def get_by_oin(self, oin: Oin) -> Sequence[HsmKeyVersion]:
@@ -48,7 +48,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             select(HsmKeyVersion)
             .options(joinedload(HsmKeyVersion.organization))
             .join(Organization)
-            .where(Organization.oin == oin.value)
+            .where(Organization.oin == oin)
             .order_by(HsmKeyVersion.version)
         )
         return self.db_session.execute(query).scalars().all()

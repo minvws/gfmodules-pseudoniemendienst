@@ -92,6 +92,8 @@ class Oin:
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Oin):
             return self.value == other.value
+        if isinstance(other, str):
+            return self.value == other
         return False
 
     def __hash__(self) -> int:

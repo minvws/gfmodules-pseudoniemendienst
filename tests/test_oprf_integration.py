@@ -13,6 +13,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from app.models.oin import Oin
 from app.rid import RidUsage
 from app import container
 from app.services.key_resolver import KeyResolver
@@ -25,6 +26,10 @@ class OprfIntegrationContext:
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
+
+
+TEST_OIN = Oin("00000099000000001000")
+TEST_OIN_STR = str(TEST_OIN)
 
 
 def generate_rsa_keypair() -> Tuple[str, str]:
@@ -47,7 +52,7 @@ def generate_rsa_keypair() -> Tuple[str, str]:
 def setup_org_and_key(
     org_service: OrgService,
     key_resolver: KeyResolver,
-    oin: str,
+    oin: Oin,
     scope: str,
 ) -> str:
     org = org_service.create(
@@ -83,7 +88,7 @@ def run_oprf_eval_and_unblind(
             "recipientOrganization": recipient_organization,
             "recipientScope": recipient_scope,
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
     assert eval_response.status_code == 200
     token = jwe.JWE()
@@ -124,7 +129,7 @@ def oprf_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
 ) -> OprfIntegrationContext:
-    recipient_organization = "oin:00000099000000001000"
+    recipient_organization = f"oin:{TEST_OIN}"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -134,7 +139,7 @@ def oprf_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        oin="00000099000000001000",
+        oin=TEST_OIN,
         scope=recipient_scope,
     )
     return OprfIntegrationContext(
@@ -186,7 +191,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
             "recipientOrganization": oprf_context.recipient_organization,
             "recipientScope": "invalid-scope",
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
 
     assert eval_response.status_code == 404
@@ -205,7 +210,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_bad_request(
             "recipientOrganization": "12345678",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
     )
 
     assert eval_response.status_code == 400
@@ -249,10 +254,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
                 "recipientOrganization": oprf_context.recipient_organization,
                 "recipientScope": oprf_context.recipient_scope,
             },
-            headers={
-                "x-gf-oin": "00000099000000001000",
-                "x-gf-audience": "prs.service",
-            },
+            headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
         )
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)

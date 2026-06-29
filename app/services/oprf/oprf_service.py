@@ -13,6 +13,7 @@ from app.models.requests import BlindRequest
 
 logger = logging.getLogger(__name__)
 
+
 class HsmKeyLabel:
     def __init__(self, oin: Oin, version: int):
         self.oin = oin
@@ -100,7 +101,9 @@ class OprfService:
             raise ValueError("HSM key version service not configured")
         # The active key versions are stored in the database, keyed by OIN number.
         try:
-            oin = Oin(recipient_org[4:] if recipient_org.startswith("oin:") else recipient_org)
+            oin = Oin(
+                recipient_org[4:] if recipient_org.startswith("oin:") else recipient_org
+            )
         except ValueError as e:
             raise ValueError("Incorrect OIN: %r", e)
 
@@ -142,7 +145,7 @@ class OprfService:
         )
         response.raise_for_status()
 
-        if not 'result' in response.json():
+        if "result" not in response.json():
             raise ValueError("HSM configuration not found")
 
     def _label_exists(self, label: HsmKeyLabel) -> bool:
@@ -167,9 +170,8 @@ class OprfService:
         )
         response.raise_for_status()
 
-        result = response.json()['objects'] or []
+        result = response.json()["objects"] or []
         return len(result) > 0
-
 
     def _evaluate_label(self, label: HsmKeyLabel, blinded_bytes: bytes) -> bytes:
         cfg = self.__hsm_config
