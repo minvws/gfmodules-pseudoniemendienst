@@ -12,7 +12,7 @@ not yet marked `removed`, the program:
 
 1. Destroys the corresponding key in the HSM via
    `POST {hsm_url}/hsm/{module}/{slot}/destroy` with the key's label
-   (`ura-ura:<ura>-v<version>` — the same label used during evaluation).
+   (`oin-<oin>-v<version>` — the same label used during evaluation).
 2. Marks the version as `removed` in the database.
 
 If the HSM call fails for a version, that version is left untouched so the next

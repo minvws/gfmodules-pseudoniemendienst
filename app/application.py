@@ -16,14 +16,13 @@ from app.routers.exchange import router as exchange_router
 from app.config import get_config
 from app.auth import get_auth_ctx
 
-
 API_DESCRIPTION = """
 The Pseudoniemendienst (PRS) lets parties exchange data about a person without
 sharing their BSN. Instead of a BSN, parties exchange **RIDs** and **pseudonyms**
 that are scoped to a recipient organization and scope.
 
-A recipient organization is always identified by a URA in the form
-`ura:<8 digits>` (e.g. `ura:90000036`).
+A recipient organization is always identified by a OIN in the form
+`oin:<20 digits>` (e.g. `oin:00000099000000001000`).
 
 The endpoints are grouped into the sections below. Most sections are protected by
 mutual TLS (mTLS); the calling organization and, where relevant, its public key
@@ -44,7 +43,7 @@ TAGS_METADATA = [
         "name": "Organizational Services",
         "description": (
             "Manage recipient organizations. An organization is identified by its "
-            "URA and has a `max_key_usage` (`bsn`, `rp`, or `irp`) that caps which "
+            "OIN and has a `max_key_usage` (`bsn`, `rp`, or `irp`) that caps which "
             "pseudonym types it is allowed to exchange."
         ),
     },

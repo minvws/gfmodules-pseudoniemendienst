@@ -226,11 +226,11 @@ To use this system:
     mtls_override_cert=./secrets/self-signed-uzi-server-cert.crt
     ```
  
-2. Insert a new organization via a POST to `/orgs`. The organization ura should be the URA of the uzi certificate you
+2. Insert a new organization via a POST to `/orgs`. The organization OIN should be the serialNumber of the OIN certificate you
 
    will be testing with.
 
-   Note: there is no mTLS check here. You can add multiple organizations with different URA values for testing.
+   Note: there is no mTLS check here. You can add multiple organizations with different OIN values for testing.
 
 3. Next, you will need to register your public key to the key services. You can do this by calling `/register/certificate` with a JSON body like:
 
@@ -286,7 +286,7 @@ To use this system:
       POST /oprf/eval
       {
         "encryptedPersonalId": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
-        "recipientOrganization": "ura:12345678",
+        "recipientOrganization": "oin:00000099000000001000",
         "recipientScope": "nvi"
       }
 
@@ -331,7 +331,7 @@ To use this system:
         },
         "decrypted": {
           "subject": "pseudonym:eval:-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
-          "aud": "ura:12345678",
+          "aud": "oin:100000099000000001000",
           "scope": "nvi",
           "version": "1.1",
           "iat": 1758616285,
