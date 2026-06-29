@@ -10,7 +10,7 @@ from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_STR = str(TEST_OIN)
+TEST_OIN_VALUE = TEST_OIN.value
 
 
 def test_create_first_version(
@@ -24,13 +24,13 @@ def test_create_first_version(
 
     response = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 201
     body = response.json()
-    assert body["oin"] == TEST_OIN_STR
+    assert body["oin"] == TEST_OIN_VALUE
     assert body["version"] == 1
     assert body["removed"] is False
     assert body["until_dt"] is None
@@ -48,13 +48,13 @@ def test_create_increments_version(
 
     first = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     second = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert first.json()["version"] == 1
@@ -75,11 +75,11 @@ def test_create_with_explicit_window(
     response = client.post(
         "/key-versions",
         json={
-            "oin": TEST_OIN_STR,
+            "oin": TEST_OIN_VALUE,
             "from_dt": from_dt.isoformat(),
             "until_dt": until_dt.isoformat(),
         },
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 201
@@ -91,8 +91,8 @@ def test_create_with_explicit_window(
 def test_create_unknown_org_returns_404(client: TestClient, database: Database) -> None:
     response = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 404
@@ -103,7 +103,7 @@ def test_create_invalid_oin_returns_422(client: TestClient, database: Database) 
     response = client.post(
         "/key-versions",
         json={"oin": "not-a-oin"},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 422
@@ -120,8 +120,8 @@ def test_create_persists_version(
 
     client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     service = HsmKeyVersionService(database)
@@ -139,15 +139,15 @@ def test_update_sets_removed_and_until_dt(
     )
     created = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     ).json()
 
     until_dt = datetime(2027, 1, 1, tzinfo=timezone.utc)
     response = client.put(
         f"/key-versions/{created['id']}",
         json={"removed": True, "until_dt": until_dt.isoformat()},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 200
@@ -172,14 +172,14 @@ def test_update_clears_until_dt(
     until_dt = datetime(2027, 1, 1, tzinfo=timezone.utc)
     created = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR, "until_dt": until_dt.isoformat()},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE, "until_dt": until_dt.isoformat()},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     ).json()
 
     response = client.put(
         f"/key-versions/{created['id']}",
         json={"removed": False},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 200
@@ -194,7 +194,7 @@ def test_update_unknown_version_returns_404(
     response = client.put(
         f"/key-versions/{uuid.uuid4()}",
         json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 404
@@ -206,7 +206,7 @@ def test_update_invalid_id_returns_422(client: TestClient, database: Database) -
     response = client.put(
         "/key-versions/not-a-uuid",
         json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 422
@@ -222,24 +222,24 @@ def test_list_versions_returns_all_for_org(
     )
     client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     response = client.get(
-        f"/key-versions/{TEST_OIN_STR}",
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        f"/key-versions/{TEST_OIN_VALUE}",
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert [v["version"] for v in body] == [1, 2]
-    assert {v["oin"] for v in body} == {TEST_OIN_STR}
+    assert {v["oin"] for v in body} == {TEST_OIN_VALUE}
 
 
 def test_list_versions_includes_removed(
@@ -252,18 +252,18 @@ def test_list_versions_includes_removed(
     )
     created = client.post(
         "/key-versions",
-        json={"oin": TEST_OIN_STR},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     ).json()
     client.put(
         f"/key-versions/{created['id']}",
         json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     response = client.get(
-        f"/key-versions/{TEST_OIN_STR}",
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        f"/key-versions/{TEST_OIN_VALUE}",
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 200
@@ -282,8 +282,8 @@ def test_list_versions_empty_for_org_without_versions(
     )
 
     response = client.get(
-        f"/key-versions/{TEST_OIN_STR}",
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        f"/key-versions/{TEST_OIN_VALUE}",
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 200
@@ -294,8 +294,8 @@ def test_list_versions_unknown_org_returns_404(
     client: TestClient, database: Database
 ) -> None:
     response = client.get(
-        f"/key-versions/{TEST_OIN_STR}",
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        f"/key-versions/{TEST_OIN_VALUE}",
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 404

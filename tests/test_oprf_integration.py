@@ -29,7 +29,7 @@ class OprfIntegrationContext:
 
 
 TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_STR = str(TEST_OIN)
+TEST_OIN_VALUE = TEST_OIN.value
 
 
 def generate_rsa_keypair() -> Tuple[str, str]:
@@ -88,7 +88,7 @@ def run_oprf_eval_and_unblind(
             "recipientOrganization": recipient_organization,
             "recipientScope": recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert eval_response.status_code == 200
     token = jwe.JWE()
@@ -191,7 +191,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
             "recipientOrganization": oprf_context.recipient_organization,
             "recipientScope": "invalid-scope",
         },
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert eval_response.status_code == 404
@@ -200,7 +200,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
     }
 
 
-def test_oprf_eval_invalid_recipient_organization_returns_bad_request(
+def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
     client: TestClient,
 ) -> None:
     eval_response = client.post(
@@ -210,13 +210,32 @@ def test_oprf_eval_invalid_recipient_organization_returns_bad_request(
             "recipientOrganization": "12345678",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
-    assert eval_response.status_code == 400
-    assert eval_response.json() == {
-        "error": "Invalid recipient organization. Format: oin:<oin_number>"
-    }
+    assert eval_response.status_code == 422
+    assert eval_response.json()["detail"][0]["msg"] == (
+        "Invalid recipient organization. Format: oin:<oin_number>"
+    )
+
+
+def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_error(
+    client: TestClient,
+) -> None:
+    eval_response = client.post(
+        "/oprf/eval",
+        json={
+            "encryptedPersonalId": "Zm9v",
+            "recipientOrganization": "oin:00000099",
+            "recipientScope": "nvi",
+        },
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+
+    assert eval_response.status_code == 422
+    assert eval_response.json()["detail"][0]["msg"] == (
+        "Invalid OIN '00000099'. Expected 20 characters structured as 8 digit prefix + 8/9 alphanumeric mainnumber + 4/3 trailing zeros."
+    )
 
 
 def test_oprf_eval_unknown_oin_returns_not_found(
@@ -254,7 +273,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
                 "recipientOrganization": oprf_context.recipient_organization,
                 "recipientScope": oprf_context.recipient_scope,
             },
-            headers={"x-gf-oin": TEST_OIN_STR, "x-gf-audience": "prs.service"},
+            headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
         )
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)

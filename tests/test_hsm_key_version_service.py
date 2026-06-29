@@ -9,7 +9,7 @@ from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
-from app.models.oin import Oin
+from app.models.oin import Oin, RecipientOrganizationOin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.oprf_service import OprfService
 
@@ -27,12 +27,9 @@ TEST_OIN_79000 = Oin("00000000012345679000")
 
 def _add(db: Database, oin: Oin, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        oin_value = str(oin)
-        org = session.query(Organization).filter(Organization.oin == oin_value).first()
+        org = session.query(Organization).filter(Organization.oin == oin.value).first()
         if org is None:
-            org = Organization(
-                oin=oin_value, name=f"org-{oin_value}", max_rid_usage="irp"
-            )
+            org = Organization(oin=oin, name=f"org-{oin.value}", max_rid_usage="irp")
             session.add(org)
             session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
@@ -86,7 +83,7 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
     service = HsmKeyVersionService(database)
     active = {v.oin for v in service.get_active_versions()}
 
-    assert active == {str(TEST_OIN_111), str(TEST_OIN_222)}
+    assert active == {TEST_OIN_111, TEST_OIN_222}
 
 
 def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> None:
@@ -124,7 +121,7 @@ def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> No
             service, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(f"oin:{TEST_OIN_78000}", b"blinded")
+        result = service._eval_via_hsm(TEST_OIN_78000, b"blinded")
 
     assert result == {2: b"evaluated", 7: b"evaluated"}
 
@@ -164,7 +161,7 @@ def test_eval_generates_keys_if_needed(database: Database) -> None:
             service, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(f"oin:{TEST_OIN_79000}", b"blinded")
+        result = service._eval_via_hsm(TEST_OIN_79000, b"blinded")
 
     assert result == {1: b"evaluated"}
 
@@ -232,7 +229,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
 
     req = BlindRequest(
         encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
-        recipientOrganization="oin:00000000012345678000",
+        recipientOrganization=RecipientOrganizationOin("oin:00000000012345678000"),
         recipientScope="scope",
     )
 
@@ -324,7 +321,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
 
     req = BlindRequest(
         encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
-        recipientOrganization=TEST_OIN_WITH_PREFIX,
+        recipientOrganization=RecipientOrganizationOin(TEST_OIN_WITH_PREFIX),
         recipientScope="scope",
     )
 
@@ -355,7 +352,7 @@ def test_eval_via_hsm_without_active_version_raises(database: Database) -> None:
         hsm_key_version_service=HsmKeyVersionService(database),
     )
     with pytest.raises(ValueError, match=f"no active key version for oin {TEST_OIN}"):
-        service._eval_via_hsm(TEST_OIN_WITH_PREFIX, b"blinded")
+        service._eval_via_hsm(TEST_OIN, b"blinded")
 
 
 def test_eval_via_hsm_without_service_raises() -> None:
@@ -364,4 +361,4 @@ def test_eval_via_hsm_without_service_raises() -> None:
     )
 
     with pytest.raises(ValueError, match="HSM key version service not configured"):
-        service._eval_via_hsm("oin:00000000012345678000", b"blinded")
+        service._eval_via_hsm(TEST_OIN_78000, b"blinded")

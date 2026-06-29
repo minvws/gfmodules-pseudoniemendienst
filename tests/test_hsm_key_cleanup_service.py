@@ -21,12 +21,9 @@ TEST_OIN_111 = Oin("00000099000000011000")
 
 def _add(db: Database, oin: Oin, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        oin_value = str(oin)
-        org = session.query(Organization).filter(Organization.oin == oin_value).first()
+        org = session.query(Organization).filter(Organization.oin == oin.value).first()
         if org is None:
-            org = Organization(
-                oin=oin_value, name=f"org-{oin_value}", max_rid_usage="irp"
-            )
+            org = Organization(oin=oin, name=f"org-{oin.value}", max_rid_usage="irp")
             session.add(org)
             session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
@@ -97,7 +94,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     version_service = HsmKeyVersionService(database)
     assert version_service.get_expired_versions() == []
     active = {(v.oin, v.version) for v in version_service.get_active_versions()}
-    assert active == {(str(TEST_OIN_ACTIVE), 2)}
+    assert active == {(TEST_OIN_ACTIVE, 2)}
 
 
 def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
@@ -181,7 +178,7 @@ def test_get_expired_versions_filters(database: Database) -> None:
     )  # expired but already removed
 
     expired = HsmKeyVersionService(database).get_expired_versions()
-    assert {v.oin for v in expired} == {str(TEST_OIN_111)}
+    assert {v.oin for v in expired} == {TEST_OIN_111}
 
 
 @pytest.mark.parametrize("hsm_url", ["", None])

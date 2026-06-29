@@ -94,7 +94,7 @@ def _eval(client: TestClient) -> Any:
             "recipientOrganization": RECIPIENT_ORG,
             "recipientScope": SCOPE,
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
     )
 
 
@@ -128,8 +128,8 @@ def test_new_key_version_is_added_to_jwe(
             # 2. Create version 1 of the HSM key.
             resp = client.post(
                 "/key-versions",
-                json={"oin": str(TEST_OIN)},
-                headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+                json={"oin": TEST_OIN.value},
+                headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
             )
             assert resp.status_code == 201
             assert resp.json()["version"] == 1
@@ -146,8 +146,8 @@ def test_new_key_version_is_added_to_jwe(
             # 4. Create version 2 of the HSM key.
             resp = client.post(
                 "/key-versions",
-                json={"oin": str(TEST_OIN)},
-                headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+                json={"oin": TEST_OIN.value},
+                headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
             )
             assert resp.status_code == 201
             assert resp.json()["version"] == 2

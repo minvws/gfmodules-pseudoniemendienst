@@ -76,7 +76,7 @@ class OprfService:
         }
 
         jwe = BlindJwe.build(
-            audience=req.recipientOrganization,
+            audience=str(req.recipientOrganization),
             scope=req.recipientScope,
             subject=subject,
             pub_key=pub_key,
@@ -91,7 +91,7 @@ class OprfService:
         return jwe
 
     def _eval_via_hsm(
-        self, recipient_org: str, blinded_bytes: bytes
+        self, recipient_org_oin: Oin, blinded_bytes: bytes
     ) -> dict[int, bytes]:
         cfg = self.__hsm_config
         if cfg is None:
@@ -100,23 +100,18 @@ class OprfService:
         if self.__hsm_key_version_service is None:
             raise ValueError("HSM key version service not configured")
         # The active key versions are stored in the database, keyed by OIN number.
-        try:
-            oin = Oin(
-                recipient_org[4:] if recipient_org.startswith("oin:") else recipient_org
-            )
-        except ValueError as e:
-            raise ValueError("Incorrect OIN: %r", e)
-
-        active = self.__hsm_key_version_service.get_active_versions(oin=oin)
+        active = self.__hsm_key_version_service.get_active_versions(
+            oin=recipient_org_oin
+        )
         versions = sorted({v.version for v in active})
         if not versions:
-            raise ValueError(f"no active key version for oin {oin}")
+            raise ValueError(f"no active key version for oin {recipient_org_oin}")
 
         # Evaluate the blind against every active key version, so the result holds
         # one entry per version (e.g. during key rotation).
         ret: dict[int, bytes] = {}
         for version in versions:
-            label = HsmKeyLabel(oin, version)
+            label = HsmKeyLabel(recipient_org_oin, version)
             if not self._label_exists(label):
                 self._generate_key(label)
 

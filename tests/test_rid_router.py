@@ -11,6 +11,7 @@ from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
+TEST_OIN_VALUE = TEST_OIN.value
 
 MOCK_ORGS = {
     TEST_OIN_WITH_PREFIX: (["nvi"], "irp", "", ""),
@@ -91,7 +92,7 @@ def test_create_happy_path(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 201
     assert response.content is not None
@@ -112,7 +113,7 @@ def test_invalid_scope(
             "recipientScope": "invalid-scope",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 404
@@ -130,7 +131,7 @@ def test_invalid_scope(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
 
     assert response.status_code == 404
@@ -153,7 +154,7 @@ def test_decode_as_receiver(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     jwe = response.content.decode("utf-8")
     headers, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -175,7 +176,7 @@ def test_decode_as_receiver(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     jwe = response.content.decode("utf-8")
     _, data2 = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -197,7 +198,7 @@ def test_receive_rids(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid RID. Should start with 'rid:'"}
@@ -210,7 +211,7 @@ def test_receive_rids(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Failed to decrypt RID"}
@@ -229,7 +230,7 @@ def test_receive_incorrect_org(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     jwe = response.content.decode("utf-8")
     _, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -244,7 +245,7 @@ def test_receive_incorrect_org(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
@@ -258,7 +259,7 @@ def test_receive_incorrect_org(
             "recipientScope": "incorrect-scope",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
@@ -272,12 +273,56 @@ def test_receive_incorrect_org(
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {
         "detail": "Organization / scope is not allowed to exchange BSNs"
     }
+
+
+def test_exchange_rid_invalid_recipient_organization_returns_expected_error(
+    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
+
+    response = client.post(
+        "/exchange/rid",
+        json={
+            "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
+            "recipientOrganization": "not-a-valid-oin",
+            "recipientScope": "nvi",
+            "ridUsage": "bsn",
+        },
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+
+    assert response.status_code == 422
+    assert (
+        response.json()["detail"][0]["msg"]
+        == "Invalid recipient organization. Format: oin:<oin_number>"
+    )
+
+
+def test_receive_invalid_recipient_organization_returns_expected_error(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/receive",
+        json={
+            "rid": "rid:foobar",
+            "recipientOrganization": "not-a-valid-oin",
+            "recipientScope": "nvi",
+            "pseudonymType": "rp",
+        },
+        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+    )
+
+    assert response.status_code == 422
+    assert (
+        response.json()["detail"][0]["msg"]
+        == "Invalid recipient organization. Format: oin:<oin_number>"
+    )
 
 
 def test_receive_incorrect_usage(
@@ -293,7 +338,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "ridUsage": "irp",  # Can only be used to exchange for an IRP, not an RP or BSN
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     jwe = response.content.decode("utf-8")
     headers, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -308,7 +353,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {
@@ -324,7 +369,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 400
     assert response.json() == {
@@ -340,7 +385,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "pseudonymType": "irp",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     assert response.status_code == 200
     assert response.json()["type"] == "irp"
@@ -359,7 +404,7 @@ def test_min_usage_level(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": str(TEST_OIN), "x-gf-audience": "prs.service"},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
     )
     jwe = response.content.decode("utf-8")
     headers, data = decode_jwe(jwe, MOCK_ORGS["oin:00000099000000002000"][2])

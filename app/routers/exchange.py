@@ -22,17 +22,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _parse_prefixed_oin(oin: str) -> Oin:
-    if not oin.startswith("oin:"):
-        logger.warning("recipientOrganization does not start with 'oin:': %s", oin)
-        raise InvalidOin(oin)
-    return Oin(oin[4:])
-
-
 class OrganizationNotFound(HTTPException):
     def __init__(self, oin: Oin) -> None:
         super().__init__(
-            status_code=404, detail=f"Organization with OIN '{oin}' not found"
+            status_code=404, detail=f"Organization with OIN '{oin.value}' not found"
         )
 
 
@@ -41,19 +34,11 @@ class InvalidRID(HTTPException):
         super().__init__(status_code=400, detail=message)
 
 
-class InvalidOin(HTTPException):
-    def __init__(self, oin: str) -> None:
-        super().__init__(
-            status_code=400,
-            detail=f"Invalid organization OIN '{oin}'. Must start with 'oin:'",
-        )
-
-
 class PubKeyNotFound(HTTPException):
     def __init__(self, oin: Oin, scope: str) -> None:
         super().__init__(
             status_code=404,
-            detail=f"No public key found for organization '{oin}' and scope '{scope}'",
+            detail=f"No public key found for organization '{oin.value}' and scope '{scope}'",
         )
 
 
@@ -93,7 +78,7 @@ def receive(
 
     # Make sure the recipient org/scope matches what is in the RID
     if (
-        recipient_org != req.recipientOrganization
+        recipient_org != str(req.recipientOrganization)
         or recipient_scope != req.recipientScope
     ):
         logger.warning(
@@ -118,7 +103,7 @@ def receive(
         )
         raise InvalidRID(message="Requested pseudonym type not allowed by RID usage")
 
-    oin = _parse_prefixed_oin(req.recipientOrganization)
+    oin = req.recipientOrganization
 
     max_rid_usage = key_resolver.max_rid_usage(oin)
     if max_rid_usage is None:
@@ -202,14 +187,14 @@ def exchange_rid(
         "usage": str(
             req.ridUsage
         ),  # Maximum usage allowed for this RID (capped by the recipient org/scope)
-        "recipient_organization": req.recipientOrganization,
+        "recipient_organization": str(req.recipientOrganization),
         "recipient_scope": req.recipientScope,
         "personal_id": req.personalId.as_str(),
     }
     rid_str = json.dumps(rid_data)
     rid = rid_service.encrypt_rid(rid_str)
 
-    oin = _parse_prefixed_oin(req.recipientOrganization)
+    oin = req.recipientOrganization
 
     org = org_service.get_by_oin(oin)
     if org is None:
@@ -219,14 +204,14 @@ def exchange_rid(
     if pub_key_jwk is None:
         logger.warning(
             "no public key found for organization '%s' and scope '%s'",
-            oin,
+            oin.value,
             req.recipientScope,
         )
         raise PubKeyNotFound(oin, req.recipientScope)
 
     # Create a blind JWE token containing the RID
     jwe = BlindJwe.build(
-        audience=req.recipientOrganization,
+        audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=f"rid:{rid}",
         pub_key=pub_key_jwk,
@@ -251,7 +236,7 @@ def exchange_pseudonym(
     org_service: OrgService = Depends(container.get_org_service),
     mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> Response:
-    recipient_oin = _parse_prefixed_oin(req.recipientOrganization)
+    recipient_oin = req.recipientOrganization
 
     org = org_service.get_by_oin(recipient_oin)
     if org is None:

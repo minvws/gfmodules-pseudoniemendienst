@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends
 from starlette.responses import JSONResponse
 
 from app import container
-from app.models.oin import Oin
 from app.models.requests import BlindRequest
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
@@ -25,14 +24,7 @@ def post_eval(
     org_service: OrgService = Depends(container.get_org_service),
     oprf_service: OprfService = Depends(container.get_oprf_service),
 ) -> JSONResponse:
-    if not req.recipientOrganization.startswith("oin:"):
-        logger.warning("does not start with oin: %s" % req.recipientOrganization)
-        return JSONResponse(
-            {"error": "Invalid recipient organization. Format: oin:<oin_number>"},
-            status_code=400,
-        )
-    oin = Oin(req.recipientOrganization[4:])
-
+    oin = req.recipientOrganization
     org = org_service.get_by_oin(oin)
     if org is None:
         logger.warning("no organization found for OIN %r", oin)

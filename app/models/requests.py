@@ -5,7 +5,7 @@ from typing import Any, Literal, List
 
 from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
 
-from app.models.oin import Oin
+from app.models.oin import Oin, RecipientOrganizationOin
 from app.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
@@ -37,14 +37,14 @@ class HsmKeyVersionUpdateRequest(BaseModel):
 
 class RidReceiveRequest(BaseModel):
     rid: str
-    recipientOrganization: str
+    recipientOrganization: RecipientOrganizationOin
     recipientScope: str
     pseudonymType: Literal["rp", "irp", "bsn"]
 
 
 class BlindRequest(BaseModel):
     encryptedPersonalId: str = Field(..., min_length=2)
-    recipientOrganization: str = Field(..., min_length=2)
+    recipientOrganization: RecipientOrganizationOin
     recipientScope: str = Field(..., min_length=2)
 
     @field_validator("encryptedPersonalId")
@@ -61,7 +61,7 @@ class BlindRequest(BaseModel):
 
 class RidExchangeRequest(BaseModel):
     personalId: Any
-    recipientOrganization: str
+    recipientOrganization: RecipientOrganizationOin
     recipientScope: str
     ridUsage: Any
 
@@ -90,7 +90,7 @@ class ExchangeRequest(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     personalId: Any
-    recipientOrganization: str
+    recipientOrganization: RecipientOrganizationOin
     recipientScope: str = Field(..., min_length=1, max_length=100)
     pseudonymType: PseudonymType
 
