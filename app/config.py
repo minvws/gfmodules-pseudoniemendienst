@@ -94,24 +94,6 @@ class ConfigPseudonym(BaseModel):
     master_key: str = Field(default="")
 
 
-class ConfigClientOAuth(BaseModel):
-    enabled: bool = Field(default=False)
-    override_ura_number: str | None = Field(default=None)
-    jwks_url: str
-    issuer: str
-    allowed_audiences: list[str] | None = Field(default=None)
-    mtls_cert: str | None = Field(default=None)
-    mtls_key: str | None = Field(default=None)
-    verify_ca: str | bool = Field(default=True)
-
-    @field_validator("allowed_audiences", mode="before")
-    @classmethod
-    def parse_space_separated(cls, v: Any) -> list[str] | None:
-        if isinstance(v, str):
-            return v.split() or None
-        return v if v is None or isinstance(v, list) else None
-
-
 class ConfigAuthorizationHeaders(BaseModel):
     expected_audiences: List[str]
 
@@ -133,7 +115,6 @@ class Config(BaseModel):
     uvicorn: ConfigUvicorn
     oprf: ConfigOprf
     pseudonym: ConfigPseudonym
-    client_oauth: ConfigClientOAuth
     authorization_headers: ConfigAuthorizationHeaders
 
 
