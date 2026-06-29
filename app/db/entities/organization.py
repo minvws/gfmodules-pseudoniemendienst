@@ -35,7 +35,7 @@ class Organization(Base):
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "oin": str(self.oin),
+            "oin": self.oin.value,
             "name": self.name,
             "max_rid_usage": self.max_rid_usage,
         }
