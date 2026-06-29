@@ -18,7 +18,7 @@ class HsmKeyLabel:
         self.oin = oin
         self.version = version
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"oin-{self.oin}-v{self.version}"
 
 
