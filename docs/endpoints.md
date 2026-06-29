@@ -4,7 +4,7 @@ Previously when working with applications within gfmodules, the actual BSN numbe
 
 This document lists the main service endpoints. The testing/helper endpoints (`/test/...`) are documented in [tests.md](tests.md), and the end-to-end OPRF evaluation flow is described in [oprf-eval-flow.md](oprf-eval-flow.md).
 
-A recipient organization is always identified by a URA in the form `ura:<8 digits>` (e.g. `ura:90000036`).
+A recipient organization is always identified by a OIN in the form `oin:<20 digits>` (e.g. `oin:00000099000000001000`).
 
 ## Organizational Services
 
@@ -13,7 +13,7 @@ Create a new organization.
 
 ```json
 {
-  "ura": "90000036",
+  "oin": "00000099000000001000",
   "name": "Example Organization",
   "max_key_usage": "irp"
 }
@@ -21,13 +21,13 @@ Create a new organization.
 
 `max_key_usage` is one of `bsn`, `rp`, or `irp` and caps which pseudonym types the organization may exchange.
 
-#### `GET /org/{ura}`
-Return the organization for the given URA (digits only, e.g. `90000036`).
+#### `GET /org/{oin}`
+Return the organization for the given OIN (digits only, e.g. `00000099000000001000`).
 
-#### `PUT /org/{ura}`
+#### `PUT /org/{oin}`
 Update an organization's `name` and `max_key_usage`.
 
-#### `DELETE /org/{ura}`
+#### `DELETE /org/{oin}`
 Delete an organization (and its keys).
 
 ## Key Registration Services
@@ -45,7 +45,7 @@ Register the public key (taken from the mTLS client certificate) for one or more
 
 Returns `201` on success, `409` if a key for that organization/scope already exists.
 
-#### `GET /keys/{ura}`
+#### `GET /keys/{oin}`
 List the registered public keys for an organization.
 
 #### `PUT /keys/{key_id}`
@@ -62,7 +62,7 @@ Exchange a personal ID for a pseudonym targeted at a recipient organization/scop
 ```json
 {
   "personalId": "NL:bsn:950000012",
-  "recipientOrganization": "ura:90000036",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar",
   "pseudonymType": "irreversible"
 }
@@ -76,7 +76,7 @@ Exchange a personal ID for a RID that the recipient can later redeem. The RID is
 ```json
 {
   "personalId": "NL:bsn:950000012",
-  "recipientOrganization": "ura:90000036",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar",
   "ridUsage": "irp"
 }
@@ -88,7 +88,7 @@ Redeem a previously issued RID for a pseudonym (or the BSN, when allowed). The r
 ```json
 {
   "rid": "rid:<encrypted-rid>",
-  "recipientOrganization": "ura:90000036",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar",
   "pseudonymType": "irp"
 }
@@ -111,7 +111,7 @@ Evaluate a blinded personal identifier and return a JWE (encrypted to the recipi
 ```json
 {
   "encryptedPersonalId": "co1ZgSqfsiB8iEzmKWl3xgxlc0erstUNyBAC3tdjxzg=",
-  "recipientOrganization": "ura:90000036",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar"
 }
 ```

@@ -25,7 +25,7 @@ Request:
 POST /oprf/eval
 {
   "encryptedPersonalId": "co1ZgSqfsiB8iEzmKWl3xgxlc0erstUNyBAC3tdjxzg=",
-  "recipientOrganization": "ura:90000036",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar"
 }
 ```
@@ -66,7 +66,7 @@ Response:
     },
     "decrypted": {
       "subject": "pseudonym:eval:Ngb5jRWtUc_EtfPud1uPnjhHwvww1pt51wx_DBao_Uc=",
-      "aud": "ura:90000036",
+      "aud": "oin:00000099000000001000",
       "scope": "bar",
       "version": "1.1",
       "iat": 1762769767,
@@ -94,7 +94,7 @@ Request:
 POST /exchange/pseudonym
 {
   "personalId": "NL:bsn:950000012",
-  "recipientOrganization": "ura:90000036",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar",
   "pseudonymType": "irreversible"
 }
@@ -151,11 +151,11 @@ Response:
 
 # Scenarios:
 
- org   | ura          | max_key_usage 
--------|--------------|---------------
- Org 1 | ura:90000036 | irp           
- Org 2 | ura:90000037 | rp            
- Org 3 | ura:90000038 | bsn           
+ org   | oin                      | max_key_usage 
+-------|--------------------------|---------------
+ Org 1 | oin:00000099000000001000 | irp           
+ Org 2 | oin:00000098000000001000 | rp            
+ Org 3 | oin:00000097000000001000 | bsn           
 
 * Org 1 can only create irreversible pseudonyms. It cannot be decoded back to the personal ID by anyone.
 * Org 2 can create reversible pseudonyms. It cannot decode itself back to the personal ID but can allow others (who have bsn max_key_usage) to do so.
