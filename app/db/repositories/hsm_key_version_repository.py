@@ -10,6 +10,7 @@ from app.db.decorator import repository
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
 from app.db.repositories.repository_base import RepositoryBase
+from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 @repository(HsmKeyVersion)
 class HsmKeyVersionRepository(RepositoryBase):
     def get_active_versions(
-        self, at: datetime, oin: Optional[str] = None
+        self, at: datetime, oin: Oin | None = None
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment, i.e. not
@@ -35,10 +36,10 @@ class HsmKeyVersionRepository(RepositoryBase):
             )
         )
         if oin is not None:
-            query = query.join(Organization).where(Organization.oin == oin)
+            query = query.join(Organization).where(Organization.oin == oin.value)
         return self.db_session.execute(query).scalars().all()
 
-    def get_by_oin(self, oin: str) -> Sequence[HsmKeyVersion]:
+    def get_by_oin(self, oin: Oin) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions belonging to the organization with the given OIN,
         regardless of date or removed state, ordered by version number.
@@ -47,7 +48,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             select(HsmKeyVersion)
             .options(joinedload(HsmKeyVersion.organization))
             .join(Organization)
-            .where(Organization.oin == oin)
+            .where(Organization.oin == oin.value)
             .order_by(HsmKeyVersion.version)
         )
         return self.db_session.execute(query).scalars().all()

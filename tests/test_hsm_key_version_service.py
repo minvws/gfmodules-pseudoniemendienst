@@ -1,7 +1,7 @@
 import base64
 import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 
@@ -9,8 +9,9 @@ from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
+from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.oprf_service import OprfService
+from app.services.oprf.oprf_service import OprfService, HsmKeyLabel
 
 
 def _add(db: Database, oin: str, **kwargs: object) -> None:
@@ -64,12 +65,12 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
 
 def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> None:
     now = datetime.now(timezone.utc)
-    _add(database, oin="12345678", version=2, from_dt=now - timedelta(days=2))
-    _add(database, oin="12345678", version=7, from_dt=now - timedelta(days=1))
+    _add(database, oin="00000000012345678000", version=2, from_dt=now - timedelta(days=2))
+    _add(database, oin="00000000012345678000", version=7, from_dt=now - timedelta(days=1))
     # a removed version must be ignored
     _add(
         database,
-        oin="12345678",
+        oin="00000000012345678000",
         version=9,
         from_dt=now - timedelta(days=1),
         removed=True,
@@ -81,16 +82,62 @@ def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> No
         hsm_key_version_service=HsmKeyVersionService(database),
     )
 
-    response = MagicMock()
-    response.json.return_value = {"result": base64.b64encode(b"evaluated").decode()}
-    with patch(
-        "app.services.oprf.oprf_service.requests.post", return_value=response
-    ) as post:
-        result = service._eval_via_hsm("oin:12345678", b"blinded")
+    with (
+        patch.object(service, "_label_exists", return_value=True) as label_exists,
+        patch.object(service, "_evaluate_label", return_value=b"evaluated") as evaluate_label,
+    ):
+        result = service._eval_via_hsm("oin:00000000012345678000", b"blinded")
 
     assert result == {2: b"evaluated", 7: b"evaluated"}
-    labels = {call.kwargs["json"]["label"] for call in post.call_args_list}
-    assert labels == {"oin-oin:12345678-v2", "oin-oin:12345678-v7"}
+
+    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
+        "oin-00000000012345678000-v2",
+        "oin-00000000012345678000-v7",
+    ]
+
+    assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
+        ("oin-00000000012345678000-v2", b"blinded"),
+        ("oin-00000000012345678000-v7", b"blinded"),
+    ]
+
+    assert label_exists.call_count == 2
+    assert evaluate_label.call_count == 2
+
+
+def test_eval_generates_keys_if_needed(database: Database) -> None:
+    now = datetime.now(timezone.utc)
+    _add(database, oin="00000000012345679000", version=1, from_dt=now - timedelta(days=2))
+
+    service = OprfService(
+        server_key=None,
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=HsmKeyVersionService(database),
+    )
+
+    with (
+        patch.object(service, "_label_exists", return_value=False) as label_exists,
+        patch.object(service, "_generate_key") as generate_key,
+        patch.object(service, "_evaluate_label", return_value=b"evaluated") as evaluate_label,
+    ):
+        result = service._eval_via_hsm("oin:00000000012345679000", b"blinded")
+
+    assert result == {1: b"evaluated"}
+
+    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
+        "oin-00000000012345679000-v1",
+    ]
+
+    assert [str(c.args[0]) for c in generate_key.call_args_list] == [
+        "oin-00000000012345679000-v1",
+    ]
+
+    assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
+        ("oin-00000000012345679000-v1", b"blinded"),
+    ]
+
+    assert label_exists.call_count == 1
+    assert evaluate_label.call_count == 1
+    assert generate_key.call_count == 1
 
 
 def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) -> None:
@@ -100,8 +147,8 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
     from app.models.requests import BlindRequest
 
     now = datetime.now(timezone.utc)
-    _add(database, oin="12345678", version=2, from_dt=now - timedelta(days=2))
-    _add(database, oin="12345678", version=7, from_dt=now - timedelta(days=1))
+    _add(database, oin="00000000012345678000", version=2, from_dt=now - timedelta(days=2))
+    _add(database, oin="00000000012345678000", version=7, from_dt=now - timedelta(days=1))
 
     service = OprfService(
         server_key=None,
@@ -113,6 +160,14 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
     pub = jwk.JWK.from_json(key.export_public())
 
     def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+        # Return slot info when asked
+        if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
+            resp = MagicMock()
+            resp.json.return_value = {
+                "objects": ["foobar"],
+            }
+            return resp
+
         version = json["label"].rsplit("v", 1)[-1]
         resp = MagicMock()
         resp.json.return_value = {
@@ -122,7 +177,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
 
     req = BlindRequest(
         encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
-        recipientOrganization="oin:12345678",
+        recipientOrganization="oin:00000000012345678000",
         recipientScope="scope",
     )
 
@@ -197,6 +252,14 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     pub = jwk.JWK.from_json(key.export_public())
 
     def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+        # Return slot info when asked
+        if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
+            resp = MagicMock()
+            resp.json.return_value = {
+                "objects": ["foobar"],
+            }
+            return resp
+
         version = json["label"].rsplit("v", 1)[-1]
         resp = MagicMock()
         resp.json.return_value = {
@@ -247,4 +310,4 @@ def test_eval_via_hsm_without_service_raises() -> None:
     )
 
     with pytest.raises(ValueError, match="HSM key version service not configured"):
-        service._eval_via_hsm("oin:12345678", b"blinded")
+        service._eval_via_hsm("oin:00000000012345678000", b"blinded")

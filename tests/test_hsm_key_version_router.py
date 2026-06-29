@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from starlette.testclient import TestClient
 
 from app.db.db import Database
+from app.models.oin import Oin
 from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.org_service import OrgService
@@ -119,7 +120,7 @@ def test_create_persists_version(
     )
 
     service = HsmKeyVersionService(database)
-    active = service.get_active_versions(oin="00000099000000001000")
+    active = service.get_active_versions(oin=Oin("00000099000000001000"))
     assert [v.version for v in active] == [1]
 
 
@@ -152,7 +153,7 @@ def test_update_sets_removed_and_until_dt(
 
     # The removed version is no longer returned as active.
     service = HsmKeyVersionService(database)
-    assert service.get_active_versions(oin="00000099000000001000") == []
+    assert service.get_active_versions(oin=Oin("00000099000000001000")) == []
 
 
 def test_update_clears_until_dt(
