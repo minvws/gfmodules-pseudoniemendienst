@@ -11,7 +11,6 @@ from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
-OIN_PATTERN = r"^\d{8}(?:[A-Za-z0-9]{8}0{4}|[A-Za-z0-9]{9}0{3})$"
 
 
 class RegisterRequest(BaseModel):
