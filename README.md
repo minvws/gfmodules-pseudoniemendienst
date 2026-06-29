@@ -169,18 +169,6 @@ Now you're able to run the pytest in poetry:
 poetry run pytest
 ```
 
-## Enabling/Disabling OAuth
-
-OAuth can be disabled for testing purposes by setting the `enabled` flag to `False` in the `[client_oauth]` section of app.conf:
-
-```ini
-[client_oauth]
-enabled = False
-```
-
-When OAuth is disabled, the `override_ura_number` configuration will be used instead. This allows you to test the application
-without requiring OAuth authentication.
-
 ## Docker container builds
 
 There are two ways to build a docker container from this application. The first is the default mode created with:
