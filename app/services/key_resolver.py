@@ -9,6 +9,7 @@ from app.db.db import Database
 from app.db.entities.organization_key import OrganizationKey
 from app.db.repositories.org_key_repository import OrganizationKeyRepository
 from app.db.repositories.org_repository import OrgRepository
+from app.models.oin import Oin
 from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class KeyResolver:
     def __init__(self, db: Database):
         self.db = db
 
-    def max_rid_usage(self, oin: str) -> Optional[RidUsage]:
+    def max_rid_usage(self, oin: Oin) -> Optional[RidUsage]:
         with self.db.get_db_session() as session:
             org = session.get_repository(OrgRepository).get_by_oin(oin)
             if org is None:

@@ -42,7 +42,7 @@ def list_keys_for_org(
     oin: Oin,
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_oin(oin.value)
+    org = org_service.get_by_oin(oin)
     if org is None:
         logger.warning("organization for OIN %s not found", oin)
         raise HTTPException(status_code=404, detail="organization not found")
@@ -59,7 +59,7 @@ def put_org(
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
 
-    org = org_service.get_by_oin(oin.value)
+    org = org_service.get_by_oin(oin)
     if org is None:
         logger.warning("organization for OIN %s not found", oin)
         raise HTTPException(status_code=404, detail="organization not found")
@@ -71,7 +71,7 @@ def put_org(
     org_service.update(
         org.id, req.name, req.max_key_usage or RidUsage.IrreversiblePseudonym
     )
-    updated_entry = org_service.get_by_oin(oin.value)
+    updated_entry = org_service.get_by_oin(oin)
     if updated_entry is None:
         logger.error("failed to retrieve updated org for OIN %s", oin)
         raise HTTPException(status_code=500, detail="failed to retrieve updated org")
@@ -88,7 +88,7 @@ def delete_org(
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
 
-    org = org_service.get_by_oin(oin.value)
+    org = org_service.get_by_oin(oin)
     if org is None:
         logger.warning(
             "organization not found for delete request, requested_oin=%s", oin

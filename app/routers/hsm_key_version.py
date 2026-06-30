@@ -1,15 +1,13 @@
 import logging
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
 from app.models.oin import Oin
 from app.models.requests import (
-    OIN_PATTERN,
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
 )
@@ -57,7 +55,7 @@ def list_key_versions(
     ),
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_oin(oin.value)
+    org = org_service.get_by_oin(oin)
     if org is None:
         logger.warning("organization for OIN %r not found", oin.value)
         raise HTTPException(status_code=404, detail="organization not found")

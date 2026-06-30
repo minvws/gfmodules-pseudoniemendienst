@@ -3,11 +3,18 @@ from typing import Any
 
 from pydantic import GetCoreSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
-from pydantic_core import core_schema
+from pydantic_core import PydanticCustomError, core_schema
 
 # An OIN is always 20 characters:
 #   prefix (8 digits) + mainnumber (8 or 9 alphanumeric) + suffix (4 or 3 zeros)
 OIN_PATTERN = re.compile(r"^\d{8}(?:[A-Za-z0-9]{8}0{4}|[A-Za-z0-9]{9}0{3})$")
+RECIPIENT_ORGANIZATION_PREFIX = "oin:"
+_RECIPIENT_ORGANIZATION_SUFFIX_PATTERN = (
+    r"\d{8}(?:[A-Za-z0-9]{8}0{4}|[A-Za-z0-9]{9}0{3})"
+)
+RECIPIENT_ORGANIZATION_PATTERN = re.compile(
+    rf"^{RECIPIENT_ORGANIZATION_PREFIX}{_RECIPIENT_ORGANIZATION_SUFFIX_PATTERN}$"
+)
 
 
 class Oin:
@@ -92,6 +99,8 @@ class Oin:
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Oin):
             return self.value == other.value
+        if isinstance(other, str):
+            return self.value == other
         return False
 
     def __hash__(self) -> int:
@@ -128,3 +137,75 @@ class Oin:
                 "8-digit prefix + 8/9-character alphanumeric mainnumber + 4/3 trailing zeros (suffix)."
             ),
         }
+
+
+class RecipientOrganizationOin(Oin):
+    """An OIN supplied with recipient organization prefix, e.g. ``oin:<oin>``.
+
+    Internally the stored value remains a plain OIN without the ``oin:`` prefix.
+    """
+
+    PREFIX = RECIPIENT_ORGANIZATION_PREFIX
+    _INVALID_ERROR = "Invalid recipient organization. Format: oin:<oin_number>"
+
+    def __init__(self, value: Any) -> None:
+        if isinstance(value, str) and value.startswith(self.PREFIX):
+            value = value[len(self.PREFIX) :]
+        super().__init__(value)
+
+    @classmethod
+    def _pydantic_validate(cls, value: Any) -> "RecipientOrganizationOin":
+        if isinstance(value, cls):
+            return value
+
+        if isinstance(value, Oin):
+            return cls(value.value)
+
+        if not isinstance(value, str):
+            raise PydanticCustomError(
+                "invalid_recipient_organization", cls._INVALID_ERROR
+            )
+
+        if not value.startswith(cls.PREFIX):
+            raise PydanticCustomError(
+                "invalid_recipient_organization", cls._INVALID_ERROR
+            )
+
+        try:
+            return cls(value[len(cls.PREFIX) :])
+        except ValueError as e:
+            raise PydanticCustomError(
+                "invalid_recipient_organization", "{error}", {"error": str(e)}
+            ) from e
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source_type: Any, _handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_plain_validator_function(
+            cls._pydantic_validate,
+            serialization=core_schema.to_string_ser_schema(),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _schema: core_schema.CoreSchema, _handler: Any
+    ) -> JsonSchemaValue:
+        return {
+            "type": "string",
+            "pattern": RECIPIENT_ORGANIZATION_PATTERN.pattern,
+            "examples": [f"{RECIPIENT_ORGANIZATION_PREFIX}00000099000000001000"],
+            "description": (
+                "Recipient organization string: prefix followed by an OIN (20-char "
+                "identifier)."
+            ),
+        }
+
+    def __str__(self) -> str:
+        """Return the recipient organization OIN in external format, including ``oin:``."""
+        return f"{self.PREFIX}{self.value}"
+
+    @property
+    def value(self) -> str:
+        """Return the normalized OIN value without the ``oin:`` prefix."""
+        return super().value

@@ -1,6 +1,8 @@
 import uuid
 from typing import Any, List, TYPE_CHECKING, Optional
 
+from app.db.types.oin import OinType
+from app.models.oin import Oin
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -21,7 +23,7 @@ class Organization(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    oin: Mapped[str] = mapped_column("oin", String, unique=True)
+    oin: Mapped[Oin] = mapped_column("oin", OinType(), unique=True)
     name: Mapped[str] = mapped_column("name", String)
     max_rid_usage: Mapped[str] = mapped_column("max_rid_usage", String)
 
@@ -33,7 +35,7 @@ class Organization(Base):
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "oin": self.oin,
+            "oin": self.oin.value,
             "name": self.name,
             "max_rid_usage": self.max_rid_usage,
         }

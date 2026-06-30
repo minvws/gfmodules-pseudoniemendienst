@@ -8,15 +8,22 @@ from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
+from app.models.oin import Oin
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
+TEST_OIN = Oin("00000099000000001000")
+TEST_OIN_EXPIRED_OTHER = Oin("00000099000001001000")
+TEST_OIN_ACTIVE = Oin("00000099000001000000")
+TEST_OIN_REMOVED = Oin("00000099000001003000")
+TEST_OIN_111 = Oin("00000099000000011000")
 
-def _add(db: Database, oin: str, **kwargs: object) -> None:
+
+def _add(db: Database, oin: Oin, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        org = session.query(Organization).filter(Organization.oin == oin).first()
+        org = session.query(Organization).filter(Organization.oin == oin.value).first()
         if org is None:
-            org = Organization(oin=oin, name=f"org-{oin}", max_rid_usage="irp")
+            org = Organization(oin=oin, name=f"org-{oin.value}", max_rid_usage="irp")
             session.add(org)
             session.flush()
         session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
@@ -34,7 +41,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # expired, not removed -> should be cleaned up
     _add(
         database,
-        oin="00000099000000001000",
+        oin=TEST_OIN,
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -42,7 +49,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # expired for a different org -> should be cleaned up too
     _add(
         database,
-        oin="00000099000001001000",
+        oin=TEST_OIN_EXPIRED_OTHER,
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=2),
@@ -50,7 +57,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # active (no end date) -> must be left alone
     _add(
         database,
-        oin="00000099000001000000",
+        oin=TEST_OIN_ACTIVE,
         version=2,
         from_dt=now - timedelta(days=1),
         until_dt=None,
@@ -58,7 +65,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # already removed -> must be ignored
     _add(
         database,
-        oin="00000099000001000000",
+        oin=TEST_OIN_ACTIVE,
         version=3,
         from_dt=now - timedelta(days=5),
         until_dt=now - timedelta(days=1),
@@ -77,8 +84,8 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # The right keys are destroyed in the HSM, by their stored label.
     labels = {call.kwargs["json"]["label"] for call in post.call_args_list}
     assert labels == {
-        "oin-00000099000000001000-v1",
-        "oin-00000099000001001000-v1",
+        f"oin-{TEST_OIN}-v1",
+        f"oin-{TEST_OIN_EXPIRED_OTHER}-v1",
     }
     urls = {call.args[0] for call in post.call_args_list}
     assert urls == {"https://hsm.local/hsm/softhsm/SoftHSMLabel/destroy"}
@@ -87,14 +94,14 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     version_service = HsmKeyVersionService(database)
     assert version_service.get_expired_versions() == []
     active = {(v.oin, v.version) for v in version_service.get_active_versions()}
-    assert active == {("00000099000001000000", 2)}
+    assert active == {(TEST_OIN_ACTIVE, 2)}
 
 
 def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
     now = datetime.now(timezone.utc)
     _add(
         database,
-        oin="00000099000001000000",
+        oin=TEST_OIN_ACTIVE,
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -117,7 +124,7 @@ def test_cleanup_keeps_version_when_hsm_destroy_fails(database: Database) -> Non
     now = datetime.now(timezone.utc)
     _add(
         database,
-        oin="00000099000000001000",
+        oin=TEST_OIN,
         version=1,
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
@@ -142,28 +149,28 @@ def test_get_expired_versions_filters(database: Database) -> None:
     now = datetime.now(timezone.utc)
     _add(
         database,
-        oin="111",
+        oin=TEST_OIN_111,
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now - timedelta(days=1),
     )  # expired
     _add(
         database,
-        oin="00000099000000001000",
+        oin=TEST_OIN,
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=None,
     )  # active, no end
     _add(
         database,
-        oin="00000099000001001000",
+        oin=TEST_OIN_EXPIRED_OTHER,
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now + timedelta(days=1),
     )  # active, future end
     _add(
         database,
-        oin="00000099000001003000",
+        oin=TEST_OIN_REMOVED,
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now - timedelta(days=1),
@@ -171,7 +178,7 @@ def test_get_expired_versions_filters(database: Database) -> None:
     )  # expired but already removed
 
     expired = HsmKeyVersionService(database).get_expired_versions()
-    assert {v.oin for v in expired} == {"111"}
+    assert {v.oin for v in expired} == {TEST_OIN_111}
 
 
 @pytest.mark.parametrize("hsm_url", ["", None])

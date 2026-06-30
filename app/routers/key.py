@@ -61,7 +61,7 @@ def list_keys_for_org(
     oin: Oin,
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = org_service.get_by_oin(oin.value)
+    org = org_service.get_by_oin(oin)
     if org is None:
         logger.warning("organization for OIN %r not found", oin)
         raise HTTPException(

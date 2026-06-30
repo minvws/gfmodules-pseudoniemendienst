@@ -1,5 +1,6 @@
 from jwcrypto import jwk
 
+from app.models.oin import Oin
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver, KeyRequest
 from app.services.org_service import OrgService
@@ -11,19 +12,22 @@ hvOXiM1EeTB7me9x2P6t6SznJA7+SQMLHpvD8oKUzbflMjlyW8fs21og2eQ1YNPi
 fRs2Wy5kQi1QlyTzAgMBAAE=
 -----END PUBLIC KEY-----"""
 
+TEST_OIN = Oin("00000099000000001000")
+TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
+
 
 def test_resolver_create_and_resolve_roundtrip(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="oin:00000099000000001000",
+        oin=TEST_OIN,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
     # create
     req = KeyRequest(
-        organization="oin:00000099000000001000",
+        organization=TEST_OIN_WITH_PREFIX,
         scope=["NVI", " lmr "],
         pub_key=TEST_PUBKEY,
     )
@@ -41,7 +45,7 @@ def test_resolver_get_and_delete(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="oin:00000099000000001000",
+        oin=TEST_OIN,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
@@ -66,7 +70,7 @@ def test_resolver_create_persists_key_id(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="oin:00000099000000001000",
+        oin=TEST_OIN,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
@@ -85,7 +89,7 @@ def test_resolver_create_without_key_id(
     key_resolver: KeyResolver, org_service: OrgService
 ) -> None:
     org = org_service.create(
-        oin="oin:00000099000000001000",
+        oin=TEST_OIN,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )

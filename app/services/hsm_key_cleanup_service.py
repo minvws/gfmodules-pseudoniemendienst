@@ -3,7 +3,6 @@ import logging
 import requests
 
 from app.config import ConfigOprf
-from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.oprf_service import HsmKeyLabel
 
@@ -39,7 +38,7 @@ class HsmKeyCleanupService:
         cleaned = 0
         for version in expired:
             try:
-                label = HsmKeyLabel(Oin(version.oin), version.version)
+                label = HsmKeyLabel(version.oin, version.version)
             except ValueError:
                 logger.exception("Value %r is not a correct OIN number", version.oin)
                 continue
