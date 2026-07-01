@@ -10,7 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 class Database:
-    def __init__(self, dsn: str):
+    def __init__(
+        self,
+        dsn: str,
+        pool_size: int = 5,
+        max_overflow: int = 10,
+        pool_pre_ping: bool = False,
+        pool_recycle: int = 3600,
+    ):
         try:
             if "sqlite://" in dsn:
                 self.engine = create_engine(
@@ -21,7 +28,14 @@ class Database:
                     echo=False,
                 )
             else:
-                self.engine = create_engine(dsn, echo=False)
+                self.engine = create_engine(
+                    dsn,
+                    echo=False,
+                    pool_size=pool_size,
+                    max_overflow=max_overflow,
+                    pool_pre_ping=pool_pre_ping,
+                    pool_recycle=pool_recycle,
+                )
         except BaseException as e:
             logger.exception("error while connecting to database")
             raise e

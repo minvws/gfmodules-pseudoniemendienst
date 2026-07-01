@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
 
-    db = Database(dsn=config.database.dsn)
+    db = Database(
+        dsn=config.database.dsn,
+        pool_size=config.database.pool_size,
+        max_overflow=config.database.max_overflow,
+        pool_pre_ping=config.database.pool_pre_ping,
+        pool_recycle=config.database.pool_recycle,
+    )
     binder.bind(Database, db)
 
     key_resolver = KeyResolver(db)
