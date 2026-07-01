@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException
 from starlette.requests import Request
 
 from app import container
+from app.config import get_config
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.headers import AuthHeaders
 from app.models.oin import Oin
@@ -18,10 +19,23 @@ def get_auth_ctx(
         container.get_auth_headers_service
     ),
 ) -> AuthContext:
+    raw_oin = (
+        request.headers.get("x-gf-oin")
+        or get_config().development.override_authenticated_oin
+    )
+    raw_audience = request.headers.get("x-gf-audience")
+
+    if raw_oin is None or raw_audience is None:
+        logger.exception("Missing authorization headers in request")
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+
+    assert raw_oin is not None
+    assert raw_audience is not None
+
     try:
-        auth_headers = AuthHeaders.from_request(request)
-    except ValueError as e:
-        logger.exception(f"Inavalid Authorization Headers in request: {e}")
+        auth_headers = AuthHeaders(oin=Oin(raw_oin), audience=raw_audience)
+    except Exception as e:
+        logger.exception(f"Invalid authorization headers in request: {e}")
         raise HTTPException(status_code=403, detail="Unauthorized request")
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)

@@ -8,11 +8,14 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
+from app.auth import authenticated_oin
 from app.models.requests import InputRequest, ReceiverRequest, JweReceiverRequest
+from app.models.oin import Oin
 from app.personal_id import PersonalId, PersonalIdJSONEncoder
 from app.rid import RidUsage
-from app.services.mtls_service import MtlsService
 from app.services.oprf.oprf_service import OprfService
+from app.services.org_service import OrgService
+from app.services.mtls_service import MtlsService
 from app.services.pseudonym_service import PseudonymService
 
 logger = logging.getLogger(__name__)
@@ -165,13 +168,20 @@ if the calling organization is authorized to reverse pseudonyms (max_key_usage =
 """,
 )
 def post_test_reversible_pseudonym(
-    request: Request,
     pseudonym: str,
+    auth_oin: Oin = Depends(authenticated_oin),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
     # Check if we as an organization are allowed to reverse pseudonyms (max_key_usage == BSN)
-    org = mtls_service.get_org_from_request(request)
+    org = org_service.get_by_oin(auth_oin)
+    if org is None:
+        logger.warning("organization for OIN %s is not registered", auth_oin)
+        return JSONResponse(
+            {"error": "Organization is not registered."},
+            status_code=400,
+        )
+
     if org.max_rid_usage != RidUsage.Bsn:
         return JSONResponse(
             {"error": "Organization is not authorized to reverse pseudonyms."},
@@ -224,12 +234,22 @@ that called this endpoint using MTLS.
 )
 def test_mtls(
     request: Request,
+    auth_oin: Oin = Depends(authenticated_oin),
     mtls_service: MtlsService = Depends(container.get_mtls_service),
+    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    org = mtls_service.get_org_from_request(request)
+    org = org_service.get_by_oin(auth_oin)
 
     cert_pem = mtls_service.get_mtls_cert(request)
     cert = mtls_service.get_oin_cert(request)
+    cert_oin = mtls_service.get_oin_from_cert(cert)
+
+    if cert_oin != auth_oin:
+        logger.warning(
+            "mismatch between auth OIN %s and certificate OIN %s in /test/mtls",
+            auth_oin,
+            cert_oin,
+        )
 
     ret = {
         "cert_pem": cert_pem,

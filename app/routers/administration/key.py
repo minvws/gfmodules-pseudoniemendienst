@@ -6,7 +6,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import authenticated_oin, require_matching_oin
+from app.auth import authenticated_oin
 from app.models.requests import RegisterRequest
 from app.models.oin import Oin
 from app.services.mtls_service import MtlsService
@@ -26,12 +26,22 @@ def post_key(
     req: RegisterRequest,
     request: Request,
     auth_oin: Oin = Depends(authenticated_oin),
+    org_service: OrgService = Depends(container.get_org_service),
     mtls_service: MtlsService = Depends(container.get_mtls_service),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
 
     mtls_pub_key = mtls_service.get_mtls_pub_key(request)
-    org = mtls_service.get_org_from_request(request)
+    org = org_service.get_by_oin(auth_oin)
+    if org is None:
+        logger.warning(
+            "caller oin %s has no registered organization when registering key",
+            auth_oin,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"organization for OIN {auth_oin.value} is not registered",
+        )
 
     if org.oin != auth_oin:
         logger.warning(
@@ -61,18 +71,18 @@ def post_key(
 
 
 @router.get(
-    "/keys/{oin}",
+    "/keys",
     summary="List public key information for the authorized organization",
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    oin: Oin = Depends(require_matching_oin),
+    auth_oin: Oin = Depends(authenticated_oin),
     org_service: OrgService = Depends(container.get_org_service),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
-    org = org_service.get_by_oin(oin)
+    org = org_service.get_by_oin(auth_oin)
     if org is None:
-        logger.warning("organization for OIN %r not found", oin)
+        logger.warning("organization for OIN %r not found", auth_oin)
         raise HTTPException(
             status_code=400, detail="organization for this OIN is not registered"
         )

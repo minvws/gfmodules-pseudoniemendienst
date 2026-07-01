@@ -98,7 +98,12 @@ cross-organisation operation is explicitly intended and separately authorized).
 
 ## Development bypass
 
-For local development without a proxy, `app.mtls_override_cert` can be set to a
+For local development without a proxy, `development.override_mtls_cert` can be set to a
 certificate file on disk. When set, `MtlsService` uses that certificate instead
 of reading it from the request header. This bypass is for development only and
 must never be configured in a deployed environment.
+
+When a request also does not include an `x-gf-oin` header in local/developer
+setups, set `development.override_authenticated_oin` to an OIN to continue authenticating as
+that organization while still requiring the rest of the auth context (in
+particular audience validation) to come from headers.

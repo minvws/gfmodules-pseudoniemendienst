@@ -228,12 +228,12 @@ To use this system:
    self-signed certificate for testing purposes.
 
    Since the system uses mTLS, you can either setup a mTLS setup (caddy, apache, etc), or enable the override in the
-    app.conf file:
-  
-    ```
-    [app]
-    mtls_override_cert=./secrets/self-signed-uzi-server-cert.crt
-    ```
+   app.conf file:
+
+   ```
+   [development]
+   override_mtls_cert=./secrets/self-signed-uzi-server-cert.crt
+   ```
  
 2. Insert a new organization via a POST to `/orgs`. The organization OIN should be the serialNumber of the OIN certificate you
 

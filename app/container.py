@@ -66,7 +66,7 @@ def container_config(binder: inject.Binder) -> None:
     org_service = OrgService(db)
     binder.bind(OrgService, org_service)
 
-    mtls_service = MtlsService(config.app.mtls_override_cert, org_service)
+    mtls_service = MtlsService(config.development.override_mtls_cert)
     binder.bind(MtlsService, mtls_service)
 
     hsm_key_version_service = HsmKeyVersionService(db)

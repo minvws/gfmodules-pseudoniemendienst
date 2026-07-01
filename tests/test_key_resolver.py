@@ -13,7 +13,6 @@ fRs2Wy5kQi1QlyTzAgMBAAE=
 -----END PUBLIC KEY-----"""
 
 TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
 
 
 def test_resolver_create_and_resolve_roundtrip(
@@ -27,7 +26,6 @@ def test_resolver_create_and_resolve_roundtrip(
 
     # create
     req = KeyRequest(
-        organization=TEST_OIN_WITH_PREFIX,
         scope=["NVI", " lmr "],
         pub_key=TEST_PUBKEY,
     )

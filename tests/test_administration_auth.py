@@ -77,13 +77,10 @@ def test_admin_key_list_blocks_oin_mismatch(
         RidUsage.IrreversiblePseudonym,
     )
 
-    response = client.get(
-        f"/administration/keys/{TEST_OTHER_OIN.value}",
-        headers=_headers(TEST_CALLER_OIN),
-    )
+    response = client.get("/administration/keys", headers=_headers(TEST_CALLER_OIN))
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
+    assert response.status_code == 404
+    assert response.json() == {"detail": "no keys found"}
 
 
 def test_admin_key_list_returns_oin(
@@ -103,10 +100,7 @@ def test_admin_key_list_returns_oin(
         TEST_PUB_KEY,
     )
 
-    response = client.get(
-        f"/administration/keys/{TEST_CALLER_OIN.value}",
-        headers=_headers(TEST_CALLER_OIN),
-    )
+    response = client.get("/administration/keys", headers=_headers(TEST_CALLER_OIN))
 
     assert response.status_code == 200
     body = response.json()
@@ -140,7 +134,6 @@ def test_admin_key_update_blocks_other_org(
     response = client.put(
         f"/administration/keys/{key_entry.id}",
         json={
-            "organization": f"oin:{TEST_CALLER_OIN}",
             "scope": ["nvi"],
             "pub_key": TEST_PUB_KEY,
         },

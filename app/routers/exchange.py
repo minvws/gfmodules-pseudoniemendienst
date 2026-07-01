@@ -3,18 +3,16 @@ import logging
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app import container
-from app.auth import get_auth_ctx
+from app.auth import get_auth_ctx, authenticated_oin
 from app.models.auth.context import AuthContext
 from app.models.oin import Oin
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
 from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK, RidUsage
 from app.services.key_resolver import KeyResolver
-from app.services.mtls_service import MtlsService
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
@@ -247,11 +245,10 @@ def exchange_rid(
 )
 def exchange_pseudonym(
     req: ExchangeRequest,
-    request: Request,
+    auth_oin: Oin = Depends(authenticated_oin),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
     org_service: OrgService = Depends(container.get_org_service),
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
 ) -> Response:
     recipient_oin = req.recipientOrganization
 
@@ -260,7 +257,13 @@ def exchange_pseudonym(
         logger.warning("recipient organization not found for OIN: %s", recipient_oin)
         raise OrganizationNotFound(recipient_oin)
 
-    source_org = mtls_service.get_org_from_request(request)
+    source_org = org_service.get_by_oin(auth_oin)
+    if source_org is None:
+        logger.warning("source organization for OIN %s is not registered", auth_oin)
+        raise HTTPException(
+            status_code=400,
+            detail=f"organization for OIN {auth_oin.value} is not registered",
+        )
 
     if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.generate_irreversible_pseudonym(

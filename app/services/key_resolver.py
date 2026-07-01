@@ -25,7 +25,6 @@ def _normalize_scope(items: List[str]) -> List[str]:
 
 
 class KeyRequest(BaseModel):
-    organization: str = Field(..., min_length=2)
     scope: List[str] = Field(...)
     pub_key: str = Field(..., min_length=32)
     max_key_usage: Optional[RidUsage] = None

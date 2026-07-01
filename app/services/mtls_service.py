@@ -6,8 +6,6 @@ from cryptography.hazmat.primitives import serialization
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app.db.entities.organization import Organization
-from app.services.org_service import OrgService
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
@@ -26,10 +24,8 @@ class MtlsService:
     def __init__(
         self,
         override_cert: str | None,
-        org_service: OrgService,
     ) -> None:
         self.__cert: bytes | None = None
-        self.org_service = org_service
 
         if override_cert is not None and override_cert != "":
             with open(override_cert, "r") as f:
@@ -105,15 +101,3 @@ class MtlsService:
         except ValueError as e:
             logger.warning(f"Invalid OIN in certificate {e}")
             raise InvalidOinCertificate()
-
-    def get_org_from_request(self, request: Request) -> Organization:
-        oin_cert = self.get_oin_cert(request)
-        oin = self.get_oin_from_cert(oin_cert)
-        org = self.org_service.get_by_oin(oin)
-        if org is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"organization for OIN {oin.value} is not registered",
-            )
-
-        return org
