@@ -7,6 +7,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from app import container
+from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.headers import (
     AUTH_HEADER_X_GF_AUDIENCE,
@@ -15,6 +16,7 @@ from app.models.auth.headers import (
 )
 from app.models.oin import Oin
 from app.services.auth.header import AuthHeaderService
+from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
 
@@ -92,3 +94,18 @@ def get_auth_ctx(
 def authenticated_oin(auth_ctx: AuthContext = Depends(get_auth_ctx)) -> Oin:
     """Return the caller OIN from the validated auth context."""
     return auth_ctx.claims.oin
+
+
+def authenticated_organization(
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    org_service: OrgService = Depends(container.get_org_service),
+) -> Organization:
+    """Return the authenticated organization resolved from the caller OIN."""
+    organization = org_service.get_by_oin(auth_ctx.claims.oin)
+    if organization is None:
+        logger.warning("organization for OIN %r not found", auth_ctx.claims.oin.value)
+        raise HTTPException(
+            status_code=400, detail="organization for this OIN is not registered"
+        )
+
+    return organization

@@ -139,7 +139,8 @@ def test_administration_key_update_blocks_other_org(
         headers=auth_headers,
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
+    assert response.json() == {"detail": "key not found"}
 
 
 def test_administration_key_delete_blocks_other_org(
@@ -173,8 +174,8 @@ def test_administration_key_delete_blocks_other_org(
         headers=auth_headers,
     )
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
+    assert response.status_code == 404
+    assert response.json() == {"detail": "key not found"}
 
 
 def test_administration_key_update_rejects_invalid_key_id(
@@ -217,3 +218,43 @@ def test_administration_key_delete_rejects_invalid_key_id(
     )
 
     assert response.status_code == 422
+
+
+def test_administration_key_update_rejects_duplicate_scope(
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    test_oin: Oin,
+    auth_headers: dict[str, str],
+    test_public_key: str,
+) -> None:
+    owner = org_service.create(
+        test_oin,
+        f"Org {test_oin}",
+        RidUsage.IrreversiblePseudonym,
+    )
+
+    key_resolver.create(
+        owner.id,
+        ["nvi"],
+        "test-key-first",
+        test_public_key,
+    )
+    second = key_resolver.create(
+        owner.id,
+        ["rp"],
+        "test-key-second",
+        test_public_key,
+    )
+
+    response = client.put(
+        f"/administration/keys/{second.id}",
+        json={
+            "scope": ["nvi"],
+            "pub_key": test_public_key,
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "key for this org/scope already exists"}

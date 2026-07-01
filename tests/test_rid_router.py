@@ -28,9 +28,8 @@ def generate_keys(
     pub_key: str,
 ) -> None:
     entries = key_resolver.get_by_org(org_id)
-    if entries is not None:
-        for entry in entries:
-            key_resolver.delete(entry.id)
+    for entry in entries:
+        key_resolver.delete(entry.id, org_id)
     key_resolver.create(
         org_id,
         scope,
