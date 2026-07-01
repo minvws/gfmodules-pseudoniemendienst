@@ -34,6 +34,16 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             return repo.get_active_versions(at, oin)
 
+    def get_version(self, version_id: uuid.UUID) -> HsmKeyVersion | None:
+        """
+        Returns a single key version by its ID, or None when it does not exist.
+        The organization is eagerly loaded so its OIN stays available after the
+        session is closed (used for ownership checks in the router).
+        """
+        with self.__db.get_db_session() as session:
+            repo = session.get_repository(HsmKeyVersionRepository)
+            return repo.get_by_id(version_id)
+
     def get_versions_for_oin(self, oin: Oin) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions for the given organization OIN, regardless of
