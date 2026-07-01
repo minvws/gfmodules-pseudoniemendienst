@@ -100,7 +100,7 @@ def test_create_unknown_org_returns_404(client: TestClient, database: Database) 
     )
 
     assert response.status_code == 404
-    assert response.json() == {"detail": f"organization with oin {TEST_OIN} not found"}
+    assert response.json() == {"detail": "organization not found"}
 
 
 def test_create_invalid_oin_returns_422(client: TestClient, database: Database) -> None:

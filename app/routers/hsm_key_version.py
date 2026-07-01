@@ -48,7 +48,7 @@ def post_key_version(
         )
     except ValueError as e:
         logger.warning("cannot create key version: %s", e)
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="organization not found")
     except Exception:
         logger.exception("failed to create key version for OIN %s", req.oin)
         raise HTTPException(status_code=500, detail="failed to create key version")
