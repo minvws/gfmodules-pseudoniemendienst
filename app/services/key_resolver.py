@@ -143,11 +143,3 @@ class KeyResolver:
             session.delete(entry)
             session.commit()
             return True
-
-    def delete_by_org(self, org_id: uuid.UUID) -> int:
-        with self.db.get_db_session() as session:
-            count = session.get_repository(OrganizationKeyRepository).delete_by_org(
-                org_id
-            )
-            session.commit()
-            return count

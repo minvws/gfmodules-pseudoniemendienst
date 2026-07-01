@@ -18,12 +18,6 @@ class RegisterRequest(BaseModel):
     key_id: str | None
 
 
-class OrgRequest(BaseModel):
-    oin: Oin
-    name: str = Field(..., min_length=5, max_length=50)
-    max_key_usage: RidUsage
-
-
 class HsmKeyVersionRequest(BaseModel):
     oin: Oin
     from_dt: datetime | None = None

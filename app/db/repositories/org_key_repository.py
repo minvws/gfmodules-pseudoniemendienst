@@ -76,16 +76,3 @@ class OrganizationKeyRepository(RepositoryBase):
         entry.key_data = key_data
         self.db_session.add(entry)
         return entry
-
-    def delete_by_org(self, org_id: uuid.UUID) -> int:
-        """
-        Deletes all key entries for a given organization.
-        """
-        query = select(OrganizationKey).where(OrganizationKey.organization_id == org_id)
-        entries = self.db_session.execute(query).scalars().all()
-        count = len(entries)
-
-        for entry in entries:
-            self.db_session.delete(entry)
-
-        return count
