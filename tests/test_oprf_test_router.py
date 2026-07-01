@@ -25,10 +25,6 @@ class OprfTestRouterContext:
     private_key_pem: str
 
 
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_VALUE = TEST_OIN.value
-
-
 def generate_rsa_keypair() -> Tuple[str, str]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
@@ -66,8 +62,9 @@ def setup_org_and_key(
 def oprf_test_router_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
+    test_oin: Oin,
 ) -> OprfTestRouterContext:
-    recipient_organization = f"oin:{TEST_OIN}"
+    recipient_organization = f"oin:{test_oin}"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -77,7 +74,7 @@ def oprf_test_router_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        oin=TEST_OIN,
+        oin=test_oin,
         scope=recipient_scope,
     )
     return OprfTestRouterContext(
@@ -91,11 +88,12 @@ def oprf_test_router_context(
 def test_test_oprf_client_and_receiver_roundtrip(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
+    auth_headers: dict[str, str],
 ) -> None:
     client_response = client.post(
         "/test/oprf/client",
         json={"personalId": oprf_test_router_context.personal_identifier},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert client_response.status_code == 200
 
@@ -109,7 +107,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert eval_response.status_code == 200
     jwe_token = eval_response.json()["jwe"]
@@ -121,7 +119,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "jwe": jwe_token,
             "priv_key_pem": oprf_test_router_context.private_key_pem,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert receiver_response.status_code == 200
 
@@ -138,6 +136,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
 def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
+    auth_headers: dict[str, str],
 ) -> None:
     info = (
         f"{oprf_test_router_context.recipient_organization}|"
@@ -160,7 +159,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert eval_response.status_code == 200
 
@@ -171,7 +170,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "jwe": eval_response.json()["jwe"],
             "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert receiver_response.status_code == 200
     assert receiver_response.json()["jwe"]["decrypted"].startswith(

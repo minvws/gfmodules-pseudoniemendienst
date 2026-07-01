@@ -30,9 +30,8 @@ from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
+from tests.helpers import assert_key_version_payload
 
-TEST_OIN = Oin("00000099000000001000")
-RECIPIENT_ORG = f"oin:{TEST_OIN}"
 SCOPE = "nvi"
 
 
@@ -85,16 +84,18 @@ def _decrypt_jwe(jwe_str: str, private_key_pem: str) -> dict[str, Any]:
     return dict(json.loads(token.payload.decode("utf-8")))
 
 
-def _eval(client: TestClient) -> Any:
+def _eval(
+    client: TestClient, auth_headers: dict[str, str], recipient_organization: str
+) -> Any:
     blinded = base64.urlsafe_b64encode(b"blinded").decode("ascii")
     return client.post(
         "/oprf/eval",
         json={
             "encryptedPersonalId": blinded,
-            "recipientOrganization": RECIPIENT_ORG,
+            "recipientOrganization": recipient_organization,
             "recipientScope": SCOPE,
         },
-        headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
 
@@ -104,10 +105,14 @@ def test_new_key_version_is_added_to_jwe(
     database: Database,
     org_service: OrgService,
     key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
 ) -> None:
+    recipient_organization = f"oin:{test_oin}"
+
     # 1. Register an organization with a public key.
     org = org_service.create(
-        oin=TEST_OIN, name=f"Org {TEST_OIN}", max_key_usage=RidUsage.ReversiblePseudonym
+        oin=test_oin, name=f"Org {test_oin}", max_key_usage=RidUsage.ReversiblePseudonym
     )
     private_key_pem, public_key_pem = _generate_rsa_keypair()
     key_resolver.create(org.id, [SCOPE], None, public_key_pem)
@@ -129,16 +134,20 @@ def test_new_key_version_is_added_to_jwe(
             resp = client.post(
                 "/administration/key-versions",
                 json={},
-                headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
+                headers=auth_headers,
             )
             assert resp.status_code == 201
-            assert resp.json()["version"] == 1
+            assert_key_version_payload(resp.json(), 1)
 
             # 3. We get a pseudonym back, carrying only version 1.
-            eval_resp = _eval(client)
+            eval_resp = _eval(
+                client=client,
+                auth_headers=auth_headers,
+                recipient_organization=recipient_organization,
+            )
             assert eval_resp.status_code == 200
             body = _decrypt_jwe(eval_resp.json()["jwe"], private_key_pem)
-            assert body["aud"] == RECIPIENT_ORG
+            assert body["aud"] == recipient_organization
             assert body["scope"] == SCOPE
             assert body["subject"] == "pseudonym:eval:" + _eval_v("1")
             assert body["extra_versions"] == {}
@@ -147,14 +156,18 @@ def test_new_key_version_is_added_to_jwe(
             resp = client.post(
                 "/administration/key-versions",
                 json={},
-                headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
+                headers=auth_headers,
             )
             assert resp.status_code == 201
-            assert resp.json()["version"] == 2
+            assert_key_version_payload(resp.json(), 2)
 
             # 5. The JWE now carries version 2 as the subject (latest) and
             #    version 1 as an extra version.
-            eval_resp = _eval(client)
+            eval_resp = _eval(
+                client=client,
+                auth_headers=auth_headers,
+                recipient_organization=recipient_organization,
+            )
             assert eval_resp.status_code == 200
             body = _decrypt_jwe(eval_resp.json()["jwe"], private_key_pem)
             assert body["subject"] == "pseudonym:eval:" + _eval_v("2")

@@ -103,7 +103,9 @@ certificate file on disk. When set, `MtlsService` uses that certificate instead
 of reading it from the request header. This bypass is for development only and
 must never be configured in a deployed environment.
 
-When a request also does not include an `x-gf-oin` header in local/developer
-setups, set `development.override_authenticated_oin` to an OIN to continue authenticating as
-that organization while still requiring the rest of the auth context (in
-particular audience validation) to come from headers.
+For local/developer setups, set `development.override_authenticated_oin` and
+`development.override_authenticated_audience` when requests do not include those
+headers so development can continue without a proxy while still validating via the
+configured audience allowlist. These values are injected into the request headers
+at application startup via middleware so normal auth parsing keeps reading from
+`x-gf-oin` and `x-gf-audience`.

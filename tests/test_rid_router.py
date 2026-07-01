@@ -11,7 +11,7 @@ from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
-TEST_OIN_VALUE = TEST_OIN.value
+TEST_OTHER_OIN_VALUE = "00000099000000002000"
 
 MOCK_ORGS = {
     TEST_OIN_WITH_PREFIX: (["nvi"], "irp", "", ""),
@@ -82,6 +82,7 @@ def test_create_happy_path(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
     response = client.post(
@@ -92,7 +93,7 @@ def test_create_happy_path(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 201
     assert response.content is not None
@@ -101,7 +102,10 @@ def test_create_happy_path(
 
 
 def test_invalid_scope(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -113,7 +117,7 @@ def test_invalid_scope(
             "recipientScope": "invalid-scope",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 404
@@ -131,7 +135,7 @@ def test_invalid_scope(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 404
@@ -142,7 +146,10 @@ def test_invalid_scope(
 
 
 def test_decode_as_receiver(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -154,7 +161,7 @@ def test_decode_as_receiver(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     jwe = response.content.decode("utf-8")
     headers, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -176,7 +183,7 @@ def test_decode_as_receiver(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     jwe = response.content.decode("utf-8")
     _, data2 = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -186,7 +193,10 @@ def test_decode_as_receiver(
 
 
 def test_receive_rids(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -198,7 +208,7 @@ def test_receive_rids(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid RID. Should start with 'rid:'"}
@@ -211,14 +221,17 @@ def test_receive_rids(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Failed to decrypt RID"}
 
 
 def test_receive_incorrect_org(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -230,7 +243,7 @@ def test_receive_incorrect_org(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     jwe = response.content.decode("utf-8")
     _, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -245,7 +258,7 @@ def test_receive_incorrect_org(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
@@ -259,7 +272,7 @@ def test_receive_incorrect_org(
             "recipientScope": "incorrect-scope",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid recipient organization and/or scope"}
@@ -273,7 +286,7 @@ def test_receive_incorrect_org(
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {
@@ -282,7 +295,10 @@ def test_receive_incorrect_org(
 
 
 def test_exchange_rid_invalid_recipient_organization_returns_expected_error(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -294,7 +310,7 @@ def test_exchange_rid_invalid_recipient_organization_returns_expected_error(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 422
@@ -306,6 +322,7 @@ def test_exchange_rid_invalid_recipient_organization_returns_expected_error(
 
 def test_receive_invalid_recipient_organization_returns_expected_error(
     client: TestClient,
+    auth_headers: dict[str, str],
 ) -> None:
     response = client.post(
         "/receive",
@@ -315,7 +332,7 @@ def test_receive_invalid_recipient_organization_returns_expected_error(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": "00000099000000001000", "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 422
@@ -326,7 +343,10 @@ def test_receive_invalid_recipient_organization_returns_expected_error(
 
 
 def test_receive_incorrect_usage(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -338,7 +358,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "ridUsage": "irp",  # Can only be used to exchange for an IRP, not an RP or BSN
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     jwe = response.content.decode("utf-8")
     headers, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -353,7 +373,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {
@@ -369,7 +389,7 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 400
     assert response.json() == {
@@ -385,14 +405,18 @@ def test_receive_incorrect_usage(
             "recipientScope": "nvi",
             "pseudonymType": "irp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert response.status_code == 200
     assert response.json()["type"] == "irp"
 
 
 def test_receive_rejects_caller_that_is_not_the_recipient(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
+    auth_headers_for_oin,
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -405,7 +429,7 @@ def test_receive_rejects_caller_that_is_not_the_recipient(
             "recipientScope": "nvi",
             "ridUsage": "irp",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     jwe = response.content.decode("utf-8")
     _, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
@@ -422,13 +446,17 @@ def test_receive_rejects_caller_that_is_not_the_recipient(
             "recipientScope": "nvi",
             "pseudonymType": "irp",
         },
-        headers={"x-gf-oin": "00000099000000002000", "x-gf-audience": "prs.service"},
+        headers=auth_headers_for_oin(TEST_OTHER_OIN_VALUE),
     )
     assert response.status_code == 403
 
 
 def test_min_usage_level(
-    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    auth_headers: dict[str, str],
+    auth_headers_for_oin,
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -440,7 +468,7 @@ def test_min_usage_level(
             "recipientScope": "nvi",
             "ridUsage": "bsn",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     jwe = response.content.decode("utf-8")
     headers, data = decode_jwe(jwe, MOCK_ORGS["oin:00000099000000002000"][2])
@@ -455,7 +483,7 @@ def test_min_usage_level(
             "recipientScope": "nvi",
             "pseudonymType": "irp",
         },
-        headers={"x-gf-oin": "00000099000000002000", "x-gf-audience": "prs.service"},
+        headers=auth_headers_for_oin(TEST_OTHER_OIN_VALUE),
     )
     assert response.status_code == 200
     assert response.json()["type"] == "irp"
@@ -470,7 +498,7 @@ def test_min_usage_level(
             "recipientScope": "nvi",
             "pseudonymType": "rp",
         },
-        headers={"x-gf-oin": "00000099000000002000", "x-gf-audience": "prs.service"},
+        headers=auth_headers_for_oin(TEST_OTHER_OIN_VALUE),
     )
     assert response.status_code == 200
     assert response.json()["type"] == "rp"
@@ -484,7 +512,7 @@ def test_min_usage_level(
             "recipientScope": "nvi",
             "pseudonymType": "bsn",
         },
-        headers={"x-gf-oin": "00000099000000002000", "x-gf-audience": "prs.service"},
+        headers=auth_headers_for_oin(TEST_OTHER_OIN_VALUE),
     )
     assert response.status_code == 400
     assert response.json() == {

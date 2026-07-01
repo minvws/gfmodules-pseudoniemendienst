@@ -416,3 +416,62 @@ def test_update_version_rejects_removed(database: Database) -> None:
     updated_until = now - timedelta(minutes=1)
     with pytest.raises(HsmKeyVersionNotFoundError):
         service.update_version(active[0].id, TEST_OIN, updated_until)
+
+
+def test_create_version_preserves_timezone_in_storage(database: Database) -> None:
+    from_dt = datetime(
+        2027,
+        1,
+        1,
+        8,
+        tzinfo=timezone(offset=timedelta(hours=2)),
+    )
+    until_dt = datetime(
+        2028,
+        1,
+        1,
+        8,
+        tzinfo=timezone(offset=timedelta(hours=-3)),
+    )
+
+    service = HsmKeyVersionService(database)
+    created = service.create_version(TEST_OIN, from_dt=from_dt, until_dt=until_dt)
+    versions = service.get_versions_for_oin(TEST_OIN)
+
+    assert len(versions) == 1
+    stored = versions[0]
+    assert created.id == stored.id
+    assert stored.from_dt.tzinfo is not None
+    assert stored.until_dt is not None
+    assert stored.until_dt.tzinfo is not None
+    assert stored.from_dt.astimezone(timezone.utc) == from_dt.astimezone(timezone.utc)
+    assert stored.until_dt.astimezone(timezone.utc) == until_dt.astimezone(timezone.utc)
+
+
+def test_update_version_preserves_timezone_in_storage(database: Database) -> None:
+    from_dt = datetime(
+        2027,
+        2,
+        1,
+        12,
+        tzinfo=timezone(offset=timedelta(hours=-7)),
+    )
+    until_dt = datetime(
+        2027,
+        2,
+        15,
+        12,
+        tzinfo=timezone(offset=timedelta(hours=8, minutes=30)),
+    )
+
+    service = HsmKeyVersionService(database)
+    created = service.create_version(TEST_OIN, from_dt=from_dt)
+    updated = service.update_version(created.id, TEST_OIN, until_dt=until_dt)
+    versions = service.get_versions_for_oin(TEST_OIN)
+
+    assert len(versions) == 1
+    stored = versions[0]
+    assert updated.id == stored.id
+    assert stored.until_dt is not None
+    assert stored.until_dt.tzinfo is not None
+    assert stored.until_dt.astimezone(timezone.utc) == until_dt.astimezone(timezone.utc)

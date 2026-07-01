@@ -1,7 +1,8 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
+from typing import Annotated
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
@@ -62,7 +63,7 @@ def list_key_versions(
     tags=["Key Version Services"],
 )
 def put_key_version(
-    id: UUID,
+    id: Annotated[UUID, Path(title="The ID of the key version to update")],
     req: HsmKeyVersionUpdateRequest,
     auth_oin: Oin = Depends(authenticated_oin),
     hsm_key_version_service: HsmKeyVersionService = Depends(

@@ -13,7 +13,7 @@ from app.routers.administration.key import router as key_router
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.exchange import router as exchange_router
 from app.config import get_config
-from app.auth import get_auth_ctx
+from app.auth import DevelopmentAuthHeaderMiddleware, get_auth_ctx
 
 API_DESCRIPTION = """
 The Pseudoniemendienst (PRS) lets parties exchange data about a person without
@@ -168,6 +168,16 @@ def setup_fastapi() -> FastAPI:
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None)
     )
+
+    if (
+        config.development.override_authenticated_oin is not None
+        or config.development.override_authenticated_audience is not None
+    ):
+        fastapi.add_middleware(
+            DevelopmentAuthHeaderMiddleware,
+            override_oin=config.development.override_authenticated_oin,
+            override_audience=config.development.override_authenticated_audience,
+        )
 
     # Non-OAuth routes
     public_routers = [

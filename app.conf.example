@@ -32,6 +32,7 @@ root_path =
 [development]
 override_mtls_cert=
 override_authenticated_oin=
+override_authenticated_audience=
 
 [oprf]
 # Local key fallback: file with base64 server key (used when hsm_url is not set)

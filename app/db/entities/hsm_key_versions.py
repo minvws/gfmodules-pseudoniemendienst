@@ -35,7 +35,6 @@ class HsmKeyVersion(Base):
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
-            "oin": self.oin.value,
             "version": self.version,
             "from_dt": self.from_dt,
             "until_dt": self.until_dt,

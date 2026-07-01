@@ -5,21 +5,15 @@ from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver, KeyRequest
 from app.services.org_service import OrgService
 
-TEST_PUBKEY = """-----BEGIN PUBLIC KEY-----
-MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgG04s6v5MQpqRk7QIUDnfrWqVO3N
-K0X0Hx2xqTjbo6ufpk7CaAsSu4zjXylcfEIHPw+jr3OXcIxkdVz00FhXsf1v2rsB
-hvOXiM1EeTB7me9x2P6t6SznJA7+SQMLHpvD8oKUzbflMjlyW8fs21og2eQ1YNPi
-fRs2Wy5kQi1QlyTzAgMBAAE=
------END PUBLIC KEY-----"""
-
-TEST_OIN = Oin("00000099000000001000")
-
 
 def test_resolver_create_and_resolve_roundtrip(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
@@ -27,7 +21,7 @@ def test_resolver_create_and_resolve_roundtrip(
     # create
     req = KeyRequest(
         scope=["NVI", " lmr "],
-        pub_key=TEST_PUBKEY,
+        pub_key=test_public_key,
     )
     entry = key_resolver.create(org.id, req.scope, "my-key-id", req.pub_key)
 
@@ -40,19 +34,21 @@ def test_resolver_create_and_resolve_roundtrip(
 
     data = key_resolver.get_by_id(entry.id)
     assert data is not None
-    assert data.to_dict()["oin"] == TEST_OIN.value
 
 
 def test_resolver_get_and_delete(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    e = key_resolver.create(org.id, ["*"], "my-key-id", TEST_PUBKEY)
+    e = key_resolver.create(org.id, ["*"], "my-key-id", test_public_key)
 
     items = key_resolver.get_by_org(org.id) or []
     assert len(items) == 1
@@ -69,15 +65,18 @@ def test_resolver_get_and_delete(
 
 
 def test_resolver_create_persists_key_id(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    entry = key_resolver.create(org.id, ["nvi"], "kid-2024", TEST_PUBKEY)
+    entry = key_resolver.create(org.id, ["nvi"], "kid-2024", test_public_key)
     assert entry.key_id == "kid-2024"
 
     # key_id survives a round-trip through the database
@@ -88,15 +87,18 @@ def test_resolver_create_persists_key_id(
 
 
 def test_resolver_create_without_key_id(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    entry = key_resolver.create(org.id, ["nvi"], None, TEST_PUBKEY)
+    entry = key_resolver.create(org.id, ["nvi"], None, test_public_key)
     assert entry.key_id is None
 
     stored = key_resolver.get_by_id(entry.id)

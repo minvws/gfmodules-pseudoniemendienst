@@ -82,6 +82,7 @@ class ConfigUvicorn(BaseModel):
 class ConfigDevelopment(BaseModel):
     override_mtls_cert: str | None = Field(default=None)
     override_authenticated_oin: str | None = Field(default=None)
+    override_authenticated_audience: str | None = Field(default=None)
 
 
 class ConfigOprf(BaseModel):

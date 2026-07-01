@@ -1,7 +1,8 @@
 import logging
-import uuid
+from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -89,10 +90,6 @@ def list_keys_for_org(
 
     entries = key_resolver.get_by_org(org.id)
 
-    if not entries:
-        logger.warning("no keys found for organization %s", org.id)
-        raise HTTPException(status_code=404, detail="no keys found")
-
     return JSONResponse(status_code=200, content=[k.to_dict() for k in entries])
 
 
@@ -102,19 +99,12 @@ def list_keys_for_org(
     tags=["Key Registration Services"],
 )
 def put_key(
-    key_id: str,
+    key_id: Annotated[UUID, Path(title="The ID of the key to update")],
     req: KeyRequest,
     auth_oin: Oin = Depends(authenticated_oin),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
-
-    try:
-        key_uuid = uuid.UUID(key_id)
-    except ValueError:
-        logger.warning("invalid key id: %r", key_id)
-        raise HTTPException(status_code=400, detail="invalid key id")
-
-    entry = key_resolver.get_by_id(key_uuid)
+    entry = key_resolver.get_by_id(key_id)
     if entry is None:
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
@@ -123,7 +113,7 @@ def put_key(
         raise HTTPException(status_code=403)
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
-    updated_entry = key_resolver.get_by_id(key_uuid)
+    updated_entry = key_resolver.get_by_id(key_id)
     if updated_entry is None:
         logger.error("failed to retrieve updated key with id %r", key_id)
         raise HTTPException(status_code=500, detail="failed to retrieve updated key")
@@ -137,17 +127,11 @@ def put_key(
     tags=["Key Registration Services"],
 )
 def delete_key(
-    key_id: str,
+    key_id: Annotated[UUID, Path(title="The ID of the key to delete")],
     auth_oin: Oin = Depends(authenticated_oin),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
-    try:
-        key_uuid = uuid.UUID(key_id)
-    except ValueError:
-        logger.warning("invalid key id: %r", key_id)
-        raise HTTPException(status_code=400, detail="invalid key id")
-
-    entry = key_resolver.get_by_id(key_uuid)
+    entry = key_resolver.get_by_id(key_id)
     if entry is None:
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
