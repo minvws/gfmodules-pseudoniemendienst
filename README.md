@@ -29,6 +29,15 @@ The code examples are only meant to help understand concepts and demonstrate pos
 By using or referencing this code, you acknowledge that you do so at your own
 risk and that the authors assume no liability for any consequences of its use.
 
+## Security & trust model
+
+The PRS does not authenticate callers itself. Caller identity is verified by a
+separate upstream system (the OIN-verifier) that injects trusted headers, which
+the PRS trusts as-is. This means the PRS must never be reachable without that
+proxy in front of it. See [docs/trust-model.md](docs/trust-model.md) for the
+full trust model, the headers involved, and the deployment invariants that must
+hold.
+
 ## Development setup
 
 This project can be setup and tested either as a python application directly on an operating system or in a Docker
