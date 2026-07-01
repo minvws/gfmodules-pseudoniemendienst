@@ -1,4 +1,5 @@
 import base64
+import logging
 
 import inject
 
@@ -14,7 +15,6 @@ from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService
 from app.services.rid_service import RidService
-import logging
 
 logger = logging.getLogger(__name__)
 

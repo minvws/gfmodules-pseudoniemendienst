@@ -114,33 +114,6 @@ class InputRequest(BaseModel):
         return data
 
 
-class ReceiverRequest(BaseModel):
-    blind_factor: str
-    jwe: str
-    priv_key_pem: str
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_jwe(cls, data: dict[str, Any]) -> dict[str, Any]:
-        # Check if JWE is actually a jwe token
-        jwe_token = data.get("jwe")
-        if not isinstance(jwe_token, str) or len(jwe_token.split(".")) != 5:
-            logger.warning("invalid JWE token format: %s", jwe_token)
-            raise ValueError("Invalid JWE token")
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_priv_key_pem(cls, data: dict[str, Any]) -> dict[str, Any]:
-        priv_key_pem = data.get("priv_key_pem")
-        if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith(
-            "-----BEGIN PRIVATE KEY-----"
-        ):
-            logger.warning("invalid private key PEM format")
-            raise ValueError("Invalid private key PEM format")
-        return data
-
-
 class JweReceiverRequest(BaseModel):
     jwe: str
     priv_key_pem: str
@@ -165,3 +138,7 @@ class JweReceiverRequest(BaseModel):
             logger.warning("invalid private key PEM format")
             raise ValueError("Invalid private key PEM format")
         return data
+
+
+class ReceiverRequest(JweReceiverRequest):
+    blind_factor: str
