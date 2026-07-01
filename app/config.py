@@ -3,7 +3,7 @@ import configparser
 import os
 from typing import Any, List
 
-from pydantic import BaseModel, ValidationError, field_validator
+from pydantic import BaseModel, field_validator
 from pydantic import Field
 
 _PATH = "app.conf"
@@ -159,18 +159,15 @@ def get_config(path: str | None = None) -> Config:
     # a standard format for pydantic, we need to do some manual parsing first.
     ini_data = read_ini_file(path)
 
-    try:
-        # Convert database.retry_backoff to a list of floats
-        if "retry_backoff" in ini_data["database"] and isinstance(
-            ini_data["database"]["retry_backoff"], str
-        ):
-            # convert the string to a list of floats
-            ini_data["database"]["retry_backoff"] = [
-                float(i) for i in ini_data["database"]["retry_backoff"].split(",")
-            ]
+    # Convert database.retry_backoff to a list of floats
+    if "retry_backoff" in ini_data["database"] and isinstance(
+        ini_data["database"]["retry_backoff"], str
+    ):
+        # convert the string to a list of floats
+        ini_data["database"]["retry_backoff"] = [
+            float(i) for i in ini_data["database"]["retry_backoff"].split(",")
+        ]
 
-        _CONFIG = Config.model_validate(ini_data)
-    except ValidationError as e:
-        raise e
+    _CONFIG = Config.model_validate(ini_data)
 
     return _CONFIG

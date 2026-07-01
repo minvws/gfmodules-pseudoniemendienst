@@ -11,18 +11,6 @@ from app.services.auth.header import AuthHeaderService
 logger = logging.getLogger(__name__)
 
 
-class OAuthError(Exception):
-    """
-    Raised for general OAuth2 errors.
-    """
-
-    def __init__(self, code: str, description: str, status_code: int = 400):
-        super().__init__(description)
-        self.code = code
-        self.description = description
-        self.status_code = status_code
-
-
 def get_auth_ctx(
     request: Request,
     auth_headers_service: AuthHeaderService = Depends(

@@ -1,10 +1,10 @@
+import logging
 import textwrap
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from fastapi import HTTPException
 from starlette.requests import Request
-import logging
 
 from app.db.entities.organization import Organization
 from app.services.org_service import OrgService

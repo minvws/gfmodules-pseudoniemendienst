@@ -29,7 +29,7 @@ if not os.path.exists(oprf_path):
     with open(oprf_path, "w") as f:
         f.write(genkey(32))
 
-if conf.pseudonym.master_key is None:
+if not conf.pseudonym.master_key:
     conf.pseudonym.master_key = genkey(32)
 set_config(conf)
 

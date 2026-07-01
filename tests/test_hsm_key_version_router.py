@@ -12,6 +12,10 @@ from app.services.org_service import OrgService
 TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_VALUE = TEST_OIN.value
 
+# A different, valid OIN used to act as an unauthorized caller.
+OTHER_OIN = Oin("00000099000000002000")
+OTHER_OIN_VALUE = OTHER_OIN.value
+
 
 def test_create_first_version(
     client: TestClient, database: Database, org_service: OrgService
@@ -96,7 +100,7 @@ def test_create_unknown_org_returns_404(client: TestClient, database: Database) 
     )
 
     assert response.status_code == 404
-    assert response.json() == {"detail": f"organization with oin {TEST_OIN} not found"}
+    assert response.json() == {"detail": "organization not found"}
 
 
 def test_create_invalid_oin_returns_422(client: TestClient, database: Database) -> None:
@@ -300,3 +304,59 @@ def test_list_versions_unknown_org_returns_404(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "organization not found"}
+
+
+def test_create_for_other_org_is_forbidden(
+    client: TestClient, database: Database
+) -> None:
+    # Caller is verified as OTHER_OIN but tries to create a key version for
+    # TEST_OIN. This must be rejected regardless of whether TEST_OIN exists.
+    response = client.post(
+        "/key-versions",
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_list_for_other_org_is_forbidden(
+    client: TestClient, database: Database
+) -> None:
+    # Caller is verified as OTHER_OIN but tries to list TEST_OIN's key versions.
+    response = client.get(
+        f"/key-versions/{TEST_OIN_VALUE}",
+        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_update_other_orgs_version_is_forbidden(
+    client: TestClient, database: Database, org_service: OrgService
+) -> None:
+    # A key version owned by TEST_OIN...
+    org_service.create(
+        TEST_OIN,
+        f"MyOrg-{TEST_OIN}",
+        RidUsage.IrreversiblePseudonym,
+    )
+    created = client.post(
+        "/key-versions",
+        json={"oin": TEST_OIN_VALUE},
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+    ).json()
+
+    # ...cannot be updated by a caller verified as a different organization.
+    response = client.put(
+        f"/key-versions/{created['id']}",
+        json={"removed": True},
+        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+
+    assert response.status_code == 403
+
+    # And the version is left untouched.
+    service = HsmKeyVersionService(database)
+    active = service.get_active_versions(oin=TEST_OIN)
+    assert [v.version for v in active] == [1]
