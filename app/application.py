@@ -11,7 +11,6 @@ from app.routers.oprf import router as oprf_router
 from app.routers.test_oprf import router as test_oprf_router
 from app.routers.key import router as key_router
 from app.routers.hsm_key_version import router as hsm_key_version_router
-from app.routers.org import router as org_router
 from app.routers.exchange import router as exchange_router
 from app.config import get_config
 from app.auth import get_auth_ctx
@@ -191,7 +190,6 @@ def setup_fastapi() -> FastAPI:
         oprf_router,
         key_router,
         hsm_key_version_router,
-        org_router,
     ]
     if config.app.enable_exchange_services_routes:
         routers.append(exchange_router)
