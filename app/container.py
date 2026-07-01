@@ -18,6 +18,35 @@ from app.services.rid_service import RidService
 
 logger = logging.getLogger(__name__)
 
+# Minimum master key size in bytes. The master key must have at least as much
+# entropy as the 256-bit keys HKDF derives from it.
+_MIN_MASTER_KEY_BYTES = 32
+
+
+def _load_master_key(raw: str) -> bytes:
+    """
+    Decode and validate the configured pseudonym master key.
+
+    All pseudonym, reversible-pseudonym and RID keys are derived from this key,
+    so an empty or weak master key would make every pseudonym forgeable and every
+    reversible pseudonym/RID decryptable. Refuse to start rather than silently
+    run with a b"" key.
+    """
+    if not raw:
+        raise ValueError(
+            "pseudonym.master_key is not configured. Set a base64-encoded key of "
+            "at least 32 bytes, e.g. `openssl rand -base64 32`."
+        )
+
+    key = base64.urlsafe_b64decode(raw)
+    if len(key) < _MIN_MASTER_KEY_BYTES:
+        raise ValueError(
+            f"pseudonym.master_key is too short ({len(key)} bytes decoded); "
+            f"at least {_MIN_MASTER_KEY_BYTES} bytes are required."
+        )
+
+    return key
+
 
 def container_config(binder: inject.Binder) -> None:
     config = get_config()
@@ -72,17 +101,13 @@ def container_config(binder: inject.Binder) -> None:
         oprf_service = OprfService(server_key=key)
     binder.bind(OprfService, oprf_service)
 
-    pseudonym_service = PseudonymService(
-        # This should be done through an HSM
-        base64.urlsafe_b64decode(config.pseudonym.master_key or ""),
-    )
+    # This should be done through an HSM
+    master_key = _load_master_key(config.pseudonym.master_key)
+
+    pseudonym_service = PseudonymService(master_key)
     binder.bind(PseudonymService, pseudonym_service)
 
-    rid_service = RidService(
-        # This should be done through an HSM
-        base64.urlsafe_b64decode(config.pseudonym.master_key or ""),
-        b"RID:v1",
-    )
+    rid_service = RidService(master_key, b"RID:v1")
     binder.bind(RidService, rid_service)
 
 
