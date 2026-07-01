@@ -7,6 +7,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app import container
+from app.auth import get_auth_ctx
+from app.models.auth.context import AuthContext
 from app.models.oin import Oin
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
@@ -45,6 +47,7 @@ class PubKeyNotFound(HTTPException):
 @router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 def receive(
     req: RidReceiveRequest,
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     rid_service: RidService = Depends(container.get_rid_service),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
@@ -89,6 +92,20 @@ def receive(
             recipient_scope,
         )
         raise InvalidRID(message="Invalid recipient organization and/or scope")
+
+    # The caller must be the recipient organization the RID was issued for.
+    # Possession of a RID must not by itself be enough to redeem it, otherwise
+    # anyone who obtains a RID could de-pseudonymize it (up to the BSN). The
+    # check above already guarantees req.recipientOrganization matches the RID,
+    # so comparing the verified caller identity against it binds redemption to
+    # the recipient.
+    if auth_ctx.claims.oin != req.recipientOrganization:
+        logger.warning(
+            "caller oin=%s attempted to redeem a RID issued for recipient oin=%s",
+            auth_ctx.claims.oin,
+            req.recipientOrganization,
+        )
+        raise HTTPException(status_code=403, detail="forbidden")
 
     # Make sure we have got the correct permissions to exchange the requested pseudonym type
     if rid_usage not in ALLOWED_BY_RID_USAGE:

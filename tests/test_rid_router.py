@@ -391,6 +391,42 @@ def test_receive_incorrect_usage(
     assert response.json()["type"] == "irp"
 
 
+def test_receive_rejects_caller_that_is_not_the_recipient(
+    client: TestClient, org_service: OrgService, key_resolver: KeyResolver
+) -> None:
+    create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
+
+    # A RID issued for TEST_OIN...
+    response = client.post(
+        "/exchange/rid",
+        json={
+            "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
+            "recipientOrganization": TEST_OIN_WITH_PREFIX,
+            "recipientScope": "nvi",
+            "ridUsage": "irp",
+        },
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+    jwe = response.content.decode("utf-8")
+    _, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
+    rid = data["subject"]
+
+    # ...cannot be redeemed by a different organization, even when it supplies the
+    # correct recipientOrganization matching the RID. The verified caller identity
+    # (x-gf-oin) must be the recipient.
+    response = client.post(
+        "/receive",
+        json={
+            "rid": rid,
+            "recipientOrganization": TEST_OIN_WITH_PREFIX,
+            "recipientScope": "nvi",
+            "pseudonymType": "irp",
+        },
+        headers={"x-gf-oin": "00000099000000002000", "x-gf-audience": "prs.service"},
+    )
+    assert response.status_code == 403
+
+
 def test_min_usage_level(
     client: TestClient, org_service: OrgService, key_resolver: KeyResolver
 ) -> None:
