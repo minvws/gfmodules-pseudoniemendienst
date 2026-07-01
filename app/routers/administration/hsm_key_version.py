@@ -6,15 +6,11 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import get_auth_ctx
-from app.models.auth.context import AuthContext
+from app.auth import authenticated_oin
 from app.models.oin import Oin
-from app.models.requests import (
-    HsmKeyVersionRequest,
-    HsmKeyVersionUpdateRequest,
-)
+from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.org_service import OrgService
+from app.services.hsm_key_version_service import HsmKeyVersionNotFoundError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -22,68 +18,39 @@ router = APIRouter()
 
 @router.post(
     "/key-versions",
-    summary="Create a new HSM key version for an organization",
+    summary="Create a new HSM key version for the authorized organization",
     tags=["Key Version Services"],
 )
 def post_key_version(
     req: HsmKeyVersionRequest,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_oin: Oin = Depends(authenticated_oin),
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
 ) -> JSONResponse:
-    # An organization may only manage its own key versions. The OIN in the
-    # request body must match the verified caller identity (x-gf-oin).
-    if req.oin != auth_ctx.claims.oin:
-        logger.warning(
-            "caller oin=%s attempted to create a key version for oin=%s",
-            auth_ctx.claims.oin,
-            req.oin,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
-
     try:
         entry = hsm_key_version_service.create_version(
-            req.oin, req.from_dt, req.until_dt
+            auth_oin, req.from_dt, req.until_dt
         )
-    except ValueError as e:
-        logger.warning("cannot create key version: %s", e)
-        raise HTTPException(status_code=404, detail="organization not found")
     except Exception:
-        logger.exception("failed to create key version for OIN %s", req.oin)
+        logger.exception("failed to create key version for OIN %s", auth_oin)
         raise HTTPException(status_code=500, detail="failed to create key version")
 
     return JSONResponse(status_code=201, content=jsonable_encoder(entry.to_dict()))
 
 
 @router.get(
-    "/key-versions/{oin}",
-    summary="List HSM key versions for an organization",
+    "/key-versions",
+    summary="List HSM key versions for the authorized organization",
     tags=["Key Version Services"],
 )
 def list_key_versions(
-    oin: Oin,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_oin: Oin = Depends(authenticated_oin),
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
-    org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
-    # An organization may only list its own key versions.
-    if oin != auth_ctx.claims.oin:
-        logger.warning(
-            "caller oin=%s attempted to list key versions for oin=%s",
-            auth_ctx.claims.oin,
-            oin,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
-
-    org = org_service.get_by_oin(oin)
-    if org is None:
-        logger.warning("organization for OIN %r not found", oin.value)
-        raise HTTPException(status_code=404, detail="organization not found")
-
-    versions = hsm_key_version_service.get_versions_for_oin(oin)
+    versions = hsm_key_version_service.get_versions_for_oin(auth_oin)
     return JSONResponse(
         status_code=200, content=jsonable_encoder([v.to_dict() for v in versions])
     )
@@ -91,41 +58,24 @@ def list_key_versions(
 
 @router.put(
     "/key-versions/{id}",
-    summary="Update an HSM key version (end date and/or removed flag)",
+    summary="Update an HSM key version for the authorized organization",
     tags=["Key Version Services"],
 )
 def put_key_version(
     id: UUID,
     req: HsmKeyVersionUpdateRequest,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_oin: Oin = Depends(authenticated_oin),
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
 ) -> JSONResponse:
-    # An organization may only update its own key versions. Verify ownership
-    # against the verified caller identity before mutating anything.
-    existing = hsm_key_version_service.get_version(id)
-    if existing is None:
-        logger.warning("key version with id %r not found", id)
-        raise HTTPException(status_code=404, detail="key version not found")
-
-    if existing.oin != auth_ctx.claims.oin:
-        logger.warning(
-            "caller oin=%s attempted to update key version %s owned by oin=%s",
-            auth_ctx.claims.oin,
-            id,
-            existing.oin,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
-
     try:
-        entry = hsm_key_version_service.update_version(id, req.until_dt, req.removed)
+        entry = hsm_key_version_service.update_version(id, auth_oin, req.until_dt)
+    except HsmKeyVersionNotFoundError:
+        logger.warning("key version %s not found for OIN %s", id, auth_oin)
+        raise HTTPException(status_code=404, detail="key version not found")
     except Exception:
         logger.exception("failed to update key version %s", id)
         raise HTTPException(status_code=500, detail="failed to update key version")
-
-    if entry is None:
-        logger.warning("key version with id %r not found", id)
-        raise HTTPException(status_code=404, detail="key version not found")
 
     return JSONResponse(status_code=200, content=jsonable_encoder(entry.to_dict()))

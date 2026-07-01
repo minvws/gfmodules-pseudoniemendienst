@@ -6,8 +6,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import get_auth_ctx
-from app.models.auth.context import AuthContext
+from app.auth import authenticated_oin, require_matching_oin
 from app.models.requests import RegisterRequest
 from app.models.oin import Oin
 from app.services.mtls_service import MtlsService
@@ -20,18 +19,27 @@ router = APIRouter()
 
 @router.post(
     "/register/certificate",
-    summary="Insert public key information for an organization",
+    summary="Insert public key information for the authorized organization",
     tags=["Key Registration Services"],
 )
 def post_key(
     req: RegisterRequest,
     request: Request,
+    auth_oin: Oin = Depends(authenticated_oin),
     mtls_service: MtlsService = Depends(container.get_mtls_service),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
 
     mtls_pub_key = mtls_service.get_mtls_pub_key(request)
     org = mtls_service.get_org_from_request(request)
+
+    if org.oin != auth_oin:
+        logger.warning(
+            "caller oin=%s attempted to register key for org %s",
+            auth_oin,
+            org.oin,
+        )
+        raise HTTPException(status_code=403, detail="forbidden")
 
     # Create the key entry
     try:
@@ -54,12 +62,13 @@ def post_key(
 
 @router.get(
     "/keys/{oin}",
-    summary="List public key information for an organization",
+    summary="List public key information for the authorized organization",
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    oin: Oin,
+    oin: Oin = Depends(require_matching_oin),
     org_service: OrgService = Depends(container.get_org_service),
+    key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
     org = org_service.get_by_oin(oin)
     if org is None:
@@ -68,22 +77,24 @@ def list_keys_for_org(
             status_code=400, detail="organization for this OIN is not registered"
         )
 
-    if org.keys is None:
+    entries = key_resolver.get_by_org(org.id)
+
+    if not entries:
         logger.warning("no keys found for organization %s", org.id)
         raise HTTPException(status_code=404, detail="no keys found")
 
-    return JSONResponse(status_code=200, content=[k.to_dict() for k in org.keys])
+    return JSONResponse(status_code=200, content=[k.to_dict() for k in entries])
 
 
 @router.put(
     "/keys/{key_id}",
-    summary="Update specific key for key/scope",
+    summary="Update a key for the authorized organization",
     tags=["Key Registration Services"],
 )
 def put_key(
     key_id: str,
     req: KeyRequest,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_oin: Oin = Depends(authenticated_oin),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
 
@@ -98,7 +109,7 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_oin:
         raise HTTPException(status_code=403)
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
@@ -112,12 +123,12 @@ def put_key(
 
 @router.delete(
     "/keys/{key_id}",
-    summary="Delete specific key for key/scope",
+    summary="Delete a key for the authorized organization",
     tags=["Key Registration Services"],
 )
 def delete_key(
     key_id: str,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_oin: Oin = Depends(authenticated_oin),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
 ) -> JSONResponse:
     try:
@@ -131,10 +142,10 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_oin:
         logger.warning(
             "caller oin=%s attempted to delete key %s owned by org %s",
-            auth_ctx.claims.oin,
+            auth_oin,
             key_id,
             entry.organization_id,
         )

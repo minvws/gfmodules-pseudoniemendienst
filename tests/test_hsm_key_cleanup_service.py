@@ -7,7 +7,6 @@ import requests
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
-from app.db.entities.organization import Organization
 from app.models.oin import Oin
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -21,12 +20,7 @@ TEST_OIN_111 = Oin("00000099000000011000")
 
 def _add(db: Database, oin: Oin, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        org = session.query(Organization).filter(Organization.oin == oin.value).first()
-        if org is None:
-            org = Organization(oin=oin, name=f"org-{oin.value}", max_rid_usage="irp")
-            session.add(org)
-            session.flush()
-        session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
+        session.add(HsmKeyVersion(oin=oin, **kwargs))
         session.commit()
 
 
@@ -93,7 +87,9 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # Nothing expired remains, and the active version is still active.
     version_service = HsmKeyVersionService(database)
     assert version_service.get_expired_versions() == []
-    active = {(v.oin, v.version) for v in version_service.get_active_versions()}
+    active = {
+        (v.oin, v.version) for v in version_service.get_active_versions(TEST_OIN_ACTIVE)
+    }
     assert active == {(TEST_OIN_ACTIVE, 2)}
 
 

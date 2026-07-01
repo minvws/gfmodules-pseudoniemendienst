@@ -3,6 +3,7 @@ import uuid
 from typing import Sequence, Optional
 
 from sqlalchemy.dialects.postgresql.json import JSONB
+from sqlalchemy.orm import joinedload
 
 from app.db.decorator import repository
 from app.db.entities.organization_key import OrganizationKey
@@ -35,14 +36,22 @@ class OrganizationKeyRepository(RepositoryBase):
         """
         Fetches the key entry by its unique ID.
         """
-        query = select(OrganizationKey).where(OrganizationKey.id == key_id)
+        query = (
+            select(OrganizationKey)
+            .options(joinedload(OrganizationKey.organization))
+            .where(OrganizationKey.id == key_id)
+        )
         return self.db_session.execute(query).scalars().first()
 
     def get_by_org(self, org_id: uuid.UUID) -> Optional[Sequence[OrganizationKey]]:
         """
         Fetches all key entries for a given organization.
         """
-        query = select(OrganizationKey).where(OrganizationKey.organization_id == org_id)
+        query = (
+            select(OrganizationKey)
+            .options(joinedload(OrganizationKey.organization))
+            .where(OrganizationKey.organization_id == org_id)
+        )
         return self.db_session.execute(query).scalars().all()
 
     def create(

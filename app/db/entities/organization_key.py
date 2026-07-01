@@ -40,6 +40,7 @@ class OrganizationKey(Base):
         return {
             "id": str(self.id),
             # We omit organization_id since this is an internal detail.
+            "oin": self.organization.oin.value,
             "scope": self.scope,
             "key_data": self.key_data,
             "key_id": self.key_id or "",

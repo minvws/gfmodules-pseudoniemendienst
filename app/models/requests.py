@@ -19,14 +19,12 @@ class RegisterRequest(BaseModel):
 
 
 class HsmKeyVersionRequest(BaseModel):
-    oin: Oin
     from_dt: datetime | None = None
     until_dt: datetime | None = None
 
 
 class HsmKeyVersionUpdateRequest(BaseModel):
     until_dt: datetime | None = None
-    removed: bool = False
 
 
 class RidReceiveRequest(BaseModel):

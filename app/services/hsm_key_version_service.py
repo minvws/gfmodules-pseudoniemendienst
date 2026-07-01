@@ -6,43 +6,42 @@ from typing import Sequence
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
-from app.db.repositories.org_repository import OrgRepository
+from app.db.repositories.hsm_key_version_repository import (
+    HsmKeyVersionNotFoundError as HsmKeyVersionRepositoryNotFoundError,
+)
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 
 
+class HsmKeyVersionNotFoundError(ValueError):
+    """Raised when the key version does not exist, is already removed, or mismatches."""
+
+    def __init__(self, version_id: uuid.UUID, oin: Oin):
+        super().__init__(f"key version {version_id} for OIN {oin} not found")
+        self.version_id = version_id
+        self.oin = oin
+
+
 class HsmKeyVersionService:
-    """
-    Looks up the currently active HSM key versions from the database, replacing
-    the former beheer-api lookup.
-    """
+    """Manages HSM key versions in the local database."""
 
     def __init__(self, db: Database) -> None:
         self.__db = db
 
     def get_active_versions(
-        self, at: datetime | None = None, oin: Oin | None = None
+        self,
+        oin: Oin,
+        at: datetime | None = None,
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment (defaults to
-        the current date/time), optionally restricted to a single organization's
-        OIN.
+        the current date/time), restricted to a single organization's OIN.
         """
         at = at or datetime.now(timezone.utc)
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
             return repo.get_active_versions(at, oin)
-
-    def get_version(self, version_id: uuid.UUID) -> HsmKeyVersion | None:
-        """
-        Returns a single key version by its ID, or None when it does not exist.
-        The organization is eagerly loaded so its OIN stays available after the
-        session is closed (used for ownership checks in the router).
-        """
-        with self.__db.get_db_session() as session:
-            repo = session.get_repository(HsmKeyVersionRepository)
-            return repo.get_by_id(version_id)
 
     def get_versions_for_oin(self, oin: Oin) -> Sequence[HsmKeyVersion]:
         """
@@ -76,22 +75,12 @@ class HsmKeyVersionService:
         OIN. The version number is automatically derived from the highest
         existing version for that organization. When no start moment is given,
         the version becomes active immediately.
-
-        Raises a ValueError when no organization exists for the given OIN.
         """
         from_dt = from_dt or datetime.now(timezone.utc)
         with self.__db.get_db_session() as session:
-            org = session.get_repository(OrgRepository).get_by_oin(oin)
-            if org is None:
-                raise ValueError(f"organization with oin {oin} not found")
-
             repo = session.get_repository(HsmKeyVersionRepository)
             try:
-                next_version = repo.get_max_version(org.id) + 1
-                entry = repo.create(org.id, next_version, from_dt, until_dt)
-                # Populate the relationship so to_dict() works after the session
-                # is closed (avoids a detached lazy-load of the organization).
-                entry.organization = org
+                entry = repo.create(oin=oin, from_dt=from_dt, until_dt=until_dt)
                 session.commit()
             except Exception:
                 session.rollback()
@@ -103,44 +92,59 @@ class HsmKeyVersionService:
     def update_version(
         self,
         version_id: uuid.UUID,
+        oin: Oin,
         until_dt: datetime | None = None,
-        removed: bool = False,
-    ) -> HsmKeyVersion | None:
+    ) -> HsmKeyVersion:
         """
-        Updates the end date and removed flag of an existing key version.
-        Returns None when no version exists for the given ID.
+        Updates the end date of an existing active key version for the authenticated
+        organization (OIN). The removed flag is not user-controllable here.
+        Raises when the version does not exist, is already removed, or belongs to a
+        different organization.
         """
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
             try:
-                entry = repo.update(version_id, until_dt, removed)
-                if entry is None:
-                    return None
+                entry = repo.update(version_id, oin, until_dt)
                 session.commit()
-            except Exception:
+                return entry
+            except HsmKeyVersionRepositoryNotFoundError as exc:
+                logger.warning(
+                    "update failed: key version %s for OIN %s not found",
+                    version_id,
+                    oin,
+                )
                 session.rollback()
-                logger.exception("failed to update hsm key version %s", version_id)
-                raise
-
-            return entry
-
-    def mark_removed(self, version_id: uuid.UUID) -> HsmKeyVersion | None:
-        """
-        Flags a key version as removed (without touching its dates). Returns None
-        when no version exists for the given ID.
-        """
-        with self.__db.get_db_session() as session:
-            repo = session.get_repository(HsmKeyVersionRepository)
-            try:
-                entry = repo.mark_removed(version_id)
-                if entry is None:
-                    return None
-                session.commit()
+                raise HsmKeyVersionNotFoundError(exc.version_id, exc.oin) from exc
             except Exception:
                 session.rollback()
                 logger.exception(
-                    "failed to mark hsm key version %s as removed", version_id
+                    "failed to update hsm key version %s for OIN %s", version_id, oin
                 )
                 raise
 
-            return entry
+    def mark_removed(self, version_id: uuid.UUID, oin: Oin) -> HsmKeyVersion:
+        """
+        Flags a key version as removed (without touching its dates).
+        """
+        with self.__db.get_db_session() as session:
+            repo = session.get_repository(HsmKeyVersionRepository)
+            try:
+                entry = repo.mark_removed(version_id, oin)
+                session.commit()
+                return entry
+            except HsmKeyVersionRepositoryNotFoundError as exc:
+                logger.warning(
+                    "mark removed failed for key version %s for OIN %s",
+                    version_id,
+                    oin,
+                )
+                session.rollback()
+                raise HsmKeyVersionNotFoundError(exc.version_id, exc.oin) from exc
+            except Exception:
+                session.rollback()
+                logger.exception(
+                    "failed to mark hsm key version %s for OIN %s as removed",
+                    version_id,
+                    oin,
+                )
+                raise

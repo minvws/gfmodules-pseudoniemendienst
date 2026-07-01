@@ -40,6 +40,10 @@ def test_resolver_create_and_resolve_roundtrip(
     assert isinstance(key, jwk.JWK)
     assert not key.has_private
 
+    data = key_resolver.get_by_id(entry.id)
+    assert data is not None
+    assert data.to_dict()["oin"] == TEST_OIN.value
+
 
 def test_resolver_get_and_delete(
     key_resolver: KeyResolver, org_service: OrgService

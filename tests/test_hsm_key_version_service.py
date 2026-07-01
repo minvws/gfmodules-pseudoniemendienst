@@ -8,9 +8,11 @@ import pytest
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
-from app.db.entities.organization import Organization
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.hsm_key_version_service import (
+    HsmKeyVersionService,
+    HsmKeyVersionNotFoundError,
+)
 from app.services.oprf.oprf_service import OprfService
 
 
@@ -27,12 +29,7 @@ TEST_OIN_79000 = Oin("00000000012345679000")
 
 def _add(db: Database, oin: Oin, **kwargs: object) -> None:
     with db.get_db_session() as session:
-        org = session.query(Organization).filter(Organization.oin == oin.value).first()
-        if org is None:
-            org = Organization(oin=oin, name=f"org-{oin.value}", max_rid_usage="irp")
-            session.add(org)
-            session.flush()
-        session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
+        session.add(HsmKeyVersion(oin=oin, **kwargs))
         session.commit()
 
 
@@ -81,7 +78,17 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
     )
 
     service = HsmKeyVersionService(database)
-    active = {v.oin for v in service.get_active_versions()}
+    active = {
+        v.oin
+        for oin in (
+            TEST_OIN_111,
+            TEST_OIN_222,
+            TEST_OIN_333,
+            TEST_OIN_444,
+            TEST_OIN_555,
+        )
+        for v in service.get_active_versions(oin)
+    }
 
     assert active == {TEST_OIN_111, TEST_OIN_222}
 
@@ -362,3 +369,50 @@ def test_eval_via_hsm_without_service_raises() -> None:
 
     with pytest.raises(ValueError, match="HSM key version service not configured"):
         service._eval_via_hsm(TEST_OIN_78000, b"blinded")
+
+
+def test_mark_removed_keeps_row_for_wrong_oin(database: Database) -> None:
+    now = datetime.now(timezone.utc)
+    _add(
+        database,
+        oin=TEST_OIN,
+        version=1,
+        from_dt=now - timedelta(days=1),
+    )
+
+    service = HsmKeyVersionService(database)
+    current = service.get_active_versions(oin=TEST_OIN)[0]
+    with pytest.raises(HsmKeyVersionNotFoundError):
+        service.mark_removed(current.id, TEST_OIN_222)
+
+    after = next(
+        (
+            version
+            for version in service.get_versions_for_oin(TEST_OIN)
+            if version.id == current.id
+        ),
+        None,
+    )
+    assert after is not None
+    assert after.removed is False
+
+
+def test_update_version_rejects_removed(database: Database) -> None:
+    now = datetime.now(timezone.utc)
+    _add(
+        database,
+        oin=TEST_OIN,
+        version=1,
+        from_dt=now - timedelta(hours=1),
+        removed=False,
+    )
+
+    service = HsmKeyVersionService(database)
+    active = service.get_active_versions(oin=TEST_OIN)
+    assert len(active) == 1
+
+    service.mark_removed(active[0].id, TEST_OIN)
+
+    updated_until = now - timedelta(minutes=1)
+    with pytest.raises(HsmKeyVersionNotFoundError):
+        service.update_version(active[0].id, TEST_OIN, updated_until)

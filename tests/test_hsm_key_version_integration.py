@@ -2,11 +2,11 @@
 End-to-end integration test for HSM key versioning.
 
 It registers an organization with a public key, creates key versions through
-the public ``/key-versions`` endpoint and verifies that an OPRF evaluation
+the ``/administration/key-versions`` endpoint and verifies that an OPRF evaluation
 returns a pseudonym carrying every active key version in the resulting JWE.
 
-The HSM itself is mocked: ``requests.post`` returns a deterministic evaluation
-per key version, so we can assert exactly which versions end up in the JWE.
+    The HSM itself is mocked: ``requests.post`` returns a deterministic evaluation
+    per key version, so we can assert exactly which versions end up in the JWE.
 """
 
 import base64
@@ -127,8 +127,8 @@ def test_new_key_version_is_added_to_jwe(
         ):
             # 2. Create version 1 of the HSM key.
             resp = client.post(
-                "/key-versions",
-                json={"oin": TEST_OIN.value},
+                "/administration/key-versions",
+                json={},
                 headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
             )
             assert resp.status_code == 201
@@ -145,8 +145,8 @@ def test_new_key_version_is_added_to_jwe(
 
             # 4. Create version 2 of the HSM key.
             resp = client.post(
-                "/key-versions",
-                json={"oin": TEST_OIN.value},
+                "/administration/key-versions",
+                json={},
                 headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
             )
             assert resp.status_code == 201
