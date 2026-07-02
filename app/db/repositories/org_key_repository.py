@@ -1,14 +1,11 @@
-import logging
 import uuid
 from typing import Optional, Sequence
 
-from sqlalchemy.dialects.postgresql.json import JSONB
 from app.db.decorator import repository
 from app.db.entities.organization_key import OrganizationKey
 from app.db.repositories.repository_base import RepositoryBase
+from sqlalchemy.dialects.postgresql.json import JSONB
 from sqlalchemy import delete, select, or_, literal, update
-
-logger = logging.getLogger(__name__)
 
 
 @repository(OrganizationKey)

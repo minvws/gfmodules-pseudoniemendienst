@@ -10,14 +10,12 @@ from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
-from app.db.repositories.hsm_key_version_repository import (
-    HsmKeyVersionCreateConflictError,
-)
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.services.org_service import OrgService
 from app.services.hsm_key_version_service import (
     HsmKeyVersionService,
     HsmKeyVersionNotFoundError,
+    HsmKeyVersionCreateConflictError,
 )
 from app.services.oprf.oprf_service import OprfService
 

@@ -1,39 +1,13 @@
-import logging
 import uuid
 from datetime import datetime
 from typing import Optional, Sequence
 
 from sqlalchemy import and_, func, insert, or_, select, update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from app.db.decorator import repository
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.repositories.repository_base import RepositoryBase
-
-logger = logging.getLogger(__name__)
-
-
-class HsmKeyVersionNotFoundError(ValueError):
-    """Raised when a version or removal target cannot be matched for organization."""
-
-    def __init__(self, version_id: uuid.UUID, organization_id: uuid.UUID):
-        super().__init__(
-            f"hsm key version {version_id} for organization_id {organization_id} not found"
-        )
-        self.version_id = version_id
-        self.organization_id = organization_id
-
-
-class HsmKeyVersionCreateConflictError(ValueError):
-    """Raised when creating a key version conflicts with an existing row."""
-
-    def __init__(self, organization_id: uuid.UUID):
-        super().__init__(
-            f"hsm key version creation for organization_id {organization_id} conflicts with"
-            " existing version"
-        )
-        self.organization_id = organization_id
 
 
 @repository(HsmKeyVersion)
@@ -115,16 +89,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             .returning(HsmKeyVersion)
         )
 
-        try:
-            entry: HsmKeyVersion = self.db_session.execute(statement).scalars().one()
-        except IntegrityError as exc:
-            raise HsmKeyVersionCreateConflictError(organization_id) from exc
-
-        logger.info(
-            "created hsm key version %s for organization_id %s",
-            entry.version,
-            organization_id,
-        )
+        entry: HsmKeyVersion = self.db_session.execute(statement).scalars().one()
         return entry
 
     def update(
@@ -132,11 +97,10 @@ class HsmKeyVersionRepository(RepositoryBase):
         version_id: uuid.UUID,
         organization_id: uuid.UUID,
         until_dt: Optional[datetime],
-    ) -> HsmKeyVersion:
+    ) -> Optional[HsmKeyVersion]:
         """
         Updates the end date of an existing active key version for the organization
-        identified by organization_id. Raises HsmKeyVersionNotFoundError when no
-        active version exists for that ID in that organization.
+        identified by organization_id.
         """
         statement = (
             update(HsmKeyVersion)
@@ -154,27 +118,14 @@ class HsmKeyVersionRepository(RepositoryBase):
         entry: Optional[HsmKeyVersion] = (
             self.db_session.execute(statement).scalars().one_or_none()
         )
-        if entry is None:
-            logger.warning(
-                "hsm key version %s for organization_id %s does not exist",
-                version_id,
-                organization_id,
-            )
-            raise HsmKeyVersionNotFoundError(version_id, organization_id)
-
-        logger.info(
-            "updated hsm key version %s for organization_id %s",
-            version_id,
-            organization_id,
-        )
         return entry
 
     def mark_removed(
         self, version_id: uuid.UUID, organization_id: uuid.UUID
-    ) -> HsmKeyVersion:
+    ) -> Optional[HsmKeyVersion]:
         """
         Flags an existing key version as removed, leaving its dates untouched.
-        Raises HsmKeyVersionNotFoundError when no version exists for that ID/id.
+        Returns ``None`` when no version exists for that ID/id.
         """
         statement = (
             update(HsmKeyVersion)
@@ -192,12 +143,4 @@ class HsmKeyVersionRepository(RepositoryBase):
         entry: Optional[HsmKeyVersion] = (
             self.db_session.execute(statement).scalars().one_or_none()
         )
-        if entry is None:
-            logger.warning(
-                "hsm key version with id %s for organization_id %s does not exist",
-                version_id,
-                organization_id,
-            )
-            raise HsmKeyVersionNotFoundError(version_id, organization_id)
-
         return entry

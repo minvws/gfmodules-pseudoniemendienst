@@ -3,13 +3,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Sequence
 
+from sqlalchemy.exc import IntegrityError
+
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
-from app.db.repositories.hsm_key_version_repository import (
-    HsmKeyVersionNotFoundError as HsmKeyVersionRepositoryNotFoundError,
-    HsmKeyVersionCreateConflictError,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +20,17 @@ class HsmKeyVersionNotFoundError(ValueError):
             f"key version {version_id} for organization {organization_id} not found"
         )
         self.version_id = version_id
+        self.organization_id = organization_id
+
+
+class HsmKeyVersionCreateConflictError(ValueError):
+    """Raised when creating a key version conflicts with an existing row."""
+
+    def __init__(self, organization_id: uuid.UUID):
+        super().__init__(
+            f"hsm key version creation for organization_id {organization_id} conflicts "
+            "with existing version"
+        )
         self.organization_id = organization_id
 
 
@@ -120,6 +129,13 @@ class HsmKeyVersionService:
                 )
                 session.commit()
                 return entry
+            except IntegrityError as exc:
+                session.rollback()
+                logger.warning(
+                    "conflict creating hsm key version for organization_id %s",
+                    organization_id,
+                )
+                raise HsmKeyVersionCreateConflictError(organization_id) from exc
             except Exception:
                 session.rollback()
                 logger.exception(
@@ -145,18 +161,19 @@ class HsmKeyVersionService:
             try:
                 repo = session.get_repository(HsmKeyVersionRepository)
                 entry = repo.update(version_id, organization_id, until_dt)
+                if entry is None:
+                    logger.warning(
+                        "update failed: key version %s for organization_id %s not found",
+                        version_id,
+                        organization_id,
+                    )
+                    raise HsmKeyVersionNotFoundError(version_id, organization_id)
+                assert entry is not None
                 session.commit()
                 return entry
-            except HsmKeyVersionRepositoryNotFoundError as exc:
-                logger.warning(
-                    "update failed: key version %s for organization_id %s not found",
-                    version_id,
-                    organization_id,
-                )
+            except HsmKeyVersionNotFoundError:
                 session.rollback()
-                raise HsmKeyVersionNotFoundError(
-                    exc.version_id, organization_id
-                ) from exc
+                raise
             except Exception:
                 session.rollback()
                 logger.exception(
@@ -176,19 +193,19 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             try:
                 entry = repo.mark_removed(version_id, organization_id)
+                if entry is None:
+                    logger.warning(
+                        "mark removed failed for key version %s for organization_id %s",
+                        version_id,
+                        organization_id,
+                    )
+                    raise HsmKeyVersionNotFoundError(version_id, organization_id)
+                assert entry is not None
                 session.commit()
                 return entry
-            except HsmKeyVersionRepositoryNotFoundError as exc:
+            except HsmKeyVersionNotFoundError:
                 session.rollback()
-                logger.warning(
-                    "mark removed failed for key version %s for organization_id %s",
-                    version_id,
-                    organization_id,
-                )
-                raise HsmKeyVersionNotFoundError(
-                    exc.version_id,
-                    organization_id,
-                ) from exc
+                raise
             except Exception:
                 session.rollback()
                 logger.exception(
