@@ -1,17 +1,21 @@
 import base64
 import json
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple
 
+from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 import pyoprf
 import pytest
 from starlette.testclient import TestClient
 
 from app.models.oin import Oin
+from app.models.auth.headers import AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
@@ -56,6 +60,33 @@ def setup_org_and_key(
     private_key_pem, public_key_pem = generate_rsa_keypair()
     key_resolver.create(org.id, [scope], None, public_key_pem)
     return private_key_pem
+
+
+def generate_client_certificate(oin: Oin) -> str:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.now(timezone.utc)
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, "Test MTLS Client"),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, oin.value),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(hours=1))
+        .add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+        .sign(key, hashes.SHA256())
+    )
+
+    return cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
 
 
 @pytest.fixture
@@ -175,4 +206,45 @@ def test_test_oprf_receiver_invalid_private_key(
     assert receiver_response.status_code == 200
     assert receiver_response.json()["jwe"]["decrypted"].startswith(
         "Could not decrypt JWE:"
+    )
+
+
+def test_test_mtls_returns_organization_and_cert_details(
+    client: TestClient,
+    test_oin: Oin,
+    auth_headers: dict[str, str],
+    org_service: OrgService,
+) -> None:
+    org_service.create(test_oin, f"Org {test_oin}", RidUsage.IrreversiblePseudonym)
+    cert_pem = generate_client_certificate(test_oin)
+
+    response = client.get(
+        "/test/mtls",
+        headers={
+            **auth_headers,
+            AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT: cert_pem,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["cert_pem"] == cert_pem
+    assert body["oin"] == {
+        "prefix": test_oin.prefix,
+        "number": test_oin.number,
+    }
+    assert body["organization"]["name"] == f"Org {test_oin}"
+
+
+def test_test_mtls_requires_mtls_client_certificate_header(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.get("/test/mtls", headers=auth_headers)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert any(
+        error["loc"] == ["header", AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT]
+        for error in errors
     )

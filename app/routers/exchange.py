@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse, Response
 
 from app import container
-from app.auth import get_auth_ctx, authenticated_oin
-from app.models.auth.context import AuthContext
+from app.auth import authenticated_oin
 from app.models.oin import Oin
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
@@ -45,7 +44,7 @@ class PubKeyNotFound(HTTPException):
 @router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 def receive(
     req: RidReceiveRequest,
-    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
     key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
     rid_service: Annotated[RidService, Depends(container.get_rid_service)],
     pseudonym_service: Annotated[
@@ -99,10 +98,10 @@ def receive(
     # check above already guarantees req.recipientOrganization matches the RID,
     # so comparing the verified caller identity against it binds redemption to
     # the recipient.
-    if auth_ctx.claims.oin != req.recipientOrganization:
+    if auth_oin != req.recipientOrganization:
         logger.warning(
             "caller oin=%s attempted to redeem a RID issued for recipient oin=%s",
-            auth_ctx.claims.oin,
+            auth_oin,
             req.recipientOrganization,
         )
         raise HTTPException(status_code=403, detail="forbidden")

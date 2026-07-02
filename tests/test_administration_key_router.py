@@ -3,6 +3,7 @@ from starlette.testclient import TestClient
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
+from app.models.auth.headers import AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT
 from app.models.oin import Oin
 
 
@@ -69,6 +70,32 @@ def test_administration_key_list_without_keys_returns_empty_list(
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_administration_key_register_rejects_missing_mtls_client_certificate_header(
+    client: TestClient,
+    org_service: OrgService,
+    test_oin: Oin,
+    auth_headers: dict[str, str],
+) -> None:
+    org_service.create(
+        test_oin,
+        f"Org {test_oin}",
+        RidUsage.IrreversiblePseudonym,
+    )
+
+    response = client.post(
+        "/administration/register/certificate",
+        json={"scope": ["nvi"]},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert any(
+        error["loc"] == ["header", AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT]
+        for error in errors
+    )
 
 
 def test_administration_key_list_returns_key_fields(

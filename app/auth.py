@@ -1,106 +1,141 @@
 import logging
-
+from inspect import Signature, Parameter
 from typing import Annotated
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from fastapi import Depends, HTTPException
+import inject
+from fastapi import Depends, Header, HTTPException
 from starlette.requests import Request
-from starlette.responses import Response
-from starlette.types import ASGIApp
-
-from app import container
 from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.headers import (
     AUTH_HEADER_X_GF_AUDIENCE,
     AUTH_HEADER_X_GF_OIN,
     AuthHeaders,
+    MtlsHeaders,
 )
 from app.models.oin import Oin
 from app.services.auth.header import AuthHeaderService
 from app.services.org_service import OrgService
 
+
 logger = logging.getLogger(__name__)
 
 
-def apply_development_auth_header_overrides(
-    request: Request,
-    override_oin: str | None,
-    override_audience: str | None,
-) -> None:
-    headers = request.headers.mutablecopy()
+class AuthContextDependency:
+    def __init__(self, include_auth_headers_in_openapi: bool) -> None:
+        self.include_auth_headers_in_openapi = include_auth_headers_in_openapi
+        self.__signature__ = self._build_signature()
 
-    if override_oin is not None and headers.get(AUTH_HEADER_X_GF_OIN) is None:
-        headers.append(AUTH_HEADER_X_GF_OIN, override_oin)
+    def _build_signature(self) -> Signature:
+        return Signature(
+            [
+                Parameter(
+                    name="request",
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Request,
+                ),
+                Parameter(
+                    name="auth_headers_service",
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Annotated[
+                        AuthHeaderService,
+                        Depends(lambda: inject.instance(AuthHeaderService)),
+                    ],
+                ),
+                Parameter(
+                    name="oin",
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Oin,
+                    default=Header(
+                        alias=AUTH_HEADER_X_GF_OIN,
+                        include_in_schema=self.include_auth_headers_in_openapi,
+                    ),
+                ),
+                Parameter(
+                    name="audience",
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=str,
+                    default=Header(
+                        alias=AUTH_HEADER_X_GF_AUDIENCE,
+                        include_in_schema=self.include_auth_headers_in_openapi,
+                    ),
+                ),
+            ]
+        )
 
-    if override_audience is not None and headers.get(AUTH_HEADER_X_GF_AUDIENCE) is None:
-        headers.append(AUTH_HEADER_X_GF_AUDIENCE, override_audience)
-
-    request._headers = headers
-    request.scope.update(headers=request.headers.raw)
-
-
-class DevelopmentAuthHeaderMiddleware(BaseHTTPMiddleware):
-    def __init__(
-        self,
-        app: ASGIApp,
-        override_oin: str | None,
-        override_audience: str | None,
-    ) -> None:
-        super().__init__(app)
-        self.override_oin = override_oin
-        self.override_audience = override_audience
-
-    async def dispatch(
+    def __call__(
         self,
         request: Request,
-        call_next: RequestResponseEndpoint,
-    ) -> Response:
-        apply_development_auth_header_overrides(
-            request,
-            override_oin=self.override_oin,
-            override_audience=self.override_audience,
+        auth_headers_service: AuthHeaderService,
+        oin: Oin,
+        audience: str,
+    ) -> AuthContext:
+        validated_auth_headers = auth_headers_service.validate(
+            AuthHeaders(oin=oin, audience=audience)
         )
-        return await call_next(request)
+
+        claims = AuthenticationClaims(
+            oin=validated_auth_headers.oin,
+        )
+        ctx = AuthContext(
+            claims=claims,
+            audience=validated_auth_headers.audience,
+        )
+        request.state.auth = ctx
+        return ctx
 
 
-def get_auth_ctx(
-    request: Request,
-    auth_headers_service: Annotated[
-        AuthHeaderService, Depends(container.get_auth_headers_service)
-    ],
-) -> AuthContext:
-    try:
-        auth_headers = AuthHeaders.from_request(request)
-    except Exception as e:
-        logger.exception(f"Invalid authorization headers in request: {e}")
-        raise HTTPException(status_code=403, detail="Unauthorized request")
+class MtlsHeadersDependency:
+    def __init__(self, include_auth_headers_in_openapi: bool) -> None:
+        self.include_auth_headers_in_openapi = include_auth_headers_in_openapi
+        self.__signature__ = self._build_signature()
 
-    validated_auth_headers = auth_headers_service.validate(auth_headers)
-    claims = AuthenticationClaims(
-        oin=validated_auth_headers.oin,
-    )
-    ctx = AuthContext(
-        claims=claims,
-        audience=validated_auth_headers.audience,
-    )
-    request.state.auth = ctx
-    return ctx
+    def _build_signature(self) -> Signature:
+        return Signature(
+            [
+                Parameter(
+                    name="mtls_headers",
+                    kind=Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=Annotated[
+                        MtlsHeaders,
+                        Header(
+                            include_in_schema=self.include_auth_headers_in_openapi,
+                        ),
+                    ],
+                )
+            ]
+        )
+
+    def __call__(self, mtls_headers: MtlsHeaders) -> MtlsHeaders:
+        return mtls_headers
 
 
-def authenticated_oin(auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)]) -> Oin:
+def _get_auth_ctx_from_request(request: Request) -> AuthContext:
+    auth_ctx = getattr(request.state, "auth", None)
+    if isinstance(auth_ctx, AuthContext):
+        return auth_ctx
+
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def authenticated_oin(
+    auth_ctx: Annotated[AuthContext, Depends(_get_auth_ctx_from_request)],
+) -> Oin:
     """Return the caller OIN from the validated auth context."""
     return auth_ctx.claims.oin
 
 
 def authenticated_organization(
-    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
-    org_service: Annotated[OrgService, Depends(container.get_org_service)],
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
+    org_service: Annotated[
+        OrgService,
+        Depends(lambda: inject.instance(OrgService)),
+    ],
 ) -> Organization:
     """Return the authenticated organization resolved from the caller OIN."""
-    organization = org_service.get_by_oin(auth_ctx.claims.oin)
+    organization = org_service.get_by_oin(auth_oin)
     if organization is None:
-        logger.warning("organization for OIN %r not found", auth_ctx.claims.oin.value)
+        logger.warning("organization for OIN %r not found", auth_oin.value)
         raise HTTPException(
             status_code=400, detail="organization for this OIN is not registered"
         )

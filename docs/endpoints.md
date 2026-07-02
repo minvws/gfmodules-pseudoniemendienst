@@ -34,6 +34,9 @@ Delete an organization (and its keys).
 
 These endpoints are protected by mutual TLS. The organization and its public key are derived from the client certificate, so they are not part of the request body.
 
+In deployments this certificate should come from a trusted proxy and is exposed as
+`x-forwarded-tls-client-cert`. For local testing, pass this header directly.
+
 #### `POST /register/certificate`
 Register the public key (taken from the mTLS client certificate) for one or more scopes of the calling organization.
 

@@ -3,17 +3,20 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path
-from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import authenticated_organization
+from app.container import get_mtls_headers_dependency
 from app.db.entities.organization import Organization
+from app.models.auth.headers import MtlsHeaders
 from app.models.requests import RegisterRequest
 from app.services.mtls_service import MtlsService
 from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 
 logger = logging.getLogger(__name__)
+
+_MTLS_HEADERS_DEPENDENCY = get_mtls_headers_dependency()
 router = APIRouter()
 
 
@@ -24,12 +27,17 @@ router = APIRouter()
 )
 def post_key(
     req: RegisterRequest,
-    request: Request,
     auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    mtls_headers: Annotated[
+        MtlsHeaders,
+        Depends(_MTLS_HEADERS_DEPENDENCY),
+    ],
     mtls_service: Annotated[MtlsService, Depends(container.get_mtls_service)],
     key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
-    mtls_pub_key = mtls_service.get_mtls_pub_key(request)
+    mtls_pub_key = mtls_service.get_mtls_pub_key(
+        mtls_client_cert=mtls_headers.forwarded_tls_client_cert,
+    )
 
     # Create the key entry
     try:

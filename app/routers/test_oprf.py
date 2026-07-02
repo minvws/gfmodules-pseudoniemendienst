@@ -6,11 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
-from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import authenticated_oin
+from app.container import get_mtls_headers_dependency
 from app.models.requests import InputRequest, ReceiverRequest, JweReceiverRequest
 from app.models.oin import Oin
 from app.personal_id import PersonalId, PersonalIdJSONEncoder
@@ -19,9 +19,12 @@ from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 from app.services.mtls_service import MtlsService
 from app.services.pseudonym_service import PseudonymService
+from app.models.auth.headers import MtlsHeaders
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_MTLS_HEADERS_DEPENDENCY = get_mtls_headers_dependency()
 
 
 @router.post(
@@ -237,15 +240,18 @@ that called this endpoint using MTLS.
 """,
 )
 def test_mtls(
-    request: Request,
     auth_oin: Annotated[Oin, Depends(authenticated_oin)],
     mtls_service: Annotated[MtlsService, Depends(container.get_mtls_service)],
     org_service: Annotated[OrgService, Depends(container.get_org_service)],
+    mtls_headers: Annotated[
+        MtlsHeaders,
+        Depends(_MTLS_HEADERS_DEPENDENCY),
+    ],
 ) -> JSONResponse:
     org = org_service.get_by_oin(auth_oin)
 
-    cert_pem = mtls_service.get_mtls_cert(request)
-    cert = mtls_service.get_oin_cert(request)
+    cert_pem = mtls_headers.forwarded_tls_client_cert.split(",")[0]
+    cert = mtls_service.get_oin_cert(mtls_headers.forwarded_tls_client_cert)
     cert_oin = mtls_service.get_oin_from_cert(cert)
 
     if cert_oin != auth_oin:

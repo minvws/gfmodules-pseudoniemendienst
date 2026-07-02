@@ -98,14 +98,11 @@ cross-organisation operation is explicitly intended and separately authorized).
 
 ## Development bypass
 
-For local development without a proxy, `development.override_mtls_cert` can be set to a
-certificate file on disk. When set, `MtlsService` uses that certificate instead
-of reading it from the request header. This bypass is for development only and
-must never be configured in a deployed environment.
+For local development without a proxy, pass `x-forwarded-tls-client-cert`
+directly in requests (for example via Swagger UI or your HTTP client). This is a
+local testing path; production should keep certificate handling in a trusted
+reverse proxy.
 
-For local/developer setups, set `development.override_authenticated_oin` and
-`development.override_authenticated_audience` when requests do not include those
-headers so development can continue without a proxy while still validating via the
-configured audience allowlist. These values are injected into the request headers
-at application startup via middleware so normal auth parsing keeps reading from
-`x-gf-oin` and `x-gf-audience`.
+For local/developer setups, pass `x-gf-oin` and `x-gf-audience` directly in
+requests (for example via Swagger UI or your HTTP client) while keeping the
+audience allowlist checks intact.

@@ -3,6 +3,7 @@ import logging
 
 import inject
 
+from app.auth import AuthContextDependency, MtlsHeadersDependency
 from app.config import get_config
 from app.db.db import Database
 from app.services.auth.header import AuthHeaderService
@@ -17,6 +18,7 @@ from app.services.pseudonym_service import PseudonymService
 from app.services.rid_service import RidService
 
 logger = logging.getLogger(__name__)
+
 
 # Minimum master key size in bytes. The master key must have at least as much
 # entropy as the 256-bit keys HKDF derives from it.
@@ -66,7 +68,7 @@ def container_config(binder: inject.Binder) -> None:
     org_service = OrgService(db)
     binder.bind(OrgService, org_service)
 
-    mtls_service = MtlsService(config.development.override_mtls_cert)
+    mtls_service = MtlsService()
     binder.bind(MtlsService, mtls_service)
 
     hsm_key_version_service = HsmKeyVersionService(db)
@@ -111,6 +113,16 @@ def container_config(binder: inject.Binder) -> None:
     rid_service = RidService(master_key, b"RID:v1")
     binder.bind(RidService, rid_service)
 
+    binder.bind(
+        AuthContextDependency,
+        AuthContextDependency(config.development.include_auth_headers_in_openapi),
+    )
+
+    binder.bind(
+        MtlsHeadersDependency,
+        MtlsHeadersDependency(config.development.include_auth_headers_in_openapi),
+    )
+
 
 def get_mtls_service() -> MtlsService:
     return inject.instance(MtlsService)
@@ -126,6 +138,14 @@ def get_rid_service() -> RidService:
 
 def get_pseudonym_service() -> PseudonymService:
     return inject.instance(PseudonymService)
+
+
+def get_auth_context_dependency() -> AuthContextDependency:
+    return inject.instance(AuthContextDependency)
+
+
+def get_mtls_headers_dependency() -> MtlsHeadersDependency:
+    return inject.instance(MtlsHeadersDependency)
 
 
 def get_key_resolver() -> KeyResolver:

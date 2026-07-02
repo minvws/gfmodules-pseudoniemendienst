@@ -80,9 +80,7 @@ class ConfigUvicorn(BaseModel):
 
 
 class ConfigDevelopment(BaseModel):
-    override_mtls_cert: str | None = Field(default=None)
-    override_authenticated_oin: str | None = Field(default=None)
-    override_authenticated_audience: str | None = Field(default=None)
+    include_auth_headers_in_openapi: bool = Field(default=False)
 
 
 class ConfigOprf(BaseModel):

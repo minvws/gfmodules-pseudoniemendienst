@@ -4,7 +4,6 @@ from typing import Any
 
 from fastapi import FastAPI, Depends
 import uvicorn
-
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.oprf import router as oprf_router
@@ -13,7 +12,7 @@ from app.routers.administration.key import router as key_router
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.exchange import router as exchange_router
 from app.config import get_config
-from app.auth import DevelopmentAuthHeaderMiddleware, get_auth_ctx
+from app.container import get_auth_context_dependency
 
 API_DESCRIPTION = """
 The Pseudoniemendienst (PRS) lets parties exchange data about a person without
@@ -169,16 +168,6 @@ def setup_fastapi() -> FastAPI:
         else FastAPI(docs_url=None, redoc_url=None)
     )
 
-    if (
-        config.development.override_authenticated_oin is not None
-        or config.development.override_authenticated_audience is not None
-    ):
-        fastapi.add_middleware(
-            DevelopmentAuthHeaderMiddleware,
-            override_oin=config.development.override_authenticated_oin,
-            override_audience=config.development.override_authenticated_audience,
-        )
-
     # Non-OAuth routes
     public_routers = [
         default_router,
@@ -197,7 +186,10 @@ def setup_fastapi() -> FastAPI:
         routers.append(test_oprf_router)
 
     for router in routers:
-        fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])
+        fastapi.include_router(
+            router,
+            dependencies=[Depends(get_auth_context_dependency())],
+        )
 
     # OAuth protected administration routes
     # TODO: Add protection based on scopes for these routes so not all organisation clients are allowed to use these
@@ -208,7 +200,9 @@ def setup_fastapi() -> FastAPI:
 
     for router in administration_routers:
         fastapi.include_router(
-            router, prefix="/administration", dependencies=[Depends(get_auth_ctx)]
+            router,
+            prefix="/administration",
+            dependencies=[Depends(get_auth_context_dependency())],
         )
 
     return fastapi
