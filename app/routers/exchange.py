@@ -1,20 +1,17 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Any, Annotated, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
-from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app import container
-from app.auth import get_auth_ctx
-from app.models.auth.context import AuthContext
+from app.auth import authenticated_oin
 from app.models.oin import Oin
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
 from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK, RidUsage
 from app.services.key_resolver import KeyResolver
-from app.services.mtls_service import MtlsService
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService, PseudonymType
@@ -47,10 +44,12 @@ class PubKeyNotFound(HTTPException):
 @router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 def receive(
     req: RidReceiveRequest,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    rid_service: RidService = Depends(container.get_rid_service),
-    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    rid_service: Annotated[RidService, Depends(container.get_rid_service)],
+    pseudonym_service: Annotated[
+        PseudonymService, Depends(container.get_pseudonym_service)
+    ],
 ) -> Response:
     """
     Receive and decrypt a RID, validate it, and return a pseudonym of the requested type if allowed.
@@ -99,10 +98,10 @@ def receive(
     # check above already guarantees req.recipientOrganization matches the RID,
     # so comparing the verified caller identity against it binds redemption to
     # the recipient.
-    if auth_ctx.claims.oin != req.recipientOrganization:
+    if auth_oin != req.recipientOrganization:
         logger.warning(
             "caller oin=%s attempted to redeem a RID issued for recipient oin=%s",
-            auth_ctx.claims.oin,
+            auth_oin,
             req.recipientOrganization,
         )
         raise HTTPException(status_code=403, detail="forbidden")
@@ -193,9 +192,9 @@ def receive(
 @router.post("/exchange/rid", summary="Exchange RID", tags=["Exchange Services"])
 def exchange_rid(
     req: RidExchangeRequest,
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    rid_service: RidService = Depends(container.get_rid_service),
-    org_service: OrgService = Depends(container.get_org_service),
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    rid_service: Annotated[RidService, Depends(container.get_rid_service)],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> Response:
     """
     Exchange a personal ID for a RID that can be used by the recipient organization/scope
@@ -247,11 +246,12 @@ def exchange_rid(
 )
 def exchange_pseudonym(
     req: ExchangeRequest,
-    request: Request,
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
-    org_service: OrgService = Depends(container.get_org_service),
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    pseudonym_service: Annotated[
+        PseudonymService, Depends(container.get_pseudonym_service)
+    ],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> Response:
     recipient_oin = req.recipientOrganization
 
@@ -260,7 +260,13 @@ def exchange_pseudonym(
         logger.warning("recipient organization not found for OIN: %s", recipient_oin)
         raise OrganizationNotFound(recipient_oin)
 
-    source_org = mtls_service.get_org_from_request(request)
+    source_org = org_service.get_by_oin(auth_oin)
+    if source_org is None:
+        logger.warning("source organization for OIN %s is not registered", auth_oin)
+        raise HTTPException(
+            status_code=400,
+            detail=f"organization for OIN {auth_oin.value} is not registered",
+        )
 
     if req.pseudonymType == PseudonymType.Irreversible:
         res = pseudonym_service.generate_irreversible_pseudonym(

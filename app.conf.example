@@ -1,6 +1,5 @@
 [app]
 loglevel=debug
-mtls_override_cert=
 # Enable the /test routes
 enable_test_routes=True
 # Enable the exchange service routes (/exchange/*, /receive)
@@ -29,6 +28,9 @@ ssl_cert_file = server.cert
 ssl_key_file = server.key
 # The root path if behind a proxy
 root_path =
+
+[development]
+include_auth_headers_in_openapi = True
 
 [oprf]
 # Local key fallback: file with base64 server key (used when hsm_url is not set)

@@ -1,5 +1,7 @@
 import logging
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from starlette.responses import JSONResponse
 
@@ -20,9 +22,9 @@ router = APIRouter()
 )
 def post_eval(
     req: BlindRequest,
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    org_service: OrgService = Depends(container.get_org_service),
-    oprf_service: OprfService = Depends(container.get_oprf_service),
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
+    oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
     oin = req.recipientOrganization
     org = org_service.get_by_oin(oin)

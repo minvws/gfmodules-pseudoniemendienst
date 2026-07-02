@@ -1,89 +1,128 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+import pytest
 from starlette.testclient import TestClient
 
 from app.db.db import Database
+from app.db.entities.hsm_key_versions import HsmKeyVersion
+from app.db.entities.organization import Organization
 from app.models.oin import Oin
-from app.rid import RidUsage
-from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.org_service import OrgService
+from tests.helpers import assert_key_version_payload
 
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_VALUE = TEST_OIN.value
 
-# A different, valid OIN used to act as an unauthorized caller.
-OTHER_OIN = Oin("00000099000000002000")
-OTHER_OIN_VALUE = OTHER_OIN.value
+@pytest.fixture(autouse=True)
+def ensure_router_organizations(
+    database: Database, test_oin: Oin, test_other_oin: Oin
+) -> None:
+    """Ensure test organizations used by this router module exist."""
+    with database.get_db_session() as session:
+        for oin in (test_oin, test_other_oin):
+            if (
+                session.query(Organization).filter(Organization.oin == oin).first()
+                is not None
+            ):
+                continue
+
+            session.add(Organization(oin=oin, name=f"Org {oin}", max_rid_usage="irp"))
+
+        session.commit()
+
+
+def _to_utc(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def _add(db: Database, oin: Oin, **kwargs: object) -> HsmKeyVersion:
+    with db.get_db_session() as session:
+        org = session.query(Organization).filter(Organization.oin == oin).one_or_none()
+        if org is None:
+            org = Organization(oin=oin, name=f"Org {oin}", max_rid_usage="irp")
+            session.add(org)
+            session.flush()
+
+        version = HsmKeyVersion(organization_id=org.id, **kwargs)
+        session.add(version)
+        session.commit()
+        return version
 
 
 def test_create_first_version(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
 
     response = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    assert_key_version_payload(response.json(), 1)
+
+
+def test_create_key_version_uses_authenticated_oin(
+    client: TestClient, auth_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     )
 
     assert response.status_code == 201
     body = response.json()
-    assert body["oin"] == TEST_OIN_VALUE
-    assert body["version"] == 1
+    assert set(body.keys()) == {"id", "version", "from_dt", "until_dt", "removed"}
+    assert isinstance(body["version"], int)
+    assert body["version"] >= 1
     assert body["removed"] is False
     assert body["until_dt"] is None
     assert body["from_dt"] is not None
 
 
 def test_create_increments_version(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        "MyOrg-12345678",
-        RidUsage.IrreversiblePseudonym,
-    )
 
     first = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     )
     second = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     )
 
     assert first.json()["version"] == 1
     assert second.json()["version"] == 2
 
 
-def test_create_with_explicit_window(
-    client: TestClient, database: Database, org_service: OrgService
+def test_key_versions_put_path_not_supported_for_get(
+    client: TestClient, auth_headers: dict[str, str]
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        "MyOrg-12345678",
-        RidUsage.IrreversiblePseudonym,
+    response = client.get(
+        f"/administration/key-versions/{uuid.uuid4()}",
+        headers=auth_headers,
     )
 
-    from_dt = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    until_dt = datetime(2027, 1, 1, tzinfo=timezone.utc)
+    assert response.status_code == 405
+
+
+def test_create_with_explicit_window(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
+) -> None:
+
+    from_dt = datetime.now(timezone.utc) + timedelta(days=1)
+    until_dt = from_dt + timedelta(days=365)
     response = client.post(
-        "/key-versions",
+        "/administration/key-versions",
         json={
-            "oin": TEST_OIN_VALUE,
             "from_dt": from_dt.isoformat(),
             "until_dt": until_dt.isoformat(),
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 201
@@ -92,98 +131,328 @@ def test_create_with_explicit_window(
     assert body["until_dt"] == until_dt.isoformat()
 
 
-def test_create_unknown_org_returns_404(client: TestClient, database: Database) -> None:
-    response = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+def test_create_with_timezone_aware_window_is_accepted(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
+) -> None:
+    from_dt = (datetime.now(timezone.utc) + timedelta(days=1)).astimezone(
+        tz=timezone(offset=timedelta(hours=2))
+    )
+    until_dt = (datetime.now(timezone.utc) + timedelta(days=2)).astimezone(
+        tz=timezone(offset=timedelta(hours=-3))
     )
 
-    assert response.status_code == 404
-    assert response.json() == {"detail": "organization not found"}
-
-
-def test_create_invalid_oin_returns_422(client: TestClient, database: Database) -> None:
     response = client.post(
-        "/key-versions",
-        json={"oin": "not-a-oin"},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={
+            "from_dt": from_dt.isoformat(),
+            "until_dt": until_dt.isoformat(),
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["from_dt"] is not None
+    assert body["until_dt"] is not None
+
+
+def test_create_with_timezone_aware_window_is_persisted_in_db(
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
+) -> None:
+    from_dt = datetime(2027, 1, 1, 10, tzinfo=timezone(offset=timedelta(hours=2)))
+    until_dt = datetime(2027, 1, 2, 10, tzinfo=timezone(offset=timedelta(hours=-3)))
+
+    response = client.post(
+        "/administration/key-versions",
+        json={
+            "from_dt": from_dt.isoformat(),
+            "until_dt": until_dt.isoformat(),
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    versions = response.json()
+
+    assert len(versions) == 1
+    stored = versions[0]
+    assert stored["from_dt"] is not None
+    assert stored["until_dt"] is not None
+    assert _to_utc(stored["from_dt"]) == from_dt.astimezone(timezone.utc)
+    assert _to_utc(stored["until_dt"]) == until_dt.astimezone(timezone.utc)
+
+
+def test_update_with_timezone_aware_until_dt_is_accepted(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
+) -> None:
+    created = client.post(
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
+    ).json()
+
+    until_dt = (datetime.now(timezone.utc) + timedelta(days=7)).astimezone(
+        tz=timezone(offset=timedelta(hours=9))
+    )
+
+    response = client.put(
+        f"/administration/key-versions/{created['id']}",
+        json={"until_dt": until_dt.isoformat()},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["until_dt"] is not None
+
+
+def test_update_with_timezone_aware_until_dt_is_persisted_in_db(
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
+) -> None:
+    created = client.post(
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
+    ).json()
+
+    until_dt = (
+        datetime(2027, 1, 2, 10, tzinfo=timezone(offset=timedelta(hours=7)))
+    ).astimezone(tz=timezone(offset=timedelta(hours=-4)))
+
+    response = client.put(
+        f"/administration/key-versions/{created['id']}",
+        json={"until_dt": until_dt.isoformat()},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    versions = response.json()
+
+    assert len(versions) == 1
+    stored = versions[0]
+    assert str(stored["id"]) == created["id"]
+    assert stored["until_dt"] is not None
+    assert _to_utc(stored["until_dt"]) == until_dt.astimezone(timezone.utc)
+
+
+def test_create_treats_utc_zero_offset_and_z_equivalently(
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
+) -> None:
+    expected_from_dt = datetime(2027, 1, 1, 10, 0, tzinfo=timezone.utc)
+    expected_until_dt = datetime(2027, 1, 2, 10, 0, tzinfo=timezone.utc)
+
+    for offset in "+00:00", "Z":
+        response = client.post(
+            "/administration/key-versions",
+            json={
+                "from_dt": f"2027-01-01T10:00:00{offset}",
+                "until_dt": f"2027-01-02T10:00:00{offset}",
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 201
+        body = response.json()
+        assert body["from_dt"] is not None
+        assert body["until_dt"] is not None
+        assert _to_utc(body["from_dt"]) == expected_from_dt
+        assert _to_utc(body["until_dt"]) == expected_until_dt
+
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    versions = response.json()
+    assert len(versions) == 2
+    assert all(_to_utc(version["from_dt"]) == expected_from_dt for version in versions)
+    assert all(
+        _to_utc(version["until_dt"]) == expected_until_dt for version in versions
+    )
+
+
+def test_update_treats_utc_zero_offset_and_z_equivalently_in_db(
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
+) -> None:
+    created = client.post(
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
+    ).json()
+
+    expected_until_dt = datetime(2027, 1, 3, 12, 0, tzinfo=timezone.utc)
+
+    for offset in "+00:00", "Z":
+        response = client.put(
+            f"/administration/key-versions/{created['id']}",
+            json={"until_dt": f"2027-01-03T12:00:00{offset}"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["until_dt"] is not None
+        assert _to_utc(body["until_dt"]) == expected_until_dt
+
+        response = client.get(
+            "/administration/key-versions",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+
+        versions = response.json()
+        assert len(versions) == 1
+        stored = versions[0]
+        assert stored["until_dt"] is not None
+        assert _to_utc(stored["until_dt"]) == expected_until_dt
+
+
+def test_create_known_org_returns_201(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 201
+    assert_key_version_payload(response.json(), 1)
+
+
+def test_create_invalid_window_returns_422(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
+) -> None:
+    response = client.post(
+        "/administration/key-versions",
+        json={"from_dt": "not-a-date"},
+        headers=auth_headers,
     )
 
     assert response.status_code == 422
 
 
 def test_create_persists_version(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
 
     client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     )
 
-    service = HsmKeyVersionService(database)
-    active = service.get_active_versions(oin=TEST_OIN)
-    assert [v.version for v in active] == [1]
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    active = response.json()
+    assert [v["version"] for v in active] == [1]
 
 
-def test_update_sets_removed_and_until_dt(
-    client: TestClient, database: Database, org_service: OrgService
+def test_update_sets_until_dt(
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_oin: Oin,
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
     created = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     ).json()
 
-    until_dt = datetime(2027, 1, 1, tzinfo=timezone.utc)
+    until_dt = datetime.now(timezone.utc) + timedelta(days=365)
     response = client.put(
-        f"/key-versions/{created['id']}",
-        json={"removed": True, "until_dt": until_dt.isoformat()},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        f"/administration/key-versions/{created['id']}",
+        json={"until_dt": until_dt.isoformat()},
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["id"] == created["id"]
-    assert body["removed"] is True
+    assert body["removed"] is False
     assert body["until_dt"] == until_dt.isoformat()
 
-    # The removed version is no longer returned as active.
-    service = HsmKeyVersionService(database)
-    assert service.get_active_versions(oin=TEST_OIN) == []
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    active = response.json()
+    assert len(active) == 1
+    assert active[0]["id"] == created["id"]
+
+
+def test_update_other_org_key_version_returns_not_found(
+    client: TestClient,
+    database: Database,
+    auth_headers: dict[str, str],
+    test_other_oin: Oin,
+) -> None:
+    entry = _add(
+        database,
+        oin=test_other_oin,
+        version=1,
+        from_dt=datetime.now(timezone.utc),
+    )
+
+    response = client.put(
+        f"/administration/key-versions/{entry.id}",
+        json={},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "key version not found"}
 
 
 def test_update_clears_until_dt(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
-    until_dt = datetime(2027, 1, 1, tzinfo=timezone.utc)
+    until_dt = datetime.now(timezone.utc) + timedelta(days=365)
     created = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE, "until_dt": until_dt.isoformat()},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={"until_dt": until_dt.isoformat()},
+        headers=auth_headers,
     ).json()
 
     response = client.put(
-        f"/key-versions/{created['id']}",
-        json={"removed": False},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        f"/administration/key-versions/{created['id']}",
+        json={},
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -193,81 +462,95 @@ def test_update_clears_until_dt(
 
 
 def test_update_unknown_version_returns_404(
-    client: TestClient, database: Database
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
     response = client.put(
-        f"/key-versions/{uuid.uuid4()}",
-        json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        f"/administration/key-versions/{uuid.uuid4()}",
+        json={},
+        headers=auth_headers,
     )
 
     assert response.status_code == 404
     assert response.json() == {"detail": "key version not found"}
 
 
-def test_update_invalid_id_returns_422(client: TestClient, database: Database) -> None:
+def test_update_removed_version_returns_404(
+    client: TestClient, database: Database, auth_headers: dict[str, str], test_oin: Oin
+) -> None:
+    removed = _add(
+        database,
+        oin=test_oin,
+        version=1,
+        from_dt=datetime.now(timezone.utc),
+        removed=True,
+    )
+
+    response = client.put(
+        f"/administration/key-versions/{removed.id}",
+        json={},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "key version not found"}
+
+
+def test_update_invalid_id_returns_422(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
+) -> None:
     # FastAPI validates the UUID path param, so a malformed id is a 422.
     response = client.put(
-        "/key-versions/not-a-uuid",
-        json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions/not-a-uuid",
+        json={},
+        headers=auth_headers,
     )
 
     assert response.status_code == 422
 
 
 def test_list_versions_returns_all_for_org(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
+    client.post(
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     )
     client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
-    )
-    client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        json={},
+        headers=auth_headers,
     )
 
     response = client.get(
-        f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
     body = response.json()
     assert [v["version"] for v in body] == [1, 2]
-    assert {v["oin"] for v in body} == {TEST_OIN_VALUE}
+    assert all(
+        set(v.keys()) == {"id", "version", "from_dt", "until_dt", "removed"}
+        for v in body
+    )
+    assert all(v["removed"] is False for v in body)
 
 
 def test_list_versions_includes_removed(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient, database: Database, auth_headers: dict[str, str], test_oin: Oin
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
-    created = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
-    ).json()
-    client.put(
-        f"/key-versions/{created['id']}",
-        json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+    _add(
+        database,
+        oin=test_oin,
+        version=1,
+        from_dt=datetime.now(timezone.utc),
+        removed=True,
     )
 
     response = client.get(
-        f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -277,86 +560,25 @@ def test_list_versions_includes_removed(
 
 
 def test_list_versions_empty_for_org_without_versions(
-    client: TestClient, database: Database, org_service: OrgService
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
 
     response = client.get(
-        f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_list_versions_unknown_org_returns_404(
-    client: TestClient, database: Database
+def test_list_versions_unknown_org_returns_empty(
+    client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
     response = client.get(
-        f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        "/administration/key-versions",
+        headers=auth_headers,
     )
 
-    assert response.status_code == 404
-    assert response.json() == {"detail": "organization not found"}
-
-
-def test_create_for_other_org_is_forbidden(
-    client: TestClient, database: Database
-) -> None:
-    # Caller is verified as OTHER_OIN but tries to create a key version for
-    # TEST_OIN. This must be rejected regardless of whether TEST_OIN exists.
-    response = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
-    )
-
-    assert response.status_code == 403
-
-
-def test_list_for_other_org_is_forbidden(
-    client: TestClient, database: Database
-) -> None:
-    # Caller is verified as OTHER_OIN but tries to list TEST_OIN's key versions.
-    response = client.get(
-        f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
-    )
-
-    assert response.status_code == 403
-
-
-def test_update_other_orgs_version_is_forbidden(
-    client: TestClient, database: Database, org_service: OrgService
-) -> None:
-    # A key version owned by TEST_OIN...
-    org_service.create(
-        TEST_OIN,
-        f"MyOrg-{TEST_OIN}",
-        RidUsage.IrreversiblePseudonym,
-    )
-    created = client.post(
-        "/key-versions",
-        json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
-    ).json()
-
-    # ...cannot be updated by a caller verified as a different organization.
-    response = client.put(
-        f"/key-versions/{created['id']}",
-        json={"removed": True},
-        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
-    )
-
-    assert response.status_code == 403
-
-    # And the version is left untouched.
-    service = HsmKeyVersionService(database)
-    active = service.get_active_versions(oin=TEST_OIN)
-    assert [v.version for v in active] == [1]
+    assert response.status_code == 200
+    assert response.json() == []

@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 from app.db.decorator import repository
@@ -7,8 +6,6 @@ from app.db.repositories.repository_base import RepositoryBase
 from sqlalchemy import select
 
 from app.models.oin import Oin
-
-logger = logging.getLogger(__name__)
 
 
 @repository(Organization)
@@ -31,6 +28,4 @@ class OrgRepository(RepositoryBase):
         )
         self.db_session.add(entry)
         self.db_session.flush()
-
-        logger.info("created organization with OIN %s and name %r", oin.value, name)
         return entry

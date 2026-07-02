@@ -1,17 +1,21 @@
 import base64
 import json
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Tuple
 
+from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 import pyoprf
 import pytest
 from starlette.testclient import TestClient
 
 from app.models.oin import Oin
+from app.models.auth.headers import AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
@@ -23,10 +27,6 @@ class OprfTestRouterContext:
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
-
-
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_VALUE = TEST_OIN.value
 
 
 def generate_rsa_keypair() -> Tuple[str, str]:
@@ -62,12 +62,40 @@ def setup_org_and_key(
     return private_key_pem
 
 
+def generate_client_certificate(oin: Oin) -> str:
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.now(timezone.utc)
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, "Test MTLS Client"),
+            x509.NameAttribute(NameOID.SERIAL_NUMBER, oin.value),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(hours=1))
+        .add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True,
+        )
+        .sign(key, hashes.SHA256())
+    )
+
+    return cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
+
+
 @pytest.fixture
 def oprf_test_router_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
+    test_oin: Oin,
 ) -> OprfTestRouterContext:
-    recipient_organization = f"oin:{TEST_OIN}"
+    recipient_organization = f"oin:{test_oin}"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -77,7 +105,7 @@ def oprf_test_router_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        oin=TEST_OIN,
+        oin=test_oin,
         scope=recipient_scope,
     )
     return OprfTestRouterContext(
@@ -91,11 +119,12 @@ def oprf_test_router_context(
 def test_test_oprf_client_and_receiver_roundtrip(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
+    auth_headers: dict[str, str],
 ) -> None:
     client_response = client.post(
         "/test/oprf/client",
         json={"personalId": oprf_test_router_context.personal_identifier},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert client_response.status_code == 200
 
@@ -109,7 +138,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert eval_response.status_code == 200
     jwe_token = eval_response.json()["jwe"]
@@ -121,7 +150,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "jwe": jwe_token,
             "priv_key_pem": oprf_test_router_context.private_key_pem,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert receiver_response.status_code == 200
 
@@ -138,6 +167,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
 def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
+    auth_headers: dict[str, str],
 ) -> None:
     info = (
         f"{oprf_test_router_context.recipient_organization}|"
@@ -160,7 +190,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert eval_response.status_code == 200
 
@@ -171,9 +201,50 @@ def test_test_oprf_receiver_invalid_private_key(
             "jwe": eval_response.json()["jwe"],
             "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert receiver_response.status_code == 200
     assert receiver_response.json()["jwe"]["decrypted"].startswith(
         "Could not decrypt JWE:"
+    )
+
+
+def test_test_mtls_returns_organization_and_cert_details(
+    client: TestClient,
+    test_oin: Oin,
+    auth_headers: dict[str, str],
+    org_service: OrgService,
+) -> None:
+    org_service.create(test_oin, f"Org {test_oin}", RidUsage.IrreversiblePseudonym)
+    cert_pem = generate_client_certificate(test_oin)
+
+    response = client.get(
+        "/test/mtls",
+        headers={
+            **auth_headers,
+            AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT: cert_pem,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["cert_pem"] == cert_pem
+    assert body["oin"] == {
+        "prefix": test_oin.prefix,
+        "number": test_oin.number,
+    }
+    assert body["organization"]["name"] == f"Org {test_oin}"
+
+
+def test_test_mtls_requires_mtls_client_certificate_header(
+    client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    response = client.get("/test/mtls", headers=auth_headers)
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert any(
+        error["loc"] == ["header", AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT]
+        for error in errors
     )

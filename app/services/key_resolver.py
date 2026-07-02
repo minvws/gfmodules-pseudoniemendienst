@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence
 
 from jwcrypto import jwk
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.exc import IntegrityError
 
 from app.db.db import Database
 from app.db.entities.organization_key import OrganizationKey
@@ -25,7 +26,6 @@ def _normalize_scope(items: List[str]) -> List[str]:
 
 
 class KeyRequest(BaseModel):
-    organization: str = Field(..., min_length=2)
     scope: List[str] = Field(...)
     pub_key: str = Field(..., min_length=32)
     max_key_usage: Optional[RidUsage] = None
@@ -100,7 +100,7 @@ class KeyResolver:
                 entry = session.get_repository(OrganizationKeyRepository).create(
                     org_id, scope, key_data, key_id
                 )
-            except Exception as e:
+            except IntegrityError as e:
                 logger.exception(
                     "failed to create key entry for org %s and scope %r",
                     org_id,
@@ -111,35 +111,42 @@ class KeyResolver:
             return entry
 
     def update(
-        self, key_id: uuid.UUID, scope: list[str], key_data: str
+        self,
+        key_id: uuid.UUID,
+        scope: list[str],
+        key_data: str,
+        organization_id: uuid.UUID,
     ) -> Optional[OrganizationKey]:
         scope = _normalize_scope(scope)
         key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).update(
-                key_id, scope, key_data
-            )
-            session.commit()
-            return entry
+            try:
+                entry = session.get_repository(OrganizationKeyRepository).update(
+                    key_id, scope, key_data, organization_id
+                )
+                session.commit()
+                return entry
+            except IntegrityError as e:
+                logger.exception(
+                    "failed to update key %s for organization %s",
+                    key_id,
+                    organization_id,
+                )
+                raise AlreadyExistsError(f"key for org/scope already exists: {e}")
 
-    def get_by_id(self, key_id: uuid.UUID) -> Optional[OrganizationKey]:
-        with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
-        return entry
-
-    def get_by_org(self, org_id: uuid.UUID) -> Sequence[OrganizationKey] | None:
+    def get_by_org(self, org_id: uuid.UUID) -> Sequence[OrganizationKey]:
         with self.db.get_db_session() as session:
             entries = session.get_repository(OrganizationKeyRepository).get_by_org(
                 org_id
             )
-            return entries
+            return entries or []
 
-    def delete(self, key_id: uuid.UUID) -> bool:
+    def delete(self, key_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
-            if entry is None:
+            repo = session.get_repository(OrganizationKeyRepository)
+            ok = repo.delete(key_id, organization_id)
+            if not ok:
                 return False
-            session.delete(entry)
             session.commit()
             return True

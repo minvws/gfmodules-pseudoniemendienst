@@ -1,35 +1,29 @@
 from jwcrypto import jwk
 
+import pytest
+
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver, KeyRequest
+from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
-
-TEST_PUBKEY = """-----BEGIN PUBLIC KEY-----
-MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgG04s6v5MQpqRk7QIUDnfrWqVO3N
-K0X0Hx2xqTjbo6ufpk7CaAsSu4zjXylcfEIHPw+jr3OXcIxkdVz00FhXsf1v2rsB
-hvOXiM1EeTB7me9x2P6t6SznJA7+SQMLHpvD8oKUzbflMjlyW8fs21og2eQ1YNPi
-fRs2Wy5kQi1QlyTzAgMBAAE=
------END PUBLIC KEY-----"""
-
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
 
 
 def test_resolver_create_and_resolve_roundtrip(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
     # create
     req = KeyRequest(
-        organization=TEST_OIN_WITH_PREFIX,
         scope=["NVI", " lmr "],
-        pub_key=TEST_PUBKEY,
+        pub_key=test_public_key,
     )
     entry = key_resolver.create(org.id, req.scope, "my-key-id", req.pub_key)
 
@@ -42,24 +36,24 @@ def test_resolver_create_and_resolve_roundtrip(
 
 
 def test_resolver_get_and_delete(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    e = key_resolver.create(org.id, ["*"], "my-key-id", TEST_PUBKEY)
+    e = key_resolver.create(org.id, ["*"], "my-key-id", test_public_key)
 
-    items = key_resolver.get_by_org(org.id) or []
+    items = key_resolver.get_by_org(org.id)
     assert len(items) == 1
     assert items[0].id == e.id
 
-    by_id = key_resolver.get_by_id(e.id)
-    assert by_id is not None
-
-    ok = key_resolver.delete(e.id)
+    ok = key_resolver.delete(e.id, org.id)
     assert ok is True
 
     items2 = key_resolver.get_by_org(org.id)
@@ -67,38 +61,69 @@ def test_resolver_get_and_delete(
 
 
 def test_resolver_create_persists_key_id(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    entry = key_resolver.create(org.id, ["nvi"], "kid-2024", TEST_PUBKEY)
+    entry = key_resolver.create(org.id, ["nvi"], "kid-2024", test_public_key)
     assert entry.key_id == "kid-2024"
 
+    items = key_resolver.get_by_org(org.id)
+    assert len(items) == 1
+    stored = items[0]
+
     # key_id survives a round-trip through the database
-    stored = key_resolver.get_by_id(entry.id)
     assert stored is not None
     assert stored.key_id == "kid-2024"
     assert stored.to_dict()["key_id"] == "kid-2024"
 
 
 def test_resolver_create_without_key_id(
-    key_resolver: KeyResolver, org_service: OrgService
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
 ) -> None:
     org = org_service.create(
-        oin=TEST_OIN,
+        oin=test_oin,
         name="test org",
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    entry = key_resolver.create(org.id, ["nvi"], None, TEST_PUBKEY)
+    entry = key_resolver.create(org.id, ["nvi"], None, test_public_key)
     assert entry.key_id is None
 
-    stored = key_resolver.get_by_id(entry.id)
+    items = key_resolver.get_by_org(org.id)
+    assert len(items) == 1
+    stored = items[0]
+
     assert stored is not None
     assert stored.key_id is None
     # to_dict() represents a missing key_id as an empty string
     assert stored.to_dict()["key_id"] == ""
+
+
+def test_resolver_update_rejects_duplicate_scope(
+    key_resolver: KeyResolver,
+    org_service: OrgService,
+    test_public_key: str,
+    test_oin: Oin,
+) -> None:
+    org = org_service.create(
+        oin=test_oin,
+        name="test org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
+    )
+
+    key_resolver.create(org.id, ["nvi"], "test-key-nvi", test_public_key)
+    other = key_resolver.create(org.id, ["rp"], "test-key-rp", test_public_key)
+
+    with pytest.raises(AlreadyExistsError):
+        key_resolver.update(other.id, ["nvi"], test_public_key, org.id)

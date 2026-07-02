@@ -1,7 +1,7 @@
 import base64
 import json
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Callable, Dict, Tuple
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -26,10 +26,6 @@ class OprfIntegrationContext:
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
-
-
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_VALUE = TEST_OIN.value
 
 
 def generate_rsa_keypair() -> Tuple[str, str]:
@@ -72,6 +68,7 @@ def run_oprf_eval_and_unblind(
     personal_identifier: Dict[str, str],
     recipient_organization: str,
     recipient_scope: str,
+    auth_headers: dict[str, str],
 ) -> str:
     blind_factor_raw, blinded_input_raw = derive_blind_factor_and_input(
         personal_identifier=personal_identifier,
@@ -88,7 +85,7 @@ def run_oprf_eval_and_unblind(
             "recipientOrganization": recipient_organization,
             "recipientScope": recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
     assert eval_response.status_code == 200
     token = jwe.JWE()
@@ -128,8 +125,9 @@ def derive_blind_factor_and_input(
 def oprf_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
+    test_oin: Oin,
 ) -> OprfIntegrationContext:
-    recipient_organization = f"oin:{TEST_OIN}"
+    recipient_organization = f"oin:{test_oin}"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -139,7 +137,7 @@ def oprf_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        oin=TEST_OIN,
+        oin=test_oin,
         scope=recipient_scope,
     )
     return OprfIntegrationContext(
@@ -153,6 +151,7 @@ def oprf_context(
 def test_oprf_integration_roundtrip_is_stable_for_same_input(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
+    auth_headers: dict[str, str],
 ) -> None:
 
     pseudonym_1 = run_oprf_eval_and_unblind(
@@ -161,6 +160,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
         personal_identifier=oprf_context.personal_identifier,
         recipient_organization=oprf_context.recipient_organization,
         recipient_scope=oprf_context.recipient_scope,
+        auth_headers=auth_headers,
     )
     pseudonym_2 = run_oprf_eval_and_unblind(
         client=client,
@@ -168,6 +168,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
         personal_identifier=oprf_context.personal_identifier,
         recipient_organization=oprf_context.recipient_organization,
         recipient_scope=oprf_context.recipient_scope,
+        auth_headers=auth_headers,
     )
 
     assert pseudonym_1 == pseudonym_2
@@ -176,6 +177,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
 def test_oprf_eval_invalid_scope_returns_not_found(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
+    auth_headers: dict[str, str],
 ) -> None:
     _, blinded_input_raw = derive_blind_factor_and_input(
         personal_identifier=oprf_context.personal_identifier,
@@ -191,7 +193,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
             "recipientOrganization": oprf_context.recipient_organization,
             "recipientScope": "invalid-scope",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert eval_response.status_code == 404
@@ -202,6 +204,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
 
 def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
     client: TestClient,
+    auth_headers: dict[str, str],
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
@@ -210,7 +213,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
             "recipientOrganization": "12345678",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert eval_response.status_code == 422
@@ -221,6 +224,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
 
 def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_error(
     client: TestClient,
+    auth_headers: dict[str, str],
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
@@ -229,7 +233,7 @@ def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_erro
             "recipientOrganization": "oin:00000099",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=auth_headers,
     )
 
     assert eval_response.status_code == 422
@@ -240,15 +244,17 @@ def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_erro
 
 def test_oprf_eval_unknown_oin_returns_not_found(
     client: TestClient,
+    auth_headers_for_oin: Callable[[str | Oin], dict[str, str]],
+    test_unknown_oin: Oin,
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
         json={
             "encryptedPersonalId": "Zm9v",
-            "recipientOrganization": "oin:00000099000000003000",
+            "recipientOrganization": f"oin:{test_unknown_oin}",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": "00000099000000003000", "x-gf-audience": "prs.service"},
+        headers=auth_headers_for_oin(test_unknown_oin),
     )
 
     assert eval_response.status_code == 404
@@ -259,6 +265,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
+    auth_headers: dict[str, str],
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
@@ -273,7 +280,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
                 "recipientOrganization": oprf_context.recipient_organization,
                 "recipientScope": oprf_context.recipient_scope,
             },
-            headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+            headers=auth_headers,
         )
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)
