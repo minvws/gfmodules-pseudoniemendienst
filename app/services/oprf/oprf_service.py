@@ -37,6 +37,9 @@ class OprfService:
         self.__hsm_key_version_service = hsm_key_version_service
         self.__org_service = org_service
 
+        if not (hsm_config and hsm_config.hsm_url) and self.__server_key is None:
+            raise ValueError("server key not configured")
+
         if hsm_config and hsm_config.hsm_url:
             logger.info("OPRF evaluation configured via HSM at %s", hsm_config.hsm_url)
         else:
@@ -109,23 +112,21 @@ class OprfService:
         if organization is None:
             raise ValueError(f"organization not found for oin {recipient_org_oin}")
 
-        active = self.__hsm_key_version_service.get_active_versions_by_organization_id(
+        # Ensure an active key version exists before evaluation (including first-use
+        # bootstrap for newly registered organizations or organizations with only
+        # removed keys).
+        active_versions = self.__hsm_key_version_service.get_active_or_create_versions_by_organization_id(
             organization.id
         )
-        versions = sorted({v.version for v in active})
-        if not versions:
-            # TODO: What HTTP Error do we want to return for this, this is not a 500.
-            raise ValueError(f"no active key version for oin {recipient_org_oin}")
-
         # Evaluate the blind against every active key version, so the result holds
         # one entry per version (e.g. during key rotation).
         ret: dict[int, bytes] = {}
-        for version in versions:
-            label = HsmKeyLabel(recipient_org_oin, version)
+        for version in active_versions:
+            label = HsmKeyLabel(recipient_org_oin, version.version)
             if not self._label_exists(label):
                 self._generate_key(label)
 
-            ret[version] = self._evaluate_label(label, blinded_bytes)
+            ret[version.version] = self._evaluate_label(label, blinded_bytes)
 
         return ret
 

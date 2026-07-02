@@ -34,11 +34,15 @@ class HsmKeyVersionRepository(RepositoryBase):
         removed, already started (from_dt <= at) and not yet ended (until_dt is
         unset or still in the future), restricted to organization_id.
         """
-        query = select(HsmKeyVersion).where(
-            HsmKeyVersion.organization_id == organization_id,
-            HsmKeyVersion.removed.is_(False),
-            HsmKeyVersion.from_dt <= at,
-            or_(HsmKeyVersion.until_dt.is_(None), HsmKeyVersion.until_dt >= at),
+        query = (
+            select(HsmKeyVersion)
+            .where(
+                HsmKeyVersion.organization_id == organization_id,
+                HsmKeyVersion.removed.is_(False),
+                HsmKeyVersion.from_dt <= at,
+                or_(HsmKeyVersion.until_dt.is_(None), HsmKeyVersion.until_dt >= at),
+            )
+            .order_by(HsmKeyVersion.version)
         )
         return self.db_session.execute(query).scalars().all()
 

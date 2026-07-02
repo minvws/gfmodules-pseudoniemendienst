@@ -1,6 +1,5 @@
 import base64
 import json
-import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -58,7 +57,7 @@ def ensure_service_organizations(database: Database) -> None:
         session.commit()
 
 
-def _add(db: Database, oin: Oin, **kwargs: object) -> None:
+def _add(db: Database, oin: Oin, **kwargs: object) -> HsmKeyVersion:
     with db.get_db_session() as session:
         org = session.query(Organization).filter(Organization.oin == oin).one_or_none()
         if org is None:
@@ -70,77 +69,59 @@ def _add(db: Database, oin: Oin, **kwargs: object) -> None:
             session.add(org)
             session.flush()
 
-        session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
+        version = HsmKeyVersion(organization_id=org.id, **kwargs)
+        session.add(version)
         session.commit()
-
-
-def _organization_id(database: Database, oin: Oin) -> uuid.UUID:
-    with database.get_db_session() as session:
-        organization = (
-            session.query(Organization).filter(Organization.oin == oin).one_or_none()
-        )
-        if organization is None:
-            raise AssertionError(f"organization for OIN {oin} not found")
-        return organization.id
+        return version
 
 
 def test_get_active_versions_filters_by_date_and_removed(database: Database) -> None:
     now = datetime.now(timezone.utc)
     # active: started, no end date
-    _add(
-        database,
-        oin=TEST_OIN_111,
-        version=1,
-        from_dt=now - timedelta(days=1),
-        until_dt=None,
-    )
-    # active: within window
-    _add(
-        database,
-        oin=TEST_OIN_222,
-        version=2,
-        from_dt=now - timedelta(days=1),
-        until_dt=now + timedelta(days=1),
-    )
-    # inactive: not started yet
-    _add(
-        database,
-        oin=TEST_OIN_333,
-        version=3,
-        from_dt=now + timedelta(days=1),
-        until_dt=None,
-    )
-    # inactive: already ended
-    _add(
-        database,
-        oin=TEST_OIN_444,
-        version=4,
-        from_dt=now - timedelta(days=2),
-        until_dt=now - timedelta(days=1),
-    )
-    # inactive: removed
-    _add(
-        database,
-        oin=TEST_OIN_555,
-        version=5,
-        from_dt=now - timedelta(days=1),
-        until_dt=None,
-        removed=True,
-    )
+    versions = [
+        _add(
+            database,
+            oin=TEST_OIN_111,
+            version=1,
+            from_dt=now - timedelta(days=1),
+            until_dt=None,
+        ),
+        _add(
+            database,
+            oin=TEST_OIN_222,
+            version=2,
+            from_dt=now - timedelta(days=1),
+            until_dt=now + timedelta(days=1),
+        ),
+        _add(
+            database,
+            oin=TEST_OIN_333,
+            version=3,
+            from_dt=now + timedelta(days=1),
+            until_dt=None,
+        ),
+        _add(
+            database,
+            oin=TEST_OIN_444,
+            version=4,
+            from_dt=now - timedelta(days=2),
+            until_dt=now - timedelta(days=1),
+        ),
+        _add(
+            database,
+            oin=TEST_OIN_555,
+            version=5,
+            from_dt=now - timedelta(days=1),
+            until_dt=None,
+            removed=True,
+        ),
+    ]
 
     service = HsmKeyVersionService(database)
     active = {
         v.organization.oin
-        for oin in (
-            TEST_OIN_111,
-            TEST_OIN_222,
-            TEST_OIN_333,
-            TEST_OIN_444,
-            TEST_OIN_555,
-        )
-        for v in service.get_active_versions_by_organization_id(
-            _organization_id(database, oin)
-        )
+        for version in versions
+        for v in service.get_active_versions_by_organization_id(version.organization_id)
     }
 
     assert active == {TEST_OIN_111, TEST_OIN_222}
@@ -409,15 +390,106 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     }
 
 
-def test_eval_via_hsm_without_active_version_raises(database: Database) -> None:
+def test_eval_via_hsm_without_active_version_creates_first_version(
+    database: Database,
+) -> None:
+    hsm_key_version_service = HsmKeyVersionService(database)
     service = OprfService(
         server_key=None,
         hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
+        hsm_key_version_service=hsm_key_version_service,
         org_service=OrgService(database),
     )
-    with pytest.raises(ValueError, match=f"no active key version for oin {TEST_OIN}"):
-        service._eval_via_hsm(TEST_OIN, b"blinded")
+
+    with (
+        patch.object(service, "_label_exists", return_value=False) as label_exists,
+        patch.object(service, "_generate_key") as generate_key,
+        patch.object(
+            service, "_evaluate_label", return_value=b"evaluated"
+        ) as evaluate_label,
+    ):
+        result = service._eval_via_hsm(TEST_OIN, b"blinded")
+
+    assert result == {1: b"evaluated"}
+
+    organization = OrgService(database).get_by_oin(TEST_OIN)
+    assert organization is not None
+    versions = hsm_key_version_service.get_versions_by_organization_id(organization.id)
+    assert len(versions) == 1
+    assert versions[0].version == 1
+
+    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
+        "oin-00000099000000001000-v1"
+    ]
+
+    assert [str(c.args[0]) for c in generate_key.call_args_list] == [
+        "oin-00000099000000001000-v1"
+    ]
+
+    assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
+        ("oin-00000099000000001000-v1", b"blinded")
+    ]
+
+
+def test_eval_via_hsm_with_removed_versions_creates_new_version(
+    database: Database,
+) -> None:
+    hsm_key_version_service = HsmKeyVersionService(database)
+    now = datetime.now(timezone.utc)
+    first = _add(
+        database,
+        oin=TEST_OIN,
+        version=1,
+        from_dt=now - timedelta(days=2),
+        until_dt=None,
+        removed=True,
+    )
+    _add(
+        database,
+        oin=TEST_OIN,
+        version=2,
+        from_dt=now - timedelta(days=1),
+        until_dt=None,
+        removed=True,
+    )
+
+    service = OprfService(
+        server_key=None,
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=hsm_key_version_service,
+        org_service=OrgService(database),
+    )
+
+    with (
+        patch.object(service, "_label_exists", return_value=False) as label_exists,
+        patch.object(service, "_generate_key") as generate_key,
+        patch.object(
+            service, "_evaluate_label", return_value=b"evaluated"
+        ) as evaluate_label,
+    ):
+        result = service._eval_via_hsm(TEST_OIN, b"blinded")
+
+    assert result == {3: b"evaluated"}
+
+    versions = hsm_key_version_service.get_versions_by_organization_id(
+        first.organization_id
+    )
+    assert len(versions) == 3
+    assert versions[-1].version == 3
+    assert all(version.removed for version in versions[:-1])
+    assert versions[-1].removed is False
+
+    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
+        "oin-00000099000000001000-v3"
+    ]
+
+    assert [str(c.args[0]) for c in generate_key.call_args_list] == [
+        "oin-00000099000000001000-v3"
+    ]
+
+    assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
+        ("oin-00000099000000001000-v3", b"blinded")
+    ]
 
 
 def test_eval_via_hsm_without_organization_raises(database: Database) -> None:
@@ -429,7 +501,7 @@ def test_eval_via_hsm_without_organization_raises(database: Database) -> None:
     )
 
     with pytest.raises(
-        ValueError, match=f"no active key version for oin {TEST_OIN_99999}"
+        ValueError, match=f"organization not found for oin {TEST_OIN_99999}"
     ):
         service._eval_via_hsm(TEST_OIN_99999, b"blinded")
 
@@ -443,9 +515,14 @@ def test_eval_via_hsm_without_service_raises() -> None:
         service._eval_via_hsm(TEST_OIN_78000, b"blinded")
 
 
+def test_constructor_requires_local_server_key_when_no_hsm() -> None:
+    with pytest.raises(ValueError, match="server key not configured"):
+        OprfService(server_key=None, hsm_config=ConfigOprf())
+
+
 def test_mark_removed_keeps_row_for_wrong_oin(database: Database) -> None:
     now = datetime.now(timezone.utc)
-    _add(
+    current_version = _add(
         database,
         oin=TEST_OIN,
         version=1,
@@ -454,18 +531,19 @@ def test_mark_removed_keeps_row_for_wrong_oin(database: Database) -> None:
 
     service = HsmKeyVersionService(database)
     current = service.get_active_versions_by_organization_id(
-        _organization_id(database, TEST_OIN)
+        current_version.organization_id
     )[0]
+
+    wrong_organization = OrgService(database).get_by_oin(TEST_OIN_222)
+    assert wrong_organization is not None
     with pytest.raises(HsmKeyVersionNotFoundError):
-        service.mark_removed_by_organization_id(
-            current.id, _organization_id(database, TEST_OIN_222)
-        )
+        service.mark_removed_by_organization_id(current.id, wrong_organization.id)
 
     after = next(
         (
             version
             for version in service.get_versions_by_organization_id(
-                _organization_id(database, TEST_OIN)
+                current_version.organization_id
             )
             if version.id == current.id
         ),
@@ -477,7 +555,7 @@ def test_mark_removed_keeps_row_for_wrong_oin(database: Database) -> None:
 
 def test_update_version_rejects_removed(database: Database) -> None:
     now = datetime.now(timezone.utc)
-    _add(
+    current_version = _add(
         database,
         oin=TEST_OIN,
         version=1,
@@ -487,18 +565,18 @@ def test_update_version_rejects_removed(database: Database) -> None:
 
     service = HsmKeyVersionService(database)
     active = service.get_active_versions_by_organization_id(
-        _organization_id(database, TEST_OIN)
+        current_version.organization_id
     )
     assert len(active) == 1
 
     service.mark_removed_by_organization_id(
-        active[0].id, _organization_id(database, TEST_OIN)
+        active[0].id, current_version.organization_id
     )
 
     updated_until = now - timedelta(minutes=1)
     with pytest.raises(HsmKeyVersionNotFoundError):
         service.update_version_by_organization_id(
-            active[0].id, _organization_id(database, TEST_OIN), updated_until
+            active[0].id, current_version.organization_id, updated_until
         )
 
 
@@ -518,13 +596,14 @@ def test_create_version_preserves_timezone_in_storage(database: Database) -> Non
         tzinfo=timezone(offset=timedelta(hours=-3)),
     )
 
+    organization = OrgService(database).get_by_oin(TEST_OIN)
+    assert organization is not None
+
     service = HsmKeyVersionService(database)
     created = service.create_version_by_organization_id(
-        _organization_id(database, TEST_OIN), from_dt=from_dt, until_dt=until_dt
+        organization.id, from_dt=from_dt, until_dt=until_dt
     )
-    versions = service.get_versions_by_organization_id(
-        _organization_id(database, TEST_OIN)
-    )
+    versions = service.get_versions_by_organization_id(organization.id)
 
     assert len(versions) == 1
     stored = versions[0]
@@ -552,16 +631,17 @@ def test_update_version_preserves_timezone_in_storage(database: Database) -> Non
         tzinfo=timezone(offset=timedelta(hours=8, minutes=30)),
     )
 
+    organization = OrgService(database).get_by_oin(TEST_OIN)
+    assert organization is not None
+
     service = HsmKeyVersionService(database)
     created = service.create_version_by_organization_id(
-        _organization_id(database, TEST_OIN), from_dt=from_dt
+        organization.id, from_dt=from_dt
     )
     updated = service.update_version_by_organization_id(
-        created.id, _organization_id(database, TEST_OIN), until_dt=until_dt
+        created.id, organization.id, until_dt=until_dt
     )
-    versions = service.get_versions_by_organization_id(
-        _organization_id(database, TEST_OIN)
-    )
+    versions = service.get_versions_by_organization_id(organization.id)
 
     assert len(versions) == 1
     stored = versions[0]

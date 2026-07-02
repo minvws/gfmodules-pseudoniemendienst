@@ -1,7 +1,7 @@
 import base64
 import json
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Callable, Dict, Tuple
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -244,7 +244,7 @@ def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_erro
 
 def test_oprf_eval_unknown_oin_returns_not_found(
     client: TestClient,
-    auth_headers_for_oin,
+    auth_headers_for_oin: Callable[[str | Oin], dict[str, str]],
     test_unknown_oin: Oin,
 ) -> None:
     eval_response = client.post(

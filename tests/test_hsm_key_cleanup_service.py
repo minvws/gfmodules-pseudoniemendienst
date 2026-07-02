@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -20,7 +19,7 @@ TEST_OIN_REMOVED = Oin("00000099000001003000")
 TEST_OIN_111 = Oin("00000099000000011000")
 
 
-def _add(db: Database, oin: Oin, **kwargs: object) -> None:
+def _add(db: Database, oin: Oin, **kwargs: object) -> HsmKeyVersion:
     with db.get_db_session() as session:
         org = session.query(Organization).filter(Organization.oin == oin).one_or_none()
         if org is None:
@@ -32,18 +31,10 @@ def _add(db: Database, oin: Oin, **kwargs: object) -> None:
             session.add(org)
             session.flush()
 
-        session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
+        version = HsmKeyVersion(organization_id=org.id, **kwargs)
+        session.add(version)
         session.commit()
-
-
-def _organization_id(database: Database, oin: Oin) -> uuid.UUID:
-    with database.get_db_session() as session:
-        organization = (
-            session.query(Organization).filter(Organization.oin == oin).one_or_none()
-        )
-        if organization is None:
-            raise AssertionError(f"organization for OIN {oin} not found")
-        return organization.id
+        return version
 
 
 def _hsm_config() -> ConfigOprf:
@@ -71,7 +62,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
         until_dt=now - timedelta(days=2),
     )
     # active (no end date) -> must be left alone
-    _add(
+    active = _add(
         database,
         oin=TEST_OIN_ACTIVE,
         version=2,
@@ -109,13 +100,13 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(database: Database) -> Non
     # Nothing expired remains, and the active version is still active.
     version_service = HsmKeyVersionService(database)
     assert version_service.get_expired_versions() == []
-    active = {
+    active_versions = {
         (v.organization.oin, v.version)
         for v in version_service.get_active_versions_by_organization_id(
-            _organization_id(database, TEST_OIN_ACTIVE)
+            active.organization_id
         )
     }
-    assert active == {(TEST_OIN_ACTIVE, 2)}
+    assert active_versions == {(TEST_OIN_ACTIVE, 2)}
 
 
 def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:

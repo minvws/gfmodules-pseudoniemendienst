@@ -44,6 +44,23 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             return repo.get_active_versions(at, organization_id)
 
+    def get_active_or_create_versions_by_organization_id(
+        self,
+        organization_id: uuid.UUID,
+    ) -> Sequence[HsmKeyVersion]:
+        """
+        Returns active versions for the organization at the current moment.
+
+        If no active version exists yet (including newly registered organizations
+        and organizations with all keys removed), creates a new one and returns it
+        as the only active version.
+        """
+        active = self.get_active_versions_by_organization_id(organization_id)
+        if active:
+            return active
+
+        return [self.create_version_by_organization_id(organization_id)]
+
     def get_versions_by_organization_id(
         self,
         organization_id: uuid.UUID,

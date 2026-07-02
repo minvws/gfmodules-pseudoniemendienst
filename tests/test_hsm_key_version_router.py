@@ -5,9 +5,9 @@ import pytest
 from starlette.testclient import TestClient
 
 from app.db.db import Database
+from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
 from app.models.oin import Oin
-from app.services.hsm_key_version_service import HsmKeyVersionService
 from tests.helpers import assert_key_version_payload
 
 
@@ -33,14 +33,18 @@ def _to_utc(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
-def _organization_id(database: Database, oin: Oin) -> uuid.UUID:
-    with database.get_db_session() as session:
-        organization = (
-            session.query(Organization).filter(Organization.oin == oin).one_or_none()
-        )
-        if organization is None:
-            raise AssertionError(f"organization for OIN {oin} not found")
-        return organization.id
+def _add(db: Database, oin: Oin, **kwargs: object) -> HsmKeyVersion:
+    with db.get_db_session() as session:
+        org = session.query(Organization).filter(Organization.oin == oin).one_or_none()
+        if org is None:
+            org = Organization(oin=oin, name=f"Org {oin}", max_rid_usage="irp")
+            session.add(org)
+            session.flush()
+
+        version = HsmKeyVersion(organization_id=org.id, **kwargs)
+        session.add(version)
+        session.commit()
+        return version
 
 
 def test_create_first_version(
@@ -172,18 +176,19 @@ def test_create_with_timezone_aware_window_is_persisted_in_db(
 
     assert response.status_code == 201
 
-    service = HsmKeyVersionService(database)
-    versions = service.get_versions_by_organization_id(
-        _organization_id(database, test_oin)
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
     )
+    assert response.status_code == 200
+    versions = response.json()
 
     assert len(versions) == 1
     stored = versions[0]
-    assert stored.from_dt.tzinfo is not None
-    assert stored.until_dt is not None
-    assert stored.until_dt.tzinfo is not None
-    assert stored.from_dt.astimezone(timezone.utc) == from_dt.astimezone(timezone.utc)
-    assert stored.until_dt.astimezone(timezone.utc) == until_dt.astimezone(timezone.utc)
+    assert stored["from_dt"] is not None
+    assert stored["until_dt"] is not None
+    assert _to_utc(stored["from_dt"]) == from_dt.astimezone(timezone.utc)
+    assert _to_utc(stored["until_dt"]) == until_dt.astimezone(timezone.utc)
 
 
 def test_update_with_timezone_aware_until_dt_is_accepted(
@@ -234,17 +239,18 @@ def test_update_with_timezone_aware_until_dt_is_persisted_in_db(
 
     assert response.status_code == 200
 
-    service = HsmKeyVersionService(database)
-    versions = service.get_versions_by_organization_id(
-        _organization_id(database, test_oin)
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
     )
+    assert response.status_code == 200
+    versions = response.json()
 
     assert len(versions) == 1
     stored = versions[0]
-    assert str(stored.id) == created["id"]
-    assert stored.until_dt is not None
-    assert stored.until_dt.tzinfo is not None
-    assert stored.until_dt.astimezone(timezone.utc) == until_dt.astimezone(timezone.utc)
+    assert str(stored["id"]) == created["id"]
+    assert stored["until_dt"] is not None
+    assert _to_utc(stored["until_dt"]) == until_dt.astimezone(timezone.utc)
 
 
 def test_create_treats_utc_zero_offset_and_z_equivalently(
@@ -273,16 +279,17 @@ def test_create_treats_utc_zero_offset_and_z_equivalently(
         assert _to_utc(body["from_dt"]) == expected_from_dt
         assert _to_utc(body["until_dt"]) == expected_until_dt
 
-    service = HsmKeyVersionService(database)
-    versions = service.get_versions_by_organization_id(
-        _organization_id(database, test_oin)
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
     )
+    assert response.status_code == 200
+
+    versions = response.json()
     assert len(versions) == 2
-    assert all(v.from_dt.astimezone(timezone.utc) == expected_from_dt for v in versions)
+    assert all(_to_utc(version["from_dt"]) == expected_from_dt for version in versions)
     assert all(
-        v.until_dt is not None
-        and v.until_dt.astimezone(timezone.utc) == expected_until_dt
-        for v in versions
+        _to_utc(version["until_dt"]) == expected_until_dt for version in versions
     )
 
 
@@ -312,15 +319,17 @@ def test_update_treats_utc_zero_offset_and_z_equivalently_in_db(
         assert body["until_dt"] is not None
         assert _to_utc(body["until_dt"]) == expected_until_dt
 
-        service = HsmKeyVersionService(database)
-        versions = service.get_versions_by_organization_id(
-            _organization_id(database, test_oin)
+        response = client.get(
+            "/administration/key-versions",
+            headers=auth_headers,
         )
+        assert response.status_code == 200
+
+        versions = response.json()
         assert len(versions) == 1
         stored = versions[0]
-        assert stored.until_dt is not None
-        assert stored.until_dt.tzinfo is not None
-        assert stored.until_dt.astimezone(timezone.utc) == expected_until_dt
+        assert stored["until_dt"] is not None
+        assert _to_utc(stored["until_dt"]) == expected_until_dt
 
 
 def test_create_unknown_org_returns_201(
@@ -361,11 +370,14 @@ def test_create_persists_version(
         headers=auth_headers,
     )
 
-    service = HsmKeyVersionService(database)
-    active = service.get_active_versions_by_organization_id(
-        _organization_id(database, test_oin)
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
     )
-    assert [v.version for v in active] == [1]
+    assert response.status_code == 200
+
+    active = response.json()
+    assert [v["version"] for v in active] == [1]
 
 
 def test_update_sets_until_dt(
@@ -393,12 +405,15 @@ def test_update_sets_until_dt(
     assert body["removed"] is False
     assert body["until_dt"] == until_dt.isoformat()
 
-    service = HsmKeyVersionService(database)
-    active = service.get_active_versions_by_organization_id(
-        _organization_id(database, test_oin)
+    response = client.get(
+        "/administration/key-versions",
+        headers=auth_headers,
     )
+    assert response.status_code == 200
+
+    active = response.json()
     assert len(active) == 1
-    assert str(active[0].id) == created["id"]
+    assert active[0]["id"] == created["id"]
 
 
 def test_update_other_org_key_version_returns_not_found(
@@ -407,9 +422,11 @@ def test_update_other_org_key_version_returns_not_found(
     auth_headers: dict[str, str],
     test_other_oin: Oin,
 ) -> None:
-    service = HsmKeyVersionService(database)
-    entry = service.create_version_by_organization_id(
-        _organization_id(database, test_other_oin)
+    entry = _add(
+        database,
+        oin=test_other_oin,
+        version=1,
+        from_dt=datetime.now(timezone.utc),
     )
 
     response = client.put(
@@ -460,18 +477,16 @@ def test_update_unknown_version_returns_404(
 def test_update_removed_version_returns_404(
     client: TestClient, database: Database, auth_headers: dict[str, str], test_oin: Oin
 ) -> None:
-    created = client.post(
-        "/administration/key-versions",
-        json={},
-        headers=auth_headers,
-    ).json()
-
-    HsmKeyVersionService(database).mark_removed_by_organization_id(
-        created["id"], _organization_id(database, test_oin)
+    removed = _add(
+        database,
+        oin=test_oin,
+        version=1,
+        from_dt=datetime.now(timezone.utc),
+        removed=True,
     )
 
     response = client.put(
-        f"/administration/key-versions/{created['id']}",
+        f"/administration/key-versions/{removed.id}",
         json={},
         headers=auth_headers,
     )
@@ -525,13 +540,12 @@ def test_list_versions_returns_all_for_org(
 def test_list_versions_includes_removed(
     client: TestClient, database: Database, auth_headers: dict[str, str], test_oin: Oin
 ) -> None:
-    created = client.post(
-        "/administration/key-versions",
-        json={},
-        headers=auth_headers,
-    ).json()
-    HsmKeyVersionService(database).mark_removed_by_organization_id(
-        created["id"], _organization_id(database, test_oin)
+    _add(
+        database,
+        oin=test_oin,
+        version=1,
+        from_dt=datetime.now(timezone.utc),
+        removed=True,
     )
 
     response = client.get(

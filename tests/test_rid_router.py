@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import List, Tuple, Dict, Any
+from typing import Any, Callable, Dict, List, Tuple
 from Crypto.PublicKey import RSA
 from jwcrypto import jwe, jwk
 
@@ -415,7 +415,7 @@ def test_receive_rejects_caller_that_is_not_the_recipient(
     org_service: OrgService,
     key_resolver: KeyResolver,
     auth_headers: dict[str, str],
-    auth_headers_for_oin,
+    auth_headers_for_oin: Callable[[str | Oin], dict[str, str]],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
@@ -455,7 +455,7 @@ def test_min_usage_level(
     org_service: OrgService,
     key_resolver: KeyResolver,
     auth_headers: dict[str, str],
-    auth_headers_for_oin,
+    auth_headers_for_oin: Callable[[str | Oin], dict[str, str]],
 ) -> None:
     create_mock_orgs(org_service, key_resolver, MOCK_ORGS)
 
