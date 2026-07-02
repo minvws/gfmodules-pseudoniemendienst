@@ -1,5 +1,6 @@
 import base64
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,9 @@ from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
+from app.db.repositories.hsm_key_version_repository import (
+    HsmKeyVersionCreateConflictError,
+)
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.services.org_service import OrgService
 from app.services.hsm_key_version_service import (
@@ -125,6 +129,40 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
     }
 
     assert active == {TEST_OIN_111, TEST_OIN_222}
+
+
+def test_get_active_or_create_versions_retries_after_create_conflict(
+    database: Database,
+) -> None:
+    organization = OrgService(database).get_by_oin(TEST_OIN_111)
+    assert organization is not None
+
+    service = HsmKeyVersionService(database)
+    original_create = service.create_version_by_organization_id
+
+    call_count = 0
+
+    def flaky_create(org_id: uuid.UUID) -> HsmKeyVersion:
+        nonlocal call_count
+        if call_count == 0:
+            call_count += 1
+            now = datetime.now(timezone.utc)
+            _add(database, oin=TEST_OIN_111, version=1, from_dt=now)
+            raise HsmKeyVersionCreateConflictError(organization.id)
+
+        return original_create(org_id)
+
+    with patch.object(
+        service, "create_version_by_organization_id", side_effect=flaky_create
+    ):
+        active = service.get_active_or_create_versions_by_organization_id(
+            organization.id
+        )
+
+    assert len(active) == 1
+    assert active[0].organization_id == organization.id
+    assert active[0].version == 1
+    assert call_count == 1
 
 
 def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> None:

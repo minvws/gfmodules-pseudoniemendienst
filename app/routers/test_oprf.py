@@ -1,6 +1,8 @@
 import json
 import logging
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
@@ -53,7 +55,7 @@ or as a string:
 )
 def post_test_eval(
     req: InputRequest,
-    oprf_service: OprfService = Depends(container.get_oprf_service),
+    oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
 
     res = oprf_service.blind_input(req.personalId.as_str())
@@ -80,7 +82,7 @@ and should be all on a single line.
 )
 def post_test_receiver(
     req: ReceiverRequest,
-    oprf_service: OprfService = Depends(container.get_oprf_service),
+    oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
 
     token = jwe.JWE()
@@ -169,9 +171,11 @@ if the calling organization is authorized to reverse pseudonyms (max_key_usage =
 )
 def post_test_reversible_pseudonym(
     pseudonym: str,
-    auth_oin: Oin = Depends(authenticated_oin),
-    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
-    org_service: OrgService = Depends(container.get_org_service),
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
+    pseudonym_service: Annotated[
+        PseudonymService, Depends(container.get_pseudonym_service)
+    ],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> JSONResponse:
     # Check if we as an organization are allowed to reverse pseudonyms (max_key_usage == BSN)
     org = org_service.get_by_oin(auth_oin)
@@ -234,9 +238,9 @@ that called this endpoint using MTLS.
 )
 def test_mtls(
     request: Request,
-    auth_oin: Oin = Depends(authenticated_oin),
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
-    org_service: OrgService = Depends(container.get_org_service),
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
+    mtls_service: Annotated[MtlsService, Depends(container.get_mtls_service)],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> JSONResponse:
     org = org_service.get_by_oin(auth_oin)
 

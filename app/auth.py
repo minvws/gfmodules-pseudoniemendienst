@@ -1,5 +1,7 @@
 import logging
 
+from typing import Annotated
+
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from fastapi import Depends, HTTPException
 from starlette.requests import Request
@@ -26,21 +28,16 @@ def apply_development_auth_header_overrides(
     override_oin: str | None,
     override_audience: str | None,
 ) -> None:
-    if override_oin is not None and request.headers.get(AUTH_HEADER_X_GF_OIN) is None:
-        request.scope["headers"].append(
-            (AUTH_HEADER_X_GF_OIN.encode("ascii"), override_oin.encode("ascii"))
-        )
+    headers = request.headers.mutablecopy()
 
-    if (
-        override_audience is not None
-        and request.headers.get(AUTH_HEADER_X_GF_AUDIENCE) is None
-    ):
-        request.scope["headers"].append(
-            (
-                AUTH_HEADER_X_GF_AUDIENCE.encode("ascii"),
-                override_audience.encode("ascii"),
-            )
-        )
+    if override_oin is not None and headers.get(AUTH_HEADER_X_GF_OIN) is None:
+        headers.append(AUTH_HEADER_X_GF_OIN, override_oin)
+
+    if override_audience is not None and headers.get(AUTH_HEADER_X_GF_AUDIENCE) is None:
+        headers.append(AUTH_HEADER_X_GF_AUDIENCE, override_audience)
+
+    request._headers = headers
+    request.scope.update(headers=request.headers.raw)
 
 
 class DevelopmentAuthHeaderMiddleware(BaseHTTPMiddleware):
@@ -69,9 +66,9 @@ class DevelopmentAuthHeaderMiddleware(BaseHTTPMiddleware):
 
 def get_auth_ctx(
     request: Request,
-    auth_headers_service: AuthHeaderService = Depends(
-        container.get_auth_headers_service
-    ),
+    auth_headers_service: Annotated[
+        AuthHeaderService, Depends(container.get_auth_headers_service)
+    ],
 ) -> AuthContext:
     try:
         auth_headers = AuthHeaders.from_request(request)
@@ -91,14 +88,14 @@ def get_auth_ctx(
     return ctx
 
 
-def authenticated_oin(auth_ctx: AuthContext = Depends(get_auth_ctx)) -> Oin:
+def authenticated_oin(auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)]) -> Oin:
     """Return the caller OIN from the validated auth context."""
     return auth_ctx.claims.oin
 
 
 def authenticated_organization(
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
-    org_service: OrgService = Depends(container.get_org_service),
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> Organization:
     """Return the authenticated organization resolved from the caller OIN."""
     organization = org_service.get_by_oin(auth_ctx.claims.oin)

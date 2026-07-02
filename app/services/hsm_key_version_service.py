@@ -8,6 +8,7 @@ from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
 from app.db.repositories.hsm_key_version_repository import (
     HsmKeyVersionNotFoundError as HsmKeyVersionRepositoryNotFoundError,
+    HsmKeyVersionCreateConflictError,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ class HsmKeyVersionNotFoundError(ValueError):
             f"key version {version_id} for organization {organization_id} not found"
         )
         self.version_id = version_id
-        self.organization = organization_id
+        self.organization_id = organization_id
 
 
 class HsmKeyVersionService:
@@ -59,7 +60,18 @@ class HsmKeyVersionService:
         if active:
             return active
 
-        return [self.create_version_by_organization_id(organization_id)]
+        try:
+            return [self.create_version_by_organization_id(organization_id)]
+        except HsmKeyVersionCreateConflictError:
+            logger.warning(
+                "concurrent key version creation for organization_id %s, reloading",
+                organization_id,
+            )
+            active = self.get_active_versions_by_organization_id(organization_id)
+            if active:
+                return active
+
+            raise
 
     def get_versions_by_organization_id(
         self,

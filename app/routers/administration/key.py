@@ -25,9 +25,9 @@ router = APIRouter()
 def post_key(
     req: RegisterRequest,
     request: Request,
-    auth_org: Organization = Depends(authenticated_organization),
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    mtls_service: Annotated[MtlsService, Depends(container.get_mtls_service)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
     mtls_pub_key = mtls_service.get_mtls_pub_key(request)
 
@@ -58,8 +58,8 @@ def post_key(
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    auth_org: Organization = Depends(authenticated_organization),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
     entries = key_resolver.get_by_org(auth_org.id)
 
@@ -74,8 +74,8 @@ def list_keys_for_org(
 def put_key(
     key_id: Annotated[UUID, Path(title="The ID of the key to update")],
     req: KeyRequest,
-    auth_org: Organization = Depends(authenticated_organization),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
     try:
         updated = key_resolver.update(
@@ -108,8 +108,8 @@ def put_key(
 )
 def delete_key(
     key_id: Annotated[UUID, Path(title="The ID of the key to delete")],
-    auth_org: Organization = Depends(authenticated_organization),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
     if not key_resolver.delete(key_id, auth_org.id):
         logger.warning(

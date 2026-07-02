@@ -62,3 +62,22 @@ def test_get_auth_ctx_keeps_existing_audience_header(test_oin: Oin) -> None:
     )
 
     assert ctx.audience == "explicit"
+
+
+def test_get_auth_ctx_with_cached_headers_uses_overrides(test_oin: Oin) -> None:
+    request = _make_request({AUTH_HEADER_X_GF_OIN: test_oin.value})
+    _ = request.headers
+
+    apply_development_auth_header_overrides(
+        request,
+        override_oin=None,
+        override_audience="prs.local",
+    )
+    service = AuthHeaderService(["prs.local"])
+
+    ctx = get_auth_ctx(
+        request=request,
+        auth_headers_service=service,
+    )
+
+    assert ctx.audience == "prs.local"

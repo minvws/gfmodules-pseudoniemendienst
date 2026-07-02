@@ -332,7 +332,7 @@ def test_update_treats_utc_zero_offset_and_z_equivalently_in_db(
         assert _to_utc(stored["until_dt"]) == expected_until_dt
 
 
-def test_create_unknown_org_returns_201(
+def test_create_known_org_returns_201(
     client: TestClient, database: Database, auth_headers: dict[str, str]
 ) -> None:
     response = client.post(

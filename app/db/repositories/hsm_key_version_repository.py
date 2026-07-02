@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, Sequence
 
 from sqlalchemy import and_, func, insert, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from app.db.decorator import repository
@@ -21,6 +22,17 @@ class HsmKeyVersionNotFoundError(ValueError):
             f"hsm key version {version_id} for organization_id {organization_id} not found"
         )
         self.version_id = version_id
+        self.organization_id = organization_id
+
+
+class HsmKeyVersionCreateConflictError(ValueError):
+    """Raised when creating a key version conflicts with an existing row."""
+
+    def __init__(self, organization_id: uuid.UUID):
+        super().__init__(
+            f"hsm key version creation for organization_id {organization_id} conflicts with"
+            " existing version"
+        )
         self.organization_id = organization_id
 
 
@@ -103,7 +115,10 @@ class HsmKeyVersionRepository(RepositoryBase):
             .returning(HsmKeyVersion)
         )
 
-        entry: HsmKeyVersion = self.db_session.execute(statement).scalars().one()
+        try:
+            entry: HsmKeyVersion = self.db_session.execute(statement).scalars().one()
+        except IntegrityError as exc:
+            raise HsmKeyVersionCreateConflictError(organization_id) from exc
 
         logger.info(
             "created hsm key version %s for organization_id %s",

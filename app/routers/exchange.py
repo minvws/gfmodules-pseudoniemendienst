@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any
+from typing import Any, Annotated, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.responses import JSONResponse, Response
@@ -45,10 +45,12 @@ class PubKeyNotFound(HTTPException):
 @router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 def receive(
     req: RidReceiveRequest,
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    rid_service: RidService = Depends(container.get_rid_service),
-    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    rid_service: Annotated[RidService, Depends(container.get_rid_service)],
+    pseudonym_service: Annotated[
+        PseudonymService, Depends(container.get_pseudonym_service)
+    ],
 ) -> Response:
     """
     Receive and decrypt a RID, validate it, and return a pseudonym of the requested type if allowed.
@@ -191,9 +193,9 @@ def receive(
 @router.post("/exchange/rid", summary="Exchange RID", tags=["Exchange Services"])
 def exchange_rid(
     req: RidExchangeRequest,
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    rid_service: RidService = Depends(container.get_rid_service),
-    org_service: OrgService = Depends(container.get_org_service),
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    rid_service: Annotated[RidService, Depends(container.get_rid_service)],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> Response:
     """
     Exchange a personal ID for a RID that can be used by the recipient organization/scope
@@ -245,10 +247,12 @@ def exchange_rid(
 )
 def exchange_pseudonym(
     req: ExchangeRequest,
-    auth_oin: Oin = Depends(authenticated_oin),
-    key_resolver: KeyResolver = Depends(container.get_key_resolver),
-    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
-    org_service: OrgService = Depends(container.get_org_service),
+    auth_oin: Annotated[Oin, Depends(authenticated_oin)],
+    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    pseudonym_service: Annotated[
+        PseudonymService, Depends(container.get_pseudonym_service)
+    ],
+    org_service: Annotated[OrgService, Depends(container.get_org_service)],
 ) -> Response:
     recipient_oin = req.recipientOrganization
 

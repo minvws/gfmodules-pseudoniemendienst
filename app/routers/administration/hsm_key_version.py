@@ -24,10 +24,10 @@ router = APIRouter()
 )
 def post_key_version(
     req: HsmKeyVersionRequest,
-    auth_org: Organization = Depends(authenticated_organization),
-    hsm_key_version_service: HsmKeyVersionService = Depends(
-        container.get_hsm_key_version_service
-    ),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    hsm_key_version_service: Annotated[
+        HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
+    ],
 ) -> JSONResponse:
     try:
         entry = hsm_key_version_service.create_version_by_organization_id(
@@ -48,10 +48,10 @@ def post_key_version(
     tags=["Key Version Services"],
 )
 def list_key_versions(
-    auth_org: Organization = Depends(authenticated_organization),
-    hsm_key_version_service: HsmKeyVersionService = Depends(
-        container.get_hsm_key_version_service
-    ),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    hsm_key_version_service: Annotated[
+        HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
+    ],
 ) -> JSONResponse:
     versions = hsm_key_version_service.get_versions_by_organization_id(auth_org.id)
     return JSONResponse(
@@ -67,10 +67,10 @@ def list_key_versions(
 def put_key_version(
     id: Annotated[UUID, Path(title="The ID of the key version to update")],
     req: HsmKeyVersionUpdateRequest,
-    auth_org: Organization = Depends(authenticated_organization),
-    hsm_key_version_service: HsmKeyVersionService = Depends(
-        container.get_hsm_key_version_service
-    ),
+    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    hsm_key_version_service: Annotated[
+        HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
+    ],
 ) -> JSONResponse:
     try:
         entry = hsm_key_version_service.update_version_by_organization_id(
