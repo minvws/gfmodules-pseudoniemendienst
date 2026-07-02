@@ -123,6 +123,7 @@ def test_new_key_version_is_added_to_jwe(
         server_key=None,
         hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
         hsm_key_version_service=HsmKeyVersionService(database),
+        org_service=org_service,
     )
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
 

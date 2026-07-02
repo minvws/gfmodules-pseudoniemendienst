@@ -37,7 +37,7 @@ class HsmKeyCleanupService:
         expired = self.__version_service.get_expired_versions()
         cleaned = 0
         for version in expired:
-            label = HsmKeyLabel(version.oin, version.version)
+            label = HsmKeyLabel(version.organization.oin, version.version)
 
             try:
                 self._destroy_key(label)
@@ -46,7 +46,10 @@ class HsmKeyCleanupService:
                 logger.exception("failed to destroy HSM key %r", label)
                 continue
 
-            self.__version_service.mark_removed(version.id, version.oin)
+            self.__version_service.mark_removed_by_organization_id(
+                version.id,
+                version.organization_id,
+            )
             cleaned += 1
             logger.info("removed expired HSM key %r", label)
 

@@ -1,14 +1,15 @@
 from datetime import datetime
 import uuid
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Integer, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.entities.base import Base
-from app.db.types.oin import OinType
-from app.models.oin import Oin
+
+if TYPE_CHECKING:
+    from app.db.entities.organization import Organization
 
 
 class HsmKeyVersion(Base):
@@ -17,12 +18,21 @@ class HsmKeyVersion(Base):
     """
 
     __tablename__ = "hsm_key_version"
-    __table_args__ = (UniqueConstraint("oin", "version"),)
+    __table_args__ = (UniqueConstraint("organization_id", "version"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    oin: Mapped[Oin] = mapped_column("oin", OinType(), nullable=False)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organization.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    organization: Mapped["Organization"] = relationship(
+        "Organization",
+        back_populates="hsm_key_versions",
+        lazy="joined",
+    )
     version: Mapped[int] = mapped_column("version", Integer, nullable=False)
     from_dt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     until_dt: Mapped[Optional[datetime]] = mapped_column(

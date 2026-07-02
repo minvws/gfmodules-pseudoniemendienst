@@ -7,8 +7,8 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import authenticated_oin
-from app.models.oin import Oin
+from app.auth import authenticated_organization
+from app.db.entities.organization import Organization
 from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.hsm_key_version_service import HsmKeyVersionNotFoundError
@@ -24,17 +24,19 @@ router = APIRouter()
 )
 def post_key_version(
     req: HsmKeyVersionRequest,
-    auth_oin: Oin = Depends(authenticated_oin),
+    auth_org: Organization = Depends(authenticated_organization),
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
 ) -> JSONResponse:
     try:
-        entry = hsm_key_version_service.create_version(
-            auth_oin, req.from_dt, req.until_dt
+        entry = hsm_key_version_service.create_version_by_organization_id(
+            auth_org.id, req.from_dt, req.until_dt
         )
     except Exception:
-        logger.exception("failed to create key version for OIN %s", auth_oin)
+        logger.exception(
+            "failed to create key version for organization_id %s", auth_org.id
+        )
         raise HTTPException(status_code=500, detail="failed to create key version")
 
     return JSONResponse(status_code=201, content=jsonable_encoder(entry.to_dict()))
@@ -46,12 +48,12 @@ def post_key_version(
     tags=["Key Version Services"],
 )
 def list_key_versions(
-    auth_oin: Oin = Depends(authenticated_oin),
+    auth_org: Organization = Depends(authenticated_organization),
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
 ) -> JSONResponse:
-    versions = hsm_key_version_service.get_versions_for_oin(auth_oin)
+    versions = hsm_key_version_service.get_versions_by_organization_id(auth_org.id)
     return JSONResponse(
         status_code=200, content=jsonable_encoder([v.to_dict() for v in versions])
     )
@@ -65,15 +67,17 @@ def list_key_versions(
 def put_key_version(
     id: Annotated[UUID, Path(title="The ID of the key version to update")],
     req: HsmKeyVersionUpdateRequest,
-    auth_oin: Oin = Depends(authenticated_oin),
+    auth_org: Organization = Depends(authenticated_organization),
     hsm_key_version_service: HsmKeyVersionService = Depends(
         container.get_hsm_key_version_service
     ),
 ) -> JSONResponse:
     try:
-        entry = hsm_key_version_service.update_version(id, auth_oin, req.until_dt)
+        entry = hsm_key_version_service.update_version_by_organization_id(
+            id, auth_org.id, req.until_dt
+        )
     except HsmKeyVersionNotFoundError:
-        logger.warning("key version %s not found for OIN %s", id, auth_oin)
+        logger.warning("key version %s not found for organization %s", id, auth_org.id)
         raise HTTPException(status_code=404, detail="key version not found")
     except Exception:
         logger.exception("failed to update key version %s", id)

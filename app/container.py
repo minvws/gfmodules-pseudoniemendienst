@@ -85,6 +85,7 @@ def container_config(binder: inject.Binder) -> None:
             server_key=None,
             hsm_config=config.oprf,
             hsm_key_version_service=hsm_key_version_service,
+            org_service=org_service,
         )
     else:
         try:

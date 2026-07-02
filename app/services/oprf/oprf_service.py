@@ -8,6 +8,7 @@ from jwcrypto import jwk
 from app.config import ConfigOprf
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.org_service import OrgService
 from app.services.oprf.jwe_token import BlindJwe
 from app.models.requests import BlindRequest
 
@@ -29,10 +30,12 @@ class OprfService:
         server_key: str | None,
         hsm_config: ConfigOprf | None = None,
         hsm_key_version_service: HsmKeyVersionService | None = None,
+        org_service: OrgService | None = None,
     ):
         self.__server_key = base64.urlsafe_b64decode(server_key) if server_key else None
         self.__hsm_config = hsm_config
         self.__hsm_key_version_service = hsm_key_version_service
+        self.__org_service = org_service
 
         if hsm_config and hsm_config.hsm_url:
             logger.info("OPRF evaluation configured via HSM at %s", hsm_config.hsm_url)
@@ -99,12 +102,19 @@ class OprfService:
 
         if self.__hsm_key_version_service is None:
             raise ValueError("HSM key version service not configured")
-        # The active key versions are stored in the database, keyed by OIN number.
-        active = self.__hsm_key_version_service.get_active_versions(
-            oin=recipient_org_oin
+        if self.__org_service is None:
+            raise ValueError("Org service not configured")
+
+        organization = self.__org_service.get_by_oin(recipient_org_oin)
+        if organization is None:
+            raise ValueError(f"organization not found for oin {recipient_org_oin}")
+
+        active = self.__hsm_key_version_service.get_active_versions_by_organization_id(
+            organization.id
         )
         versions = sorted({v.version for v in active})
         if not versions:
+            # TODO: What HTTP Error do we want to return for this, this is not a 500.
             raise ValueError(f"no active key version for oin {recipient_org_oin}")
 
         # Evaluate the blind against every active key version, so the result holds
