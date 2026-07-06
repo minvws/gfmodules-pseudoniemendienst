@@ -1,24 +1,53 @@
-from typing import Annotated, Any, Dict, Self
+from typing import Annotated, Final
 
-from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field
 from app.models.oin import Oin
+
+
+AUTH_HEADER_X_GF_OIN: Final[str] = "x-gf-oin"
+AUTH_HEADER_X_GF_AUDIENCE: Final[str] = "x-gf-audience"
+AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT: Final[str] = "x-forwarded-tls-client-cert"
 
 
 class AuthHeaders(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    oin: Annotated[Oin, Field(alias="x-gf-oin")]
-    audience: Annotated[str, Field(alias="x-gf-audience")]
+    oin: Annotated[
+        Oin,
+        Field(
+            alias=AUTH_HEADER_X_GF_OIN,
+            description=(
+                "OIN of the calling organization as provided by the trusted "
+                "proxy in production; can be provided directly in local "
+                "development/testing."
+            ),
+        ),
+    ]
+    audience: Annotated[
+        str,
+        Field(
+            alias=AUTH_HEADER_X_GF_AUDIENCE,
+            description=(
+                "Audience of this PRS service as provided by the trusted proxy "
+                "in production; can be provided directly in local "
+                "development/testing."
+            ),
+        ),
+    ]
 
-    @classmethod
-    def from_request(cls, req: Request) -> Self:
-        headers = req.headers
-        data: Dict[str, Any] = {}
-        for name, field in cls.model_fields.items():
-            header_name = field.alias or name
-            value = headers.get(header_name)
 
-            data[name] = value
+class MtlsHeaders(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
 
-        return cls(**data)
+    forwarded_tls_client_cert: Annotated[
+        str,
+        Field(
+            alias=AUTH_HEADER_X_FORWARDED_TLS_CLIENT_CERT,
+            description=(
+                "Client TLS certificate as provided by the trusted proxy in production; "
+                "can be provided directly in local development/testing."
+            ),
+        ),
+    ]
+
+    

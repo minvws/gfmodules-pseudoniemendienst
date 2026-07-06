@@ -21,7 +21,6 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
-    mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
 
@@ -80,6 +79,10 @@ class ConfigUvicorn(BaseModel):
     root_path: str = Field(default="")
 
 
+class ConfigDevelopment(BaseModel):
+    include_auth_headers_in_openapi: bool = Field(default=False)
+
+
 class ConfigOprf(BaseModel):
     server_key_file: str = Field(default="")
     hsm_url: str | None = Field(default=None)
@@ -111,6 +114,7 @@ class ConfigAuthorizationHeaders(BaseModel):
 
 class Config(BaseModel):
     app: ConfigApp
+    development: ConfigDevelopment = Field(default_factory=ConfigDevelopment)
     database: ConfigDatabase
     uvicorn: ConfigUvicorn
     oprf: ConfigOprf

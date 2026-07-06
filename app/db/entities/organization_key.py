@@ -2,7 +2,7 @@ import uuid
 from typing import Any, TYPE_CHECKING
 
 from pyoprf import List
-from sqlalchemy import Text, ForeignKey
+from sqlalchemy import Text, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.entities.base import Base
@@ -17,6 +17,7 @@ class OrganizationKey(Base):
     """
 
     __tablename__ = "organization_key"
+    __table_args__ = (UniqueConstraint("organization_id", "scope"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

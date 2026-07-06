@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, List, TYPE_CHECKING, Optional
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from app.db.types.oin import OinType
 from app.models.oin import Oin
@@ -11,6 +11,7 @@ from app.db.entities.base import Base
 
 if TYPE_CHECKING:
     from app.db.entities.organization_key import OrganizationKey
+    from app.db.entities.hsm_key_versions import HsmKeyVersion
 
 
 class Organization(Base):
@@ -29,6 +30,11 @@ class Organization(Base):
 
     keys: Mapped[Optional[List["OrganizationKey"]]] = relationship(
         "OrganizationKey",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
+    hsm_key_versions: Mapped[Optional[List["HsmKeyVersion"]]] = relationship(
+        "HsmKeyVersion",
         back_populates="organization",
         cascade="all, delete-orphan",
     )

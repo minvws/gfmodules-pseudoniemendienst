@@ -227,13 +227,10 @@ To use this system:
 1. You will need a generated UZI Server certificate (<https://www.uziregister.nl/servercertificaat>) or create a
    self-signed certificate for testing purposes.
 
-   Since the system uses mTLS, you can either setup a mTLS setup (caddy, apache, etc), or enable the override in the
-    app.conf file:
-  
-    ```
-    [app]
-    mtls_override_cert=./secrets/self-signed-uzi-server-cert.crt
-    ```
+   Since the system uses mTLS, you can either set up a TLS termination path
+   (Caddy, Apache, etc.) that forwards the certificate as
+   `x-forwarded-tls-client-cert` or pass that header directly when using a test
+   client/Swagger UI.
  
 2. Insert a new organization via a POST to `/orgs`. The organization OIN should be the serialNumber of the OIN certificate you
 
