@@ -6,6 +6,17 @@ enable_test_routes=True
 # Enable the exchange service routes (/exchange/*, /receive)
 enable_exchange_services_routes=True
 
+[logging]
+# Syslog targets (host:port) per log stream; leave empty to disable
+app_path=
+siem_path=
+public_inspect_path=
+debug_path=
+# Include stack traces in the JSON logs
+include_traces=True
+# Log everything as plain text to the console (for local development)
+debug_logs_in_console=True
+
 [database]
 dsn=postgresql+psycopg://postgres:postgres@postgres:5432/postgres
 create_tables=false

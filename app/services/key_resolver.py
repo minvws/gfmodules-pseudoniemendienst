@@ -80,9 +80,12 @@ class KeyResolver:
 
         return None
 
-    def resolve(self, org_id: uuid.UUID, scope: str) -> Optional[jwk.JWK]:
+    def resolve_entry(self, org_id: uuid.UUID, scope: str) -> Optional[OrganizationKey]:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).get(org_id, scope)
+            return session.get_repository(OrganizationKeyRepository).get(org_id, scope)
+
+    def resolve(self, org_id: uuid.UUID, scope: str) -> Optional[jwk.JWK]:
+        entry = self.resolve_entry(org_id, scope)
 
         if entry is None:
             return None

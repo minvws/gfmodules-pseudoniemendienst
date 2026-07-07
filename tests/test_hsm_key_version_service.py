@@ -234,10 +234,12 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
     )
 
     with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
-        token_str = service.eval_blind(req, pub)
+        result = service.eval_blind(req, pub)
+
+    assert result.key_versions == (2, 7)
 
     token = jwelib.JWE()
-    token.deserialize(token_str)
+    token.deserialize(result.jwe)
     token.decrypt(key)
     body = json.loads(token.payload.decode("utf-8"))
 
@@ -326,10 +328,12 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     )
 
     with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
-        token_str = service.eval_blind(req, pub)
+        result = service.eval_blind(req, pub)
+
+    assert result.key_versions == (3, 5)
 
     token = jwelib.JWE()
-    token.deserialize(token_str)
+    token.deserialize(result.jwe)
     token.decrypt(key)
     body = json.loads(token.payload.decode("utf-8"))
 
