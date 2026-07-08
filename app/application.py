@@ -1,9 +1,13 @@
 import logging
 
+from logging.config import dictConfig
 from typing import Any
 
 from fastapi import FastAPI, Depends
 import uvicorn
+
+from app.logging.config_builder import LogConfigBuilder
+from app.logging.middleware import RequestContextMiddleware
 
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
@@ -144,14 +148,16 @@ def create_fastapi_app() -> FastAPI:
 
 
 def setup_logging() -> None:
-    loglevel = logging.getLevelName(get_config().app.loglevel.upper())
+    config = get_config()
+    loglevel = config.app.loglevel.upper()
+    if loglevel not in logging.getLevelNamesMapping():
+        raise ValueError(f"Invalid loglevel {loglevel}")
 
-    if isinstance(loglevel, str):
-        raise ValueError(f"Invalid loglevel {loglevel.upper()}")
-    logging.basicConfig(
-        level=loglevel,
-        datefmt="%m/%d/%Y %I:%M:%S %p",
-    )
+    log_config = LogConfigBuilder(
+        loglevel=loglevel,
+        logging_config=config.logging,
+    ).build()
+    dictConfig(log_config)
 
 
 def setup_fastapi() -> FastAPI:
@@ -176,6 +182,8 @@ def setup_fastapi() -> FastAPI:
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None)
     )
+
+    fastapi.add_middleware(RequestContextMiddleware)
 
     # Non-OAuth routes
     public_routers = [

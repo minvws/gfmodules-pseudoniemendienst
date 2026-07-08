@@ -1,7 +1,8 @@
 import base64
 import json
+import logging
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Dict, Generator, List, Tuple
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -13,10 +14,12 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from app.logging.filters import LoggingStreams
 from app.models.oin import Oin
 from app.rid import RidUsage
 from app import container
 from app.services.key_resolver import KeyResolver
+from app.services.oprf.oprf_service import OprfEvaluationError
 from app.services.org_service import OrgService
 
 
@@ -253,6 +256,114 @@ def test_oprf_eval_unknown_oin_returns_not_found(
 
     assert eval_response.status_code == 404
     assert eval_response.json() == {"error": "No organization found for this OIN"}
+
+
+class _RecordingHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: List[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@pytest.fixture
+def oprf_event_records() -> Generator[List[logging.LogRecord], None, None]:
+    handler = _RecordingHandler()
+    target = logging.getLogger("app.routers.oprf")
+    target.addHandler(handler)
+    try:
+        yield handler.records
+    finally:
+        target.removeHandler(handler)
+
+
+def _events(records: List[logging.LogRecord], event_id: str) -> List[logging.LogRecord]:
+    return [r for r in records if getattr(r, "event_id", None) == event_id]
+
+
+def test_oprf_eval_success_emits_audit_event(
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    oprf_event_records: List[logging.LogRecord],
+) -> None:
+    run_oprf_eval_and_unblind(
+        client=client,
+        private_key_pem=oprf_context.private_key_pem,
+        personal_identifier=oprf_context.personal_identifier,
+        recipient_organization=oprf_context.recipient_organization,
+        recipient_scope=oprf_context.recipient_scope,
+    )
+
+    events = _events(oprf_event_records, "210400")
+    assert len(events) == 1
+    record = events[0]
+    assert record.levelno == logging.INFO
+    assert record.handelende_oin == TEST_OIN_VALUE  # type: ignore[attr-defined]
+    assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
+    assert record.oprf_secret_versie == 1  # type: ignore[attr-defined]
+    assert LoggingStreams.SIEM in record.stream  # type: ignore[attr-defined]
+
+
+def test_oprf_eval_unknown_scope_emits_refused_event(
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    oprf_event_records: List[logging.LogRecord],
+) -> None:
+    response = client.post(
+        "/oprf/eval",
+        json={
+            "encryptedPersonalId": "Zm9v",
+            "recipientOrganization": oprf_context.recipient_organization,
+            "recipientScope": "invalid-scope",
+        },
+        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+    )
+
+    assert response.status_code == 404
+    events = _events(oprf_event_records, "210403")
+    assert len(events) == 1
+    record = events[0]
+    assert record.levelno == logging.WARNING
+    assert record.handelende_oin == TEST_OIN_VALUE  # type: ignore[attr-defined]
+    assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
+    assert record.endpoint == "/oprf/eval"  # type: ignore[attr-defined]
+
+
+def test_oprf_eval_failure_emits_failed_event_with_error_type(
+    app: FastAPI,
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    oprf_event_records: List[logging.LogRecord],
+) -> None:
+    class FailingOprfService:
+        def eval_blind(self, req: object, pub_key_jwk: object) -> str:
+            raise OprfEvaluationError(
+                "invalid blinded input", error_type="invalid_blinded_input"
+            )
+
+    app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
+    try:
+        response = client.post(
+            "/oprf/eval",
+            json={
+                "encryptedPersonalId": "Zm9v",
+                "recipientOrganization": oprf_context.recipient_organization,
+                "recipientScope": oprf_context.recipient_scope,
+            },
+            headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        )
+    finally:
+        app.dependency_overrides.pop(container.get_oprf_service, None)
+
+    assert response.status_code == 400
+    events = _events(oprf_event_records, "210402")
+    assert len(events) == 1
+    record = events[0]
+    assert record.levelno == logging.ERROR
+    assert record.error_type == "invalid_blinded_input"  # type: ignore[attr-defined]
+    assert record.handelende_oin == TEST_OIN_VALUE  # type: ignore[attr-defined]
+    assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
 
 
 def test_oprf_eval_when_service_rejects_blind_returns_bad_request(

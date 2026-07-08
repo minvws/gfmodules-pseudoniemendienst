@@ -1,5 +1,6 @@
 import base64
 import logging
+from dataclasses import dataclass
 
 import pyoprf
 import requests
@@ -12,6 +13,27 @@ from app.services.oprf.jwe_token import BlindJwe
 from app.models.requests import BlindRequest
 
 logger = logging.getLogger(__name__)
+
+
+class OprfEvaluationError(ValueError):
+    """
+    Raised when an OPRF evaluation fails. The error_type matches the audit
+    logging spec: invalid_blinded_input | secret_version_destroyed |
+    crypto_evaluation_failure.
+    """
+
+    def __init__(
+        self, message: str, error_type: str = "crypto_evaluation_failure"
+    ) -> None:
+        super().__init__(message)
+        self.error_type = error_type
+
+
+@dataclass(frozen=True)
+class OprfEvalResult:
+    jwe: str
+    # OPRF secret key versions the blind was evaluated against
+    key_versions: tuple[int, ...]
 
 
 class HsmKeyLabel:
@@ -46,19 +68,40 @@ class OprfService:
         """
         return base64.urlsafe_b64encode(pyoprf.keygen()).decode("ascii")
 
-    def eval_blind(self, req: BlindRequest, pub_key: jwk.JWK) -> str:
+    def eval_blind(self, req: BlindRequest, pub_key: jwk.JWK) -> OprfEvalResult:
         """
-        Evaluate a blind and returns a JWE encrypted on the pubkey
+        Evaluate a blind and returns a JWE encrypted on the pubkey, plus the
+        key versions the blind was evaluated against
         """
         try:
             bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
-            if self.__hsm_config and self.__hsm_config.hsm_url:
-                evals = self._eval_via_hsm(req.recipientOrganization, bi)
-            else:
-                evals = {1: pyoprf.evaluate(self.__server_key, bi)}
         except Exception as e:
-            logger.exception("unable to evaluate blind")
-            raise ValueError(f"unable to evaluate blind: {e}")
+            logger.exception("unable to decode blinded input")
+            raise OprfEvaluationError(
+                f"unable to decode blinded input: {e}",
+                error_type="invalid_blinded_input",
+            )
+
+        if self.__hsm_config and self.__hsm_config.hsm_url:
+            try:
+                evals = self._eval_via_hsm(req.recipientOrganization, bi)
+            except OprfEvaluationError:
+                raise
+            except Exception as e:
+                logger.exception("unable to evaluate blind")
+                raise OprfEvaluationError(
+                    f"unable to evaluate blind: {e}",
+                    error_type="crypto_evaluation_failure",
+                )
+        else:
+            try:
+                evals = {1: pyoprf.evaluate(self.__server_key, bi)}
+            except Exception as e:
+                logger.exception("unable to evaluate blind")
+                raise OprfEvaluationError(
+                    f"unable to evaluate blind: {e}",
+                    error_type="invalid_blinded_input",
+                )
 
         # The subject always carries the latest key version in the original,
         # backwards-compatible format so existing clients keep working unchanged.
@@ -88,7 +131,7 @@ class OprfService:
             req.recipientOrganization,
             req.recipientScope,
         )
-        return jwe
+        return OprfEvalResult(jwe=jwe, key_versions=tuple(sorted(evals)))
 
     def _eval_via_hsm(
         self, recipient_org_oin: Oin, blinded_bytes: bytes
@@ -105,7 +148,10 @@ class OprfService:
         )
         versions = sorted({v.version for v in active})
         if not versions:
-            raise ValueError(f"no active key version for oin {recipient_org_oin}")
+            raise OprfEvaluationError(
+                f"no active key version for oin {recipient_org_oin}",
+                error_type="secret_version_destroyed",
+            )
 
         # Evaluate the blind against every active key version, so the result holds
         # one entry per version (e.g. during key rotation).
