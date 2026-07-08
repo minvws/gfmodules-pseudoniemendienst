@@ -36,6 +36,7 @@ It takes the form of:
       "landCode": "NL",
       "type": "bsn",
       "value": "950000012"
+    }
 }
 ```
 
