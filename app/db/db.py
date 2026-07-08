@@ -58,19 +58,27 @@ class Database:
             logger.exception("error while truncating tables")
             raise e
 
+    def health_error(self) -> str | None:
+        """
+        Check if the database is healthy
+
+        :return: None if the database is healthy, the error detail otherwise
+        """
+        try:
+            with Session(self.engine) as session:
+                session.execute(text("SELECT 1"))
+            return None
+        except Exception as e:
+            logger.info("database is not healthy: %s", e)
+            return str(e)
+
     def is_healthy(self) -> bool:
         """
         Check if the database is healthy
 
         :return: True if the database is healthy, False otherwise
         """
-        try:
-            with Session(self.engine) as session:
-                session.execute(text("SELECT 1"))
-            return True
-        except Exception as e:
-            logger.info("database is not healthy: %s", e)
-            return False
+        return self.health_error() is None
 
     def get_db_session(self) -> DbSession:
         return DbSession(self.engine)

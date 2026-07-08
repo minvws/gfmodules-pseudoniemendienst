@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.logging.context import client_trace_id_var, ip_var, request_id_var
+from app.logging.filters import LoggingStreams
 
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 
@@ -12,7 +13,30 @@ _BUILTIN_LOGRECORD_ATTRS: frozenset[str] = frozenset(
     logging.LogRecord(
         name="", level=0, pathname="", lineno=0, msg="", args=(), exc_info=None
     ).__dict__.keys()
-) | {"message", "asctime", "event_id", "stream"}
+) | {"message", "asctime", "event_id", "stream", "field_streams"}
+
+# Correlation metadata that is always retained, regardless of per-stream field routing.
+_ALWAYS_KEEP_FIELDS: frozenset[str] = frozenset({"request_id", "ip", "client_trace_id"})
+
+
+def _route_fields(
+    record: logging.LogRecord,
+    stream: LoggingStreams | None,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Restrict ``data`` to the fields allowed for ``stream`` by the event.
+
+    When the formatter is not bound to a stream (console/debug), or the event
+    carries no per-stream routing, every field is kept. Correlation metadata is
+    always retained so records remain traceable across streams.
+    """
+    field_streams: dict[LoggingStreams, tuple[str, ...]] | None = getattr(
+        record, "field_streams", None
+    )
+    if stream is None or not field_streams:
+        return data
+    allowed = set(field_streams.get(stream, ())) | _ALWAYS_KEEP_FIELDS
+    return {key: value for key, value in data.items() if key in allowed}
 
 
 def _sanitize_message(value: str) -> str:
@@ -66,11 +90,13 @@ class JsonFormatter(logging.Formatter):
     def __init__(
         self,
         include_traces: bool = True,
+        stream: LoggingStreams | None = None,
         stream_id: str | None = None,
         application_id: str | None = None,
     ) -> None:
         super().__init__()
         self.include_traces = include_traces
+        self.stream = stream
         self.stream_id = stream_id
         self.application_id = application_id
 
@@ -82,8 +108,8 @@ class JsonFormatter(logging.Formatter):
         if record.stack_info and self.include_traces:
             message["stack_info"] = self.formatStack(record.stack_info)
 
-        message.update(_collect_context())
-        message.update(_collect_extras(record))
+        data = {**_collect_context(), **_collect_extras(record)}
+        message.update(_route_fields(record, self.stream, data))
 
         log_record: dict[str, Any] = {
             "event_id": getattr(record, "event_id", None),
@@ -110,6 +136,10 @@ class PlainTextFormatter(logging.Formatter):
         2026-04-23T10:11:12Z INFO app.application [100601] Application started version=...
     """
 
+    def __init__(self, stream: LoggingStreams | None = None) -> None:
+        super().__init__()
+        self.stream = stream
+
     def format(self, record: logging.LogRecord) -> str:
         timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
@@ -120,11 +150,11 @@ class PlainTextFormatter(logging.Formatter):
             f"[{event_id}] {_sanitize_message(record.getMessage())}"
         )
 
-        pairs: list[str] = []
-        for key, value in _collect_context().items():
-            pairs.append(f"{key}={value}")
-        for key, value in _collect_extras(record).items():
-            pairs.append(f"{key}={value}")
+        data = {**_collect_context(), **_collect_extras(record)}
+        pairs = [
+            f"{key}={value}"
+            for key, value in _route_fields(record, self.stream, data).items()
+        ]
 
         out = base if not pairs else f"{base} {' '.join(pairs)}"
 

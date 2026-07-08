@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import get_config
 from app.db.entities.base import Base
 from app.db.repositories import repository_base
+from app.logging.events import SYS_DB_CONNECTION_FAILED, log_event
 
 """
 This module contains the DbSession class, which is a context manager that provides a session to interact with
@@ -132,15 +133,19 @@ class DbSession:
         Retry a function call in case of database errors
         """
         backoff = get_config().database.retry_backoff
+        attempt = 0
 
         while True:
+            error: Exception
             try:
                 return f(*args, **kwargs)
             except PendingRollbackError as e:
                 logger.warning("retrying operation due to PendingRollbackError: %s", e)
                 self.session.rollback()
+                error = e
             except OperationalError as e:
                 logger.warning("retrying operation due to OperationalError: %s", e)
+                error = e
             except DatabaseError as e:
                 logger.warning("retrying operation due to DatabaseError: %s", e)
                 raise e
@@ -148,12 +153,29 @@ class DbSession:
                 logger.warning("generic Exception during operation: %s", e)
                 raise e
 
+            attempt += 1
             if len(backoff) == 0:
                 logger.error("operation failed after all retries")
+                log_event(
+                    logger,
+                    SYS_DB_CONNECTION_FAILED,
+                    "Database connection lost: giving up after all retries",
+                    datastore="prs-database",
+                    error_type=type(error).__name__,
+                    retry_attempt=attempt,
+                )
                 raise DatabaseError(
                     "Operation failed after all retries", None, BaseException()
                 )
 
-            logger.info("retrying operation in %s seconds", backoff[0])
+            log_event(
+                logger,
+                SYS_DB_CONNECTION_FAILED,
+                "Database connection lost, retrying",
+                datastore="prs-database",
+                error_type=type(error).__name__,
+                retry_attempt=attempt,
+                backoff_seconds=backoff[0],
+            )
             sleep(backoff[0] + random.uniform(0, 0.1))
             backoff = backoff[1:]

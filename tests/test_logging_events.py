@@ -9,9 +9,16 @@ from jwcrypto import jwk
 from app.config import ConfigOprf
 from app.logging.events import (
     PRSEvent,
+    HEALTH_UNHEALTHY,
     OPRF_EVAL_FAILED,
     OPRF_EVAL_OK,
     OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+    SYS_APP_CRASHED,
+    SYS_APP_STARTED,
+    SYS_APP_STOPPED,
+    SYS_DB_CONNECTION_FAILED,
+    SYS_HSM_UNREACHABLE,
+    SYS_UNHANDLED_EXCEPTION,
     log_event,
 )
 from app.logging.filters import LoggingStreams
@@ -42,9 +49,15 @@ def test_log_event_attaches_event_id_and_streams(
         (OPRF_EVAL_OK, "210400", logging.INFO),
         (OPRF_EVAL_FAILED, "210402", logging.ERROR),
         (OPRF_REFUSED_NO_ACTIVE_PUBKEY, "210403", logging.WARNING),
+        (HEALTH_UNHEALTHY, "270400", logging.ERROR),
+        (SYS_APP_STOPPED, "270402", logging.INFO),
+        (SYS_APP_CRASHED, "270402", logging.CRITICAL),
+        (SYS_DB_CONNECTION_FAILED, "270403", logging.ERROR),
+        (SYS_UNHANDLED_EXCEPTION, "270404", logging.ERROR),
+        (SYS_HSM_UNREACHABLE, "270406", logging.CRITICAL),
     ],
 )
-def test_oprf_events_match_logging_spec(
+def test_events_match_logging_spec(
     caplog: pytest.LogCaptureFixture,
     event: PRSEvent,
     expected_id: str,
@@ -59,6 +72,12 @@ def test_oprf_events_match_logging_spec(
     with caplog.at_level(logging.DEBUG, logger="test.events_levels"):
         log_event(logger, event, "msg")
     assert caplog.records[-1].levelno == expected_level
+
+
+def test_sys_app_started_has_app_stream_only() -> None:
+    # PRS-SYS-001: "stroom 3" is "-" in the spec, so no SIEM stream.
+    assert SYS_APP_STARTED.event_id == "270401"
+    assert SYS_APP_STARTED.streams == (LoggingStreams.APP,)
 
 
 def test_log_event_includes_exc_info(caplog: pytest.LogCaptureFixture) -> None:

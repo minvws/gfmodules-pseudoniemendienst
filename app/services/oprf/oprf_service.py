@@ -1,12 +1,14 @@
 import base64
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import pyoprf
 import requests
 from jwcrypto import jwk
 
 from app.config import ConfigOprf
+from app.logging.events import SYS_HSM_UNREACHABLE, log_event
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.jwe_token import BlindJwe
@@ -168,77 +170,59 @@ class OprfService:
 
         return ret
 
-    def _generate_key(self, label: HsmKeyLabel) -> None:
+    def _hsm_post(self, path: str, payload: dict[str, str]) -> Any:
+        """
+        POST to the HSM API and return the decoded JSON response
+        """
         cfg = self.__hsm_config
         if cfg is None:
             raise ValueError("HSM configuration not found")
 
-        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}/generate/oprf"
-        response = requests.post(
-            url,
-            json={
-                "label": str(label),
-            },
-            timeout=10,
-            verify=cfg.hsm_ca_cert_file or True,
-            cert=(
-                (cfg.hsm_cert_file, cfg.hsm_key_file)
-                if (cfg.hsm_cert_file and cfg.hsm_key_file)
-                else None
-            ),
-        )
+        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}{path}"
+        try:
+            response = requests.post(
+                url,
+                json=payload,
+                timeout=10,
+                verify=cfg.hsm_ca_cert_file or True,
+                cert=(
+                    (cfg.hsm_cert_file, cfg.hsm_key_file)
+                    if (cfg.hsm_cert_file and cfg.hsm_key_file)
+                    else None
+                ),
+            )
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            log_event(
+                logger,
+                SYS_HSM_UNREACHABLE,
+                "HSM/KMS unreachable",
+                error_reason=str(e),
+            )
+            raise
         response.raise_for_status()
+        return response.json()
 
-        if "result" not in response.json():
+    def _generate_key(self, label: HsmKeyLabel) -> None:
+        data = self._hsm_post("/generate/oprf", {"label": str(label)})
+
+        if "result" not in data:
             raise ValueError("HSM configuration not found")
 
     def _label_exists(self, label: HsmKeyLabel) -> bool:
-        cfg = self.__hsm_config
-        if cfg is None:
-            raise ValueError("HSM configuration not found")
+        data = self._hsm_post("", {"label": str(label), "objtype": "SECRET_KEY"})
 
-        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}"
-        response = requests.post(
-            url,
-            json={
-                "label": str(label),
-                "objtype": "SECRET_KEY",
-            },
-            timeout=10,
-            verify=cfg.hsm_ca_cert_file or True,
-            cert=(
-                (cfg.hsm_cert_file, cfg.hsm_key_file)
-                if (cfg.hsm_cert_file and cfg.hsm_key_file)
-                else None
-            ),
-        )
-        response.raise_for_status()
-
-        result = response.json()["objects"] or []
+        result = data["objects"] or []
         return len(result) > 0
 
     def _evaluate_label(self, label: HsmKeyLabel, blinded_bytes: bytes) -> bytes:
-        cfg = self.__hsm_config
-        if cfg is None:
-            raise ValueError("HSM configuration not found")
-
-        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}/oprf/evaluate"
-        response = requests.post(
-            url,
-            json={
+        data = self._hsm_post(
+            "/oprf/evaluate",
+            {
                 "label": str(label),
                 "blinded_point": base64.b64encode(blinded_bytes).decode(),
             },
-            timeout=10,
-            verify=cfg.hsm_ca_cert_file or True,
-            cert=(
-                (cfg.hsm_cert_file, cfg.hsm_key_file)
-                if (cfg.hsm_cert_file and cfg.hsm_key_file)
-                else None
-            ),
         )
-        response.raise_for_status()
-        return base64.b64decode(response.json()["result"])
+        return base64.b64decode(data["result"])
 
     @staticmethod
     def blind_input(input: str) -> dict[str, str]:
