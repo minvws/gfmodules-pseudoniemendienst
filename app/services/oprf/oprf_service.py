@@ -68,7 +68,9 @@ class OprfService:
         """
         return base64.urlsafe_b64encode(pyoprf.keygen()).decode("ascii")
 
-    def eval_blind(self, req: BlindRequest, pub_key: jwk.JWK) -> OprfEvalResult:
+    def eval_blind(
+        self, req: BlindRequest, pub_key: jwk.JWK, pub_key_id: str | None
+    ) -> OprfEvalResult:
         """
         Evaluate a blind and returns a JWE encrypted on the pubkey, plus the
         key versions the blind was evaluated against
@@ -123,6 +125,7 @@ class OprfService:
             scope=req.recipientScope,
             subject=subject,
             pub_key=pub_key,
+            pub_key_id=pub_key_id,
             extra_claims={"extra_versions": extra_versions},
         )
 

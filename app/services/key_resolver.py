@@ -84,13 +84,15 @@ class KeyResolver:
         with self.db.get_db_session() as session:
             return session.get_repository(OrganizationKeyRepository).get(org_id, scope)
 
-    def resolve(self, org_id: uuid.UUID, scope: str) -> Optional[jwk.JWK]:
+    def resolve(
+        self, org_id: uuid.UUID, scope: str
+    ) -> tuple[Optional[jwk.JWK], Optional[str]]:
         entry = self.resolve_entry(org_id, scope)
 
         if entry is None:
-            return None
+            return None, None
 
-        return jwk.JWK.from_pem(entry.key_data.encode("ascii"))
+        return jwk.JWK.from_pem(entry.key_data.encode("ascii")), entry.key_id
 
     def create(
         self, org_id: uuid.UUID, scope: list[str], key_id: Optional[str], key_data: str

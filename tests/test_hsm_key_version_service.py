@@ -234,7 +234,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
     )
 
     with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
-        result = service.eval_blind(req, pub)
+        result = service.eval_blind(req, pub, None)
 
     assert result.key_versions == (2, 7)
 
@@ -328,7 +328,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     )
 
     with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
-        result = service.eval_blind(req, pub)
+        result = service.eval_blind(req, pub, None)
 
     assert result.key_versions == (3, 5)
 

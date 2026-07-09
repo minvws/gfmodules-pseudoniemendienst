@@ -11,6 +11,7 @@ class BlindJwe:
         scope: str,
         subject: str,
         pub_key: jwk.JWK,
+        pub_key_id: str | None,
         extra_claims: dict[str, Any] = {},
     ) -> str:
         """
@@ -28,7 +29,7 @@ class BlindJwe:
         }
 
         protected_headers = {
-            "kid": pub_key.thumbprint(),
+            "kid": pub_key_id if pub_key_id else pub_key.thumbprint(),
             "alg": "RSA-OAEP-256",
             "enc": "A256GCM",
             "cty": "application/json",

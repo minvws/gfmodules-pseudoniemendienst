@@ -36,8 +36,10 @@ def test_resolver_create_and_resolve_roundtrip(
     assert entry.organization_id == org.id
     assert sorted(entry.scope) == ["lmr", "nvi"]
 
-    key = key_resolver.resolve(org.id, "nvi")
+    (key, key_id) = key_resolver.resolve(org.id, "nvi")
     assert isinstance(key, jwk.JWK)
+    assert key_id is not None
+    assert key_id == "my-key-id"
     assert not key.has_private
 
 
