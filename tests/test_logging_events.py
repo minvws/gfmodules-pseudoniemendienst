@@ -93,7 +93,7 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     service = OprfService(server_key=OprfService.generate_server_key())
 
     with pytest.raises(OprfEvaluationError) as exc:
-        service.eval_blind(_blind_request(), pub_key)
+        service.eval_blind(_blind_request(), pub_key, None)
 
     assert exc.value.error_type == "invalid_blinded_input"
 
@@ -110,7 +110,7 @@ def test_eval_blind_without_active_versions_raises_secret_version_destroyed(
     )
 
     with pytest.raises(OprfEvaluationError) as exc:
-        service.eval_blind(_blind_request(), pub_key)
+        service.eval_blind(_blind_request(), pub_key, None)
 
     assert exc.value.error_type == "secret_version_destroyed"
 
@@ -135,6 +135,6 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
         ),
         pytest.raises(OprfEvaluationError) as exc,
     ):
-        service.eval_blind(_blind_request(), pub_key)
+        service.eval_blind(_blind_request(), pub_key, None)
 
     assert exc.value.error_type == "crypto_evaluation_failure"

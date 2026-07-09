@@ -217,7 +217,7 @@ def exchange_rid(
     if org is None:
         raise OrganizationNotFound(oin)
 
-    pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
+    (pub_key_jwk, pub_key_id) = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         logger.warning(
             "no public key found for organization '%s' and scope '%s'",
@@ -232,6 +232,7 @@ def exchange_rid(
         scope=req.recipientScope,
         subject=f"rid:{rid}",
         pub_key=pub_key_jwk,
+        pub_key_id=pub_key_id,
         extra_claims={
             "ridUsage": rid_data["usage"],
         },
@@ -299,7 +300,7 @@ def exchange_pseudonym(
         )
         raise HTTPException(status_code=500, detail="Pseudonym exchange failed")
 
-    pub_key_jwk = key_resolver.resolve(org.id, req.recipientScope)
+    (pub_key_jwk, pub_key_id) = key_resolver.resolve(org.id, req.recipientScope)
     if pub_key_jwk is None:
         logger.warning(
             "no public key found for organization '%s' and scope '%s'",
@@ -313,6 +314,7 @@ def exchange_pseudonym(
         scope=req.recipientScope,
         subject=subject,
         pub_key=pub_key_jwk,
+        pub_key_id=pub_key_id,
     )
 
     return Response(

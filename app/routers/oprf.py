@@ -70,7 +70,7 @@ def post_eval(
     pub_key_jwk = jwk.JWK.from_pem(key_entry.key_data.encode("ascii"))
 
     try:
-        result = oprf_service.eval_blind(req, pub_key_jwk)
+        result = oprf_service.eval_blind(req, pub_key_jwk, key_entry.key_id)
     except ValueError as e:
         log_event(
             logger,
