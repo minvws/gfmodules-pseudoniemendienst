@@ -67,6 +67,29 @@ class LogConfigBuilder:
                     "()": JsonFormatter,
                     "include_traces": True,
                 },
+                # Stream-stamped formatters: all streams are multiplexed over a
+                # single syslog channel, and stream_id lets the log server tell
+                # them apart.
+                "json_app": {
+                    "()": JsonFormatter,
+                    "include_traces": False,
+                    "stream_id": "app",
+                },
+                "json_siem": {
+                    "()": JsonFormatter,
+                    "include_traces": False,
+                    "stream_id": "siem",
+                },
+                "json_public_inspect": {
+                    "()": JsonFormatter,
+                    "include_traces": False,
+                    "stream_id": "public_inspect",
+                },
+                "json_debug": {
+                    "()": JsonFormatter,
+                    "include_traces": True,
+                    "stream_id": "debug",
+                },
                 "plain": {
                     "()": PlainTextFormatter,
                 },
@@ -100,41 +123,49 @@ class LogConfigBuilder:
             "root": {"handlers": ["console"], "level": self.loglevel},
         }
 
+        # Stamp every JSON record with the configured application id so the
+        # log server can tell apart applications sharing the syslog channel.
+        if self.logging_config.application_id:
+            for formatter in conf["formatters"].values():
+                if formatter["()"] is JsonFormatter:
+                    formatter["application_id"] = self.logging_config.application_id
+
         self._add_log_handlers(conf)
 
         return conf
 
     def _add_log_handlers(self, conf: dict[str, Any]) -> None:
+        # All streams share one syslog channel; each handler stamps its records
+        # with a stream_id via its formatter so the log server can split them.
+        path = self.logging_config.syslog_path
+        if not path:
+            return
+
         app_logger_handlers = conf["loggers"]["app"]["handlers"]
         uvicorn_handlers = conf["loggers"]["uvicorn"]["handlers"]
         uvicorn_error_handlers = conf["loggers"]["uvicorn.error"]["handlers"]
 
-        if self.logging_config.app_path:
-            conf["handlers"]["app_syslog"] = self._syslog_handler(
-                self.logging_config.app_path, filters=["app_filter"]
-            )
-            app_logger_handlers.append("app_syslog")
-            uvicorn_handlers.append("app_syslog")
-            uvicorn_error_handlers.append("app_syslog")
+        conf["handlers"]["syslog_app"] = self._syslog_handler(
+            path, formatter="json_app", filters=["app_filter"]
+        )
+        app_logger_handlers.append("syslog_app")
+        uvicorn_handlers.append("syslog_app")
+        uvicorn_error_handlers.append("syslog_app")
 
-        if self.logging_config.siem_path:
-            conf["handlers"]["siem"] = self._syslog_handler(
-                self.logging_config.siem_path, filters=["siem_filter"]
-            )
-            app_logger_handlers.append("siem")
+        conf["handlers"]["syslog_siem"] = self._syslog_handler(
+            path, formatter="json_siem", filters=["siem_filter"]
+        )
+        app_logger_handlers.append("syslog_siem")
 
-        if self.logging_config.public_inspect_path:
-            conf["handlers"]["public_inspect"] = self._syslog_handler(
-                self.logging_config.public_inspect_path,
-                filters=["public_inspect_filter"],
-            )
-            app_logger_handlers.append("public_inspect")
+        conf["handlers"]["syslog_public_inspect"] = self._syslog_handler(
+            path, formatter="json_public_inspect", filters=["public_inspect_filter"]
+        )
+        app_logger_handlers.append("syslog_public_inspect")
 
-        if self.logging_config.debug_path:
-            conf["handlers"]["debug"] = self._syslog_handler(
-                self.logging_config.debug_path, formatter="json_traces"
-            )
-            app_logger_handlers.append("debug")
-            uvicorn_handlers.append("debug")
-            uvicorn_error_handlers.append("debug")
-            conf["root"]["handlers"].append("debug")
+        conf["handlers"]["syslog_debug"] = self._syslog_handler(
+            path, formatter="json_debug"
+        )
+        app_logger_handlers.append("syslog_debug")
+        uvicorn_handlers.append("syslog_debug")
+        uvicorn_error_handlers.append("syslog_debug")
+        conf["root"]["handlers"].append("syslog_debug")
