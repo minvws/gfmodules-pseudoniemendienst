@@ -20,6 +20,7 @@ bearer_auth = HTTPBearer(
     auto_error=False,
 )
 
+
 def get_auth_ctx(
     request: Request,
     # We don't do anything with it, but it's just a marker that allows swagger to add the authorize button

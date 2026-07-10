@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.container import get_database
 from app.db.db import Database
+from app.logging.events import HEALTH_UNHEALTHY, log_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -62,13 +63,24 @@ def health(
 ) -> JSONResponse:
     logger.info("Checking application health")
 
-    components = {
-        "database": ok_or_error(db.is_healthy()),
+    errors = {
+        "database": db.health_error(),
     }
+    components = {name: ok_or_error(error is None) for name, error in errors.items()}
     healthy = ok_or_error(all(value == "ok" for value in components.values()))
     content = {"status": healthy, "components": components}
     if healthy == "ok":
         return JSONResponse(content=content)
-    unhealthy = [name for name, status in components.items() if status != "ok"]
-    logger.warning("Health check failed for components: %s", ", ".join(unhealthy))
+
+    for name, error in errors.items():
+        if error is None:
+            continue
+        log_event(
+            logger,
+            HEALTH_UNHEALTHY,
+            "Health check unhealthy",
+            component=name,
+            status="error",
+            error_detail=error,
+        )
     return JSONResponse(status_code=503, content=content)

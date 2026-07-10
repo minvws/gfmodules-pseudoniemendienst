@@ -3,6 +3,7 @@ from typing import Any
 from app.config import ConfigLogging
 from app.logging.filters import (
     AppFilter,
+    LoggingStreams,
     PublicInspectFilter,
     SiemFilter,
 )
@@ -69,16 +70,20 @@ class LogConfigBuilder:
                 },
                 # Stream-stamped formatters: all streams are multiplexed over a
                 # single syslog channel, and stream_id lets the log server tell
-                # them apart.
+                # them apart. json_app/json_siem are additionally stream-bound so
+                # the per-event field allow-list restricts each stream to the data
+                # the spec assigns to it. APP == "stroom 2", SIEM == "stroom 3".
                 "json_app": {
                     "()": JsonFormatter,
                     "include_traces": False,
                     "stream_id": "app",
+                    "stream": LoggingStreams.APP,
                 },
                 "json_siem": {
                     "()": JsonFormatter,
                     "include_traces": False,
                     "stream_id": "siem",
+                    "stream": LoggingStreams.SIEM,
                 },
                 "json_public_inspect": {
                     "()": JsonFormatter,

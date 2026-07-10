@@ -1,9 +1,10 @@
+import logging
 import os
 
 os.environ["FASTAPI_CONFIG_PATH"] = "./app.test.conf"  # noqa
 
 from app.config import get_config, set_config
-from typing import Generator
+from typing import Callable, Generator, List
 import inject
 import pytest
 from fastapi import FastAPI
@@ -32,6 +33,39 @@ if not os.path.exists(oprf_path):
 if not conf.pseudonym.master_key:
     conf.pseudonym.master_key = genkey(32)
 set_config(conf)
+
+
+class RecordingHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: List[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@pytest.fixture
+def record_logs() -> Generator[Callable[[str], List[logging.LogRecord]], None, None]:
+    """Attach a recording handler to a specific module logger and return its records.
+
+    The logging dictConfig neither propagates ``app.*`` records to the root logger
+    (so caplog misses them) nor configures the module loggers themselves, so a
+    handler attached there survives ``create_fastapi_app`` re-running dictConfig.
+    """
+    attached: List[tuple[logging.Logger, RecordingHandler]] = []
+
+    def _attach(logger_name: str) -> List[logging.LogRecord]:
+        handler = RecordingHandler()
+        target = logging.getLogger(logger_name)
+        target.addHandler(handler)
+        attached.append((target, handler))
+        return handler.records
+
+    try:
+        yield _attach
+    finally:
+        for target, handler in attached:
+            target.removeHandler(handler)
 
 
 @pytest.fixture

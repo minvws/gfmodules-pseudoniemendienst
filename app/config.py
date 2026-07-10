@@ -21,6 +21,8 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
+    # Deployment environment carried on the PRS-SYS-001 startup event
+    environment: str = Field(default="unknown")
     mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
