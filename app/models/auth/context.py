@@ -5,7 +5,9 @@ from app.models.oin import Oin
 
 @dataclass(frozen=True)
 class AuthenticationClaims:
-    oin: Oin
+    sub: Oin
+    act_sub: str
+    act_cn: str
 
 
 @dataclass(frozen=True)

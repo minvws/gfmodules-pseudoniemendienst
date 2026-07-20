@@ -1,3 +1,4 @@
+from app.models.oin import Oin
 import logging
 from typing import Annotated
 
@@ -37,7 +38,9 @@ def get_auth_ctx(
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)
     claims = AuthenticationClaims(
-        oin=validated_auth_headers.oin,
+        sub=Oin(validated_auth_headers.sub),
+        act_sub=validated_auth_headers.act_sub,
+        act_cn=validated_auth_headers.act_cn,
     )
     ctx = AuthContext(
         claims=claims,

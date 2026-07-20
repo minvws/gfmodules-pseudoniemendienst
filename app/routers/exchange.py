@@ -99,10 +99,10 @@ def receive(
     # check above already guarantees req.recipientOrganization matches the RID,
     # so comparing the verified caller identity against it binds redemption to
     # the recipient.
-    if auth_ctx.claims.oin != req.recipientOrganization:
+    if auth_ctx.claims.sub != req.recipientOrganization:
         logger.warning(
             "caller oin=%s attempted to redeem a RID issued for recipient oin=%s",
-            auth_ctx.claims.oin,
+            auth_ctx.claims.sub,
             req.recipientOrganization,
         )
         raise HTTPException(status_code=403, detail="forbidden")

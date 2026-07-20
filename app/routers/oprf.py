@@ -36,7 +36,7 @@ def post_eval(
     org_service: OrgService = Depends(container.get_org_service),
     oprf_service: OprfService = Depends(container.get_oprf_service),
 ) -> JSONResponse:
-    handelende_oin = str(auth.claims.oin)
+    handelende_oin = str(auth.claims.act_sub)
     doel_oin = str(req.recipientOrganization)
 
     oin = req.recipientOrganization

@@ -2,13 +2,14 @@ from typing import Annotated, Any, Dict, Self
 
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field
-from app.models.oin import Oin
 
 
 class AuthHeaders(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    oin: Annotated[Oin, Field(alias="x-gf-oin")]
+    sub: Annotated[str, Field(alias="x-gf-sub")]
+    act_sub: Annotated[str, Field(alias="x-gf-act-sub")]
+    act_cn: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
 
     @classmethod

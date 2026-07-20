@@ -98,7 +98,7 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_ctx.claims.sub.value:
         raise HTTPException(status_code=403)
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
@@ -131,10 +131,10 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_ctx.claims.sub.value:
         logger.warning(
             "caller oin=%s attempted to delete key %s owned by org %s",
-            auth_ctx.claims.oin,
+            auth_ctx.claims.sub,
             key_id,
             entry.organization_id,
         )
