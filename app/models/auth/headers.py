@@ -3,12 +3,14 @@ from typing import Annotated, Any, Dict, Self
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.oin import Oin
+
 
 class AuthHeaders(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    organization_id: Annotated[str, Field(alias="x-gf-sub")]
-    client_organization_id: Annotated[str, Field(alias="x-gf-act-sub")]
+    organization_id: Annotated[Oin, Field(alias="x-gf-sub")]
+    client_organization_id: Annotated[Oin, Field(alias="x-gf-act-sub")]
     client_organization_common_name: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
 

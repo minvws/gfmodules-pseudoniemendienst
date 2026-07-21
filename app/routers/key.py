@@ -98,7 +98,7 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.organization_id.value:
+    if entry.organization.oin != auth_ctx.claims.organization_id:
         raise HTTPException(status_code=403)
 
     key_resolver.update(entry.id, req.scope, req.pub_key)

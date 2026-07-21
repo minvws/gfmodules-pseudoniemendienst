@@ -292,7 +292,7 @@ def test_oprf_eval_success_emits_audit_event(
     oprf_context: OprfIntegrationContext,
     oprf_event_records: List[logging.LogRecord],
     valid_headers: Dict[str, str],
-    valid_organization_id: Oin,
+    valid_client_organization_id: Oin,
 ) -> None:
     run_oprf_eval_and_unblind(
         client=client,
@@ -307,7 +307,7 @@ def test_oprf_eval_success_emits_audit_event(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert record.handelende_oin == valid_organization_id.value  # type: ignore[attr-defined]
+    assert record.handelende_oin == valid_client_organization_id.value  # type: ignore[attr-defined]
     assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
     assert record.oprf_secret_versie == 1  # type: ignore[attr-defined]
     assert LoggingStreams.SIEM in record.stream  # type: ignore[attr-defined]
@@ -318,7 +318,7 @@ def test_oprf_eval_unknown_scope_emits_refused_event(
     oprf_context: OprfIntegrationContext,
     oprf_event_records: List[logging.LogRecord],
     valid_headers: Dict[str, str],
-    valid_organization_id: Oin,
+    valid_client_organization_id: Oin,
 ) -> None:
     response = client.post(
         "/oprf/eval",
@@ -335,7 +335,7 @@ def test_oprf_eval_unknown_scope_emits_refused_event(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.WARNING
-    assert record.handelende_oin == valid_organization_id.value  # type: ignore[attr-defined]
+    assert record.handelende_oin == valid_client_organization_id.value  # type: ignore[attr-defined]
     assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
     assert record.endpoint == "/oprf/eval"  # type: ignore[attr-defined]
 
@@ -346,7 +346,7 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     oprf_context: OprfIntegrationContext,
     oprf_event_records: List[logging.LogRecord],
     valid_headers: Dict[str, str],
-    valid_organization_id: Oin,
+    valid_client_organization_id: Oin,
 ) -> None:
     class FailingOprfService:
         def eval_blind(
@@ -376,7 +376,7 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     record = events[0]
     assert record.levelno == logging.ERROR
     assert record.error_type == "invalid_blinded_input"  # type: ignore[attr-defined]
-    assert record.handelende_oin == valid_organization_id.value  # type: ignore[attr-defined]
+    assert record.handelende_oin == valid_client_organization_id.value  # type: ignore[attr-defined]
     assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
 
 

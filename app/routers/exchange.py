@@ -99,7 +99,7 @@ def receive(
     # check above already guarantees req.recipientOrganization matches the RID,
     # so comparing the verified caller identity against it binds redemption to
     # the recipient.
-    if auth_ctx.claims.organization_id.value != req.recipientOrganization.value:
+    if auth_ctx.claims.organization_id != req.recipientOrganization:
         logger.warning(
             "caller oin=%s attempted to redeem a RID issued for recipient oin=%s",
             auth_ctx.claims.organization_id,
