@@ -2,7 +2,7 @@ import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 
 from app import container
@@ -32,12 +32,14 @@ def get_auth_ctx(
     try:
         auth_headers = AuthHeaders.from_request(request)
     except ValueError as e:
-        logger.exception(f"Inavalid Authorization Headers in request: {e}")
+        logger.exception(f"Invalid Authorization Headers in request: {e}")
         raise HTTPException(status_code=403, detail="Unauthorized request")
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)
     claims = AuthenticationClaims(
-        oin=validated_auth_headers.oin,
+        organization_id=validated_auth_headers.organization_id,
+        client_organization_id=validated_auth_headers.client_organization_id,
+        client_common_name=validated_auth_headers.client_organization_common_name,
     )
     ctx = AuthContext(
         claims=claims,

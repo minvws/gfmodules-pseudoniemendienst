@@ -1,14 +1,14 @@
 import base64
 import logging
 from datetime import datetime
-from typing import Any, Literal, List
+from typing import Any, List, Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.personal_id import PersonalId
-from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
+from app.services.pseudonym_service import PseudonymType
 
 logger = logging.getLogger(__name__)
 

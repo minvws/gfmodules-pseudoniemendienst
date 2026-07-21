@@ -1,11 +1,11 @@
 import logging
 from typing import Optional
 
+from sqlalchemy import select
+
 from app.db.decorator import repository
 from app.db.entities.organization import Organization
 from app.db.repositories.repository_base import RepositoryBase
-from sqlalchemy import select
-
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)

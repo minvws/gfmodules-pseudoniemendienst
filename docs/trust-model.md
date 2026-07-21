@@ -86,7 +86,7 @@ The correct pattern is to bind every action to the **verified header identity**,
 not to an OIN supplied in the request body or path. For example, the key
 update/delete endpoints compare the resource owner against the verified caller:
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_ctx.claims.sub.value:
         raise HTTPException(status_code=403)
 
 Endpoints that instead take an OIN from the request body/path and act on it

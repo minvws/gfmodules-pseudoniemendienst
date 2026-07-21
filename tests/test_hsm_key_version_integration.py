@@ -11,7 +11,7 @@ per key version, so we can assert exactly which versions end up in the JWE.
 
 import base64
 import json
-from typing import Any
+from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
 from cryptography.hazmat.primitives import serialization
@@ -24,8 +24,8 @@ from starlette.testclient import TestClient
 from app import container
 from app.config import ConfigOprf
 from app.db.db import Database
-from app.rid import RidUsage
 from app.models.oin import Oin
+from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
@@ -85,8 +85,9 @@ def _decrypt_jwe(jwe_str: str, private_key_pem: str) -> dict[str, Any]:
     return dict(json.loads(token.payload.decode("utf-8")))
 
 
-def _eval(client: TestClient) -> Any:
+def _eval(client: TestClient, valid_headers: Dict[str, str]) -> Any:
     blinded = base64.urlsafe_b64encode(b"blinded").decode("ascii")
+    valid_headers["x-gf-sub"] = TEST_OIN.value
     return client.post(
         "/oprf/eval",
         json={
@@ -94,7 +95,7 @@ def _eval(client: TestClient) -> Any:
             "recipientOrganization": RECIPIENT_ORG,
             "recipientScope": SCOPE,
         },
-        headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
 
 
@@ -104,6 +105,7 @@ def test_new_key_version_is_added_to_jwe(
     database: Database,
     org_service: OrgService,
     key_resolver: KeyResolver,
+    valid_headers: Dict[str, str],
 ) -> None:
     # 1. Register an organization with a public key.
     org = org_service.create(
@@ -111,6 +113,7 @@ def test_new_key_version_is_added_to_jwe(
     )
     private_key_pem, public_key_pem = _generate_rsa_keypair()
     key_resolver.create(org.id, [SCOPE], None, public_key_pem)
+    valid_headers["x-gf-sub"] = TEST_OIN.value
 
     # Route OPRF evaluation through a (mocked) HSM that reads its active key
     # versions from the same database the endpoint writes to.
@@ -129,13 +132,13 @@ def test_new_key_version_is_added_to_jwe(
             resp = client.post(
                 "/key-versions",
                 json={"oin": TEST_OIN.value},
-                headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
+                headers=valid_headers,
             )
             assert resp.status_code == 201
             assert resp.json()["version"] == 1
 
             # 3. We get a pseudonym back, carrying only version 1.
-            eval_resp = _eval(client)
+            eval_resp = _eval(client, valid_headers)
             assert eval_resp.status_code == 200
             body = _decrypt_jwe(eval_resp.json()["jwe"], private_key_pem)
             assert body["aud"] == RECIPIENT_ORG
@@ -147,14 +150,14 @@ def test_new_key_version_is_added_to_jwe(
             resp = client.post(
                 "/key-versions",
                 json={"oin": TEST_OIN.value},
-                headers={"x-gf-oin": TEST_OIN.value, "x-gf-audience": "prs.service"},
+                headers=valid_headers,
             )
             assert resp.status_code == 201
             assert resp.json()["version"] == 2
 
             # 5. The JWE now carries version 2 as the subject (latest) and
             #    version 1 as an extra version.
-            eval_resp = _eval(client)
+            eval_resp = _eval(client, valid_headers)
             assert eval_resp.status_code == 200
             body = _decrypt_jwe(eval_resp.json()["jwe"], private_key_pem)
             assert body["subject"] == "pseudonym:eval:" + _eval_v("2")

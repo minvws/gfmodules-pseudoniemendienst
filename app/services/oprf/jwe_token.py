@@ -1,7 +1,8 @@
-from jwcrypto import jwe, jwk
-from typing import Any
 import json
 import time
+from typing import Any
+
+from jwcrypto import jwe, jwk
 
 
 class BlindJwe:

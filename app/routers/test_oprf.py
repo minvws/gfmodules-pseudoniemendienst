@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
-from app.models.requests import InputRequest, ReceiverRequest, JweReceiverRequest
+from app.models.requests import InputRequest, JweReceiverRequest, ReceiverRequest
 from app.personal_id import PersonalId, PersonalIdJSONEncoder
 from app.rid import RidUsage
 from app.services.mtls_service import MtlsService

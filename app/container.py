@@ -6,11 +6,10 @@ import inject
 from app.config import get_config
 from app.db.db import Database
 from app.services.auth.header import AuthHeaderService
-from app.services.mtls_service import MtlsService
-
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
+from app.services.mtls_service import MtlsService
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService

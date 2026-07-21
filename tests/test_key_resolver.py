@@ -2,7 +2,7 @@ from jwcrypto import jwk
 
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver, KeyRequest
+from app.services.key_resolver import KeyRequest, KeyResolver
 from app.services.org_service import OrgService
 
 TEST_PUBKEY = """-----BEGIN PUBLIC KEY-----

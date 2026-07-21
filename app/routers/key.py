@@ -8,10 +8,10 @@ from starlette.responses import JSONResponse
 from app import container
 from app.auth import get_auth_ctx
 from app.models.auth.context import AuthContext
-from app.models.requests import RegisterRequest
 from app.models.oin import Oin
+from app.models.requests import RegisterRequest
+from app.services.key_resolver import AlreadyExistsError, KeyRequest, KeyResolver
 from app.services.mtls_service import MtlsService
-from app.services.key_resolver import KeyResolver, KeyRequest, AlreadyExistsError
 from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ def put_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_ctx.claims.organization_id:
         raise HTTPException(status_code=403)
 
     key_resolver.update(entry.id, req.scope, req.pub_key)
@@ -131,10 +131,10 @@ def delete_key(
         logger.warning("key with id %r not found", key_id)
         raise HTTPException(status_code=404, detail="key not found")
 
-    if entry.organization.oin != auth_ctx.claims.oin.value:
+    if entry.organization.oin != auth_ctx.claims.organization_id:
         logger.warning(
             "caller oin=%s attempted to delete key %s owned by org %s",
-            auth_ctx.claims.oin,
+            auth_ctx.claims.organization_id,
             key_id,
             entry.organization_id,
         )

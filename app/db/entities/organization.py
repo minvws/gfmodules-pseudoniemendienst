@@ -1,13 +1,13 @@
 import uuid
-from typing import Any, List, TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
-from app.db.types.oin import OinType
-from app.models.oin import Oin
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.entities.base import Base
+from app.db.types.oin import OinType
+from app.models.oin import Oin
 
 if TYPE_CHECKING:
     from app.db.entities.organization_key import OrganizationKey

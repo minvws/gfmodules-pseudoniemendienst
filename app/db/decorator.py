@@ -1,4 +1,4 @@
-from typing import Callable, Type, Dict, TypeVar
+from typing import Callable, Dict, Type, TypeVar
 
 from app.db.entities.base import Base
 from app.db.repositories.repository_base import RepositoryBase
