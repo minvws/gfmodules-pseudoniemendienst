@@ -10,9 +10,9 @@ from jwcrypto import jwk
 from app.config import ConfigOprf
 from app.logging.events import SYS_HSM_UNREACHABLE, log_event
 from app.models.oin import Oin
+from app.models.requests import BlindRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.jwe_token import BlindJwe
-from app.models.requests import BlindRequest
 
 logger = logging.getLogger(__name__)
 

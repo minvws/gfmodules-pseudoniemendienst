@@ -2,17 +2,18 @@ import json
 import logging
 import signal
 import sys
-
 from contextlib import asynccontextmanager
 from logging.config import dictConfig
 from pathlib import Path
 from types import TracebackType
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, Depends, Request
-from fastapi.responses import JSONResponse
 import uvicorn
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 
+from app.auth import get_auth_ctx
+from app.config import get_config
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import (
     SYS_APP_CRASHED,
@@ -22,16 +23,13 @@ from app.logging.events import (
     log_event,
 )
 from app.logging.middleware import RequestContextMiddleware
-
 from app.routers.default import router as default_router
+from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
+from app.routers.hsm_key_version import router as hsm_key_version_router
+from app.routers.key import router as key_router
 from app.routers.oprf import router as oprf_router
 from app.routers.test_oprf import router as test_oprf_router
-from app.routers.key import router as key_router
-from app.routers.hsm_key_version import router as hsm_key_version_router
-from app.routers.exchange import router as exchange_router
-from app.config import get_config
-from app.auth import get_auth_ctx
 
 logger = logging.getLogger(__name__)
 

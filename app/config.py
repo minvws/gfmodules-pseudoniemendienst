@@ -1,10 +1,9 @@
-from enum import Enum
 import configparser
 import os
+from enum import Enum
 from typing import Any, List
 
-from pydantic import BaseModel, field_validator
-from pydantic import Field
+from pydantic import BaseModel, Field, field_validator
 
 _PATH = "app.conf"
 _ENVIRONMENT_CONFIG_PATH_NAME = "FASTAPI_CONFIG_PATH"

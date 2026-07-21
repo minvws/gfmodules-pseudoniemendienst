@@ -4,20 +4,19 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Generator, List, Tuple
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.asymmetric import rsa
-from jwcrypto import jwe, jwk
 import pyoprf
 import pytest
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import FastAPI
+from jwcrypto import jwe, jwk
 from starlette.testclient import TestClient
 
+from app import container
 from app.logging.filters import LoggingStreams
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app import container
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfEvaluationError
 from app.services.org_service import OrgService
@@ -29,10 +28,6 @@ class OprfIntegrationContext:
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
-
-
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_VALUE = TEST_OIN.value
 
 
 def generate_rsa_keypair() -> Tuple[str, str]:
@@ -75,6 +70,7 @@ def run_oprf_eval_and_unblind(
     personal_identifier: Dict[str, str],
     recipient_organization: str,
     recipient_scope: str,
+    headers: Dict[str, str],
 ) -> str:
     blind_factor_raw, blinded_input_raw = derive_blind_factor_and_input(
         personal_identifier=personal_identifier,
@@ -91,7 +87,7 @@ def run_oprf_eval_and_unblind(
             "recipientOrganization": recipient_organization,
             "recipientScope": recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=headers,
     )
     assert eval_response.status_code == 200
     token = jwe.JWE()
@@ -131,8 +127,9 @@ def derive_blind_factor_and_input(
 def oprf_context(
     org_service: OrgService,
     key_resolver: KeyResolver,
+    valid_organization_id: Oin,
 ) -> OprfIntegrationContext:
-    recipient_organization = f"oin:{TEST_OIN}"
+    recipient_organization = f"oin:{valid_organization_id}"
     recipient_scope = "nvi"
     personal_identifier = {
         "landCode": "NL",
@@ -142,7 +139,7 @@ def oprf_context(
     private_key_pem = setup_org_and_key(
         org_service=org_service,
         key_resolver=key_resolver,
-        oin=TEST_OIN,
+        oin=valid_organization_id,
         scope=recipient_scope,
     )
     return OprfIntegrationContext(
@@ -156,6 +153,7 @@ def oprf_context(
 def test_oprf_integration_roundtrip_is_stable_for_same_input(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
+    valid_headers: Dict[str, str],
 ) -> None:
 
     pseudonym_1 = run_oprf_eval_and_unblind(
@@ -164,6 +162,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
         personal_identifier=oprf_context.personal_identifier,
         recipient_organization=oprf_context.recipient_organization,
         recipient_scope=oprf_context.recipient_scope,
+        headers=valid_headers,
     )
     pseudonym_2 = run_oprf_eval_and_unblind(
         client=client,
@@ -171,6 +170,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
         personal_identifier=oprf_context.personal_identifier,
         recipient_organization=oprf_context.recipient_organization,
         recipient_scope=oprf_context.recipient_scope,
+        headers=valid_headers,
     )
 
     assert pseudonym_1 == pseudonym_2
@@ -179,6 +179,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
 def test_oprf_eval_invalid_scope_returns_not_found(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
+    valid_headers: Dict[str, str],
 ) -> None:
     _, blinded_input_raw = derive_blind_factor_and_input(
         personal_identifier=oprf_context.personal_identifier,
@@ -194,7 +195,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
             "recipientOrganization": oprf_context.recipient_organization,
             "recipientScope": "invalid-scope",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
 
     assert eval_response.status_code == 404
@@ -205,6 +206,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
 
 def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
     client: TestClient,
+    valid_headers: Dict[str, str],
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
@@ -213,7 +215,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
             "recipientOrganization": "12345678",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
 
     assert eval_response.status_code == 422
@@ -224,6 +226,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
 
 def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_error(
     client: TestClient,
+    valid_headers: Dict[str, str],
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
@@ -232,7 +235,7 @@ def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_erro
             "recipientOrganization": "oin:00000099",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
 
     assert eval_response.status_code == 422
@@ -243,7 +246,9 @@ def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_erro
 
 def test_oprf_eval_unknown_oin_returns_not_found(
     client: TestClient,
+    valid_headers: Dict[str, str],
 ) -> None:
+    valid_headers["x-gf-sub"] = "00000099000000003000"
     eval_response = client.post(
         "/oprf/eval",
         json={
@@ -251,7 +256,7 @@ def test_oprf_eval_unknown_oin_returns_not_found(
             "recipientOrganization": "oin:00000099000000003000",
             "recipientScope": "nvi",
         },
-        headers={"x-gf-oin": "00000099000000003000", "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
 
     assert eval_response.status_code == 404
@@ -286,6 +291,8 @@ def test_oprf_eval_success_emits_audit_event(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
     oprf_event_records: List[logging.LogRecord],
+    valid_headers: Dict[str, str],
+    valid_organization_id: Oin,
 ) -> None:
     run_oprf_eval_and_unblind(
         client=client,
@@ -293,13 +300,14 @@ def test_oprf_eval_success_emits_audit_event(
         personal_identifier=oprf_context.personal_identifier,
         recipient_organization=oprf_context.recipient_organization,
         recipient_scope=oprf_context.recipient_scope,
+        headers=valid_headers,
     )
 
     events = _events(oprf_event_records, "210400")
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert record.handelende_oin == TEST_OIN_VALUE  # type: ignore[attr-defined]
+    assert record.handelende_oin == valid_organization_id.value  # type: ignore[attr-defined]
     assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
     assert record.oprf_secret_versie == 1  # type: ignore[attr-defined]
     assert LoggingStreams.SIEM in record.stream  # type: ignore[attr-defined]
@@ -309,6 +317,8 @@ def test_oprf_eval_unknown_scope_emits_refused_event(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
     oprf_event_records: List[logging.LogRecord],
+    valid_headers: Dict[str, str],
+    valid_organization_id: Oin,
 ) -> None:
     response = client.post(
         "/oprf/eval",
@@ -317,7 +327,7 @@ def test_oprf_eval_unknown_scope_emits_refused_event(
             "recipientOrganization": oprf_context.recipient_organization,
             "recipientScope": "invalid-scope",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
 
     assert response.status_code == 404
@@ -325,7 +335,7 @@ def test_oprf_eval_unknown_scope_emits_refused_event(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.WARNING
-    assert record.handelende_oin == TEST_OIN_VALUE  # type: ignore[attr-defined]
+    assert record.handelende_oin == valid_organization_id.value  # type: ignore[attr-defined]
     assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
     assert record.endpoint == "/oprf/eval"  # type: ignore[attr-defined]
 
@@ -335,9 +345,13 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
     oprf_event_records: List[logging.LogRecord],
+    valid_headers: Dict[str, str],
+    valid_organization_id: Oin,
 ) -> None:
     class FailingOprfService:
-        def eval_blind(self, req: object, pub_key_jwk: object, pub_key_id: str|None) -> str:
+        def eval_blind(
+            self, req: object, pub_key_jwk: object, pub_key_id: str | None
+        ) -> str:
             raise OprfEvaluationError(
                 "invalid blinded input", error_type="invalid_blinded_input"
             )
@@ -351,7 +365,7 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
                 "recipientOrganization": oprf_context.recipient_organization,
                 "recipientScope": oprf_context.recipient_scope,
             },
-            headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+            headers=valid_headers,
         )
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)
@@ -362,7 +376,7 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     record = events[0]
     assert record.levelno == logging.ERROR
     assert record.error_type == "invalid_blinded_input"  # type: ignore[attr-defined]
-    assert record.handelende_oin == TEST_OIN_VALUE  # type: ignore[attr-defined]
+    assert record.handelende_oin == valid_organization_id.value  # type: ignore[attr-defined]
     assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
 
 
@@ -370,9 +384,12 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
+    valid_headers: Dict[str, str],
 ) -> None:
     class FailingOprfService:
-        def eval_blind(self, req: object, pub_key_jwk: object, pub_key_id: str|None) -> str:
+        def eval_blind(
+            self, req: object, pub_key_jwk: object, pub_key_id: str | None
+        ) -> str:
             raise ValueError("invalid blinded input")
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
@@ -384,7 +401,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
                 "recipientOrganization": oprf_context.recipient_organization,
                 "recipientScope": oprf_context.recipient_scope,
             },
-            headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+            headers=valid_headers,
         )
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)

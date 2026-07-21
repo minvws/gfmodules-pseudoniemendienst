@@ -1,10 +1,10 @@
 import logging
 import random
 from time import sleep
-from typing import Callable, Any, TypeVar, Type
+from typing import Any, Callable, Type, TypeVar
 
 from sqlalchemy import Engine, Result
-from sqlalchemy.exc import OperationalError, DatabaseError, PendingRollbackError
+from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
 
 from app.config import get_config

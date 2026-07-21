@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app.db.entities.organization import Organization
-from app.services.org_service import OrgService
 from app.models.oin import Oin
+from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
 

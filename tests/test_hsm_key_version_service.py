@@ -13,7 +13,6 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.oprf_service import OprfService
 
-
 TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
 TEST_OIN_111 = Oin("00000099000000011000")

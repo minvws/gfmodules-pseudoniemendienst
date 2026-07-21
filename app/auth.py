@@ -1,14 +1,14 @@
-from app.models.oin import Oin
 import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 
 from app import container
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.headers import AuthHeaders
+from app.models.oin import Oin
 from app.services.auth.header import AuthHeaderService
 
 logger = logging.getLogger(__name__)
@@ -38,9 +38,9 @@ def get_auth_ctx(
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)
     claims = AuthenticationClaims(
-        sub=Oin(validated_auth_headers.sub),
-        act_sub=validated_auth_headers.act_sub,
-        act_cn=validated_auth_headers.act_cn,
+        organization_id=Oin(validated_auth_headers.organization_id),
+        client_organization_id=Oin(validated_auth_headers.client_organization_id),
+        client_common_name=validated_auth_headers.client_organization_common_name,
     )
     ctx = AuthContext(
         claims=claims,

@@ -1,14 +1,15 @@
 from typing import cast
 
+from pydantic import ValidationError
+
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.services.pseudonym_service import PseudonymType
 from app.models.requests import (
     BlindRequest,
     ExchangeRequest,
     RegisterRequest,
     RidExchangeRequest,
 )
-from pydantic import ValidationError
+from app.services.pseudonym_service import PseudonymType
 
 
 def test_blind_request_encrypted_personal_id_is_normalized() -> None:

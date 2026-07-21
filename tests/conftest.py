@@ -1,21 +1,24 @@
 import logging
 import os
 
+from app.models.oin import Oin
+
 os.environ["FASTAPI_CONFIG_PATH"] = "./app.test.conf"  # noqa
 
-from app.config import get_config, set_config
-from typing import Callable, Generator, List
+import base64
+import secrets
+from typing import Callable, Dict, Generator, List
+
 import inject
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from app.db.repositories.org_key_repository import OrganizationKeyRepository
-from app.services.org_service import OrgService
-from app.db.db import Database
-from app.services.key_resolver import KeyResolver
 
-import secrets
-import base64
+from app.config import get_config, set_config
+from app.db.db import Database
+from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.services.key_resolver import KeyResolver
+from app.services.org_service import OrgService
 
 
 def genkey(len: int) -> str:
@@ -118,3 +121,32 @@ def repo(key_resolver: KeyResolver) -> OrganizationKeyRepository:
 @pytest.fixture
 def org_service(database: Database) -> OrgService:
     return OrgService(database)
+
+
+@pytest.fixture
+def valid_organization_id() -> Oin:
+    return Oin("00000099000000002000")
+
+
+@pytest.fixture
+def valid_client_organization_id() -> Oin:
+    return Oin("00000099000000001000")
+
+
+@pytest.fixture
+def valid_client_common_name() -> str:
+    return "client_common_name"
+
+
+@pytest.fixture
+def valid_headers(
+    valid_organization_id: Oin,
+    valid_client_organization_id: Oin,
+    valid_client_common_name: str,
+) -> Dict[str, str]:
+    return {
+        "x-gf-sub": valid_organization_id.value,
+        "x-gf-act-sub": valid_client_organization_id.value,
+        "x-gf-act-cn": valid_client_common_name,
+        "x-gf-audience": "prs.service",
+    }

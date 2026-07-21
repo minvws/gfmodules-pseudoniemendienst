@@ -7,9 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field
 class AuthHeaders(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    sub: Annotated[str, Field(alias="x-gf-sub")]
-    act_sub: Annotated[str, Field(alias="x-gf-act-sub")]
-    act_cn: Annotated[str, Field(alias="x-gf-act-cn")]
+    organization_id: Annotated[str, Field(alias="x-gf-sub")]
+    client_organization_id: Annotated[str, Field(alias="x-gf-act-sub")]
+    client_organization_common_name: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
 
     @classmethod

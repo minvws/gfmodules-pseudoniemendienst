@@ -8,7 +8,6 @@ from jwcrypto import jwk
 
 from app.config import ConfigOprf
 from app.logging.events import (
-    PRSEvent,
     HEALTH_UNHEALTHY,
     OPRF_EVAL_FAILED,
     OPRF_EVAL_OK,
@@ -19,6 +18,7 @@ from app.logging.events import (
     SYS_DB_CONNECTION_FAILED,
     SYS_HSM_UNREACHABLE,
     SYS_UNHANDLED_EXCEPTION,
+    PRSEvent,
     log_event,
 )
 from app.logging.filters import LoggingStreams

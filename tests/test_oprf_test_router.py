@@ -3,12 +3,11 @@ import json
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.asymmetric import rsa
 import pyoprf
 import pytest
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from starlette.testclient import TestClient
 
 from app.models.oin import Oin
@@ -91,11 +90,12 @@ def oprf_test_router_context(
 def test_test_oprf_client_and_receiver_roundtrip(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
+    valid_headers: Dict[str, str],
 ) -> None:
     client_response = client.post(
         "/test/oprf/client",
         json={"personalId": oprf_test_router_context.personal_identifier},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
     assert client_response.status_code == 200
 
@@ -109,7 +109,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
     assert eval_response.status_code == 200
     jwe_token = eval_response.json()["jwe"]
@@ -121,7 +121,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
             "jwe": jwe_token,
             "priv_key_pem": oprf_test_router_context.private_key_pem,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
     assert receiver_response.status_code == 200
 
@@ -138,6 +138,7 @@ def test_test_oprf_client_and_receiver_roundtrip(
 def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
+    valid_headers: Dict[str, str],
 ) -> None:
     info = (
         f"{oprf_test_router_context.recipient_organization}|"
@@ -160,7 +161,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "recipientOrganization": oprf_test_router_context.recipient_organization,
             "recipientScope": oprf_test_router_context.recipient_scope,
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
     assert eval_response.status_code == 200
 
@@ -171,7 +172,7 @@ def test_test_oprf_receiver_invalid_private_key(
             "jwe": eval_response.json()["jwe"],
             "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=valid_headers,
     )
     assert receiver_response.status_code == 200
     assert receiver_response.json()["jwe"]["decrypted"].startswith(

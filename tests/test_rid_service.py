@@ -1,9 +1,9 @@
 import base64
+
 import pytest
 from Crypto.Random import get_random_bytes
 
 from app.services.rid_service import RidService
-
 
 AES_KEY_SIZE = 32
 

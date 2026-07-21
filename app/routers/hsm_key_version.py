@@ -33,11 +33,11 @@ def post_key_version(
     ),
 ) -> JSONResponse:
     # An organization may only manage its own key versions. The OIN in the
-    # request body must match the verified caller identity (x-gf-oin).
-    if req.oin != auth_ctx.claims.sub:
+    # request body must match the verified caller identity (x-gf-sub).
+    if req.oin != auth_ctx.claims.organization_id:
         logger.warning(
             "caller oin=%s attempted to create a key version for oin=%s",
-            auth_ctx.claims.sub,
+            auth_ctx.claims.organization_id,
             req.oin,
         )
         raise HTTPException(status_code=403, detail="forbidden")
@@ -70,10 +70,10 @@ def list_key_versions(
     org_service: OrgService = Depends(container.get_org_service),
 ) -> JSONResponse:
     # An organization may only list its own key versions.
-    if oin != auth_ctx.claims.sub:
+    if oin != auth_ctx.claims.organization_id:
         logger.warning(
             "caller oin=%s attempted to list key versions for oin=%s",
-            auth_ctx.claims.sub,
+            auth_ctx.claims.organization_id,
             oin,
         )
         raise HTTPException(status_code=403, detail="forbidden")
@@ -109,10 +109,10 @@ def put_key_version(
         logger.warning("key version with id %r not found", id)
         raise HTTPException(status_code=404, detail="key version not found")
 
-    if existing.oin != auth_ctx.claims.sub:
+    if existing.oin != auth_ctx.claims.organization_id:
         logger.warning(
             "caller oin=%s attempted to update key version %s owned by oin=%s",
-            auth_ctx.claims.sub,
+            auth_ctx.claims.organization_id,
             id,
             existing.oin,
         )

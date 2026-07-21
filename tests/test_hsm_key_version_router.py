@@ -10,11 +10,21 @@ from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
+TEST_CLIENT_OIN = Oin("00000099000000002000")
 TEST_OIN_VALUE = TEST_OIN.value
+TEST_CLIENT_ID = TEST_CLIENT_OIN.value
+TEST_CLIENT_CN = "client_cn"
 
 # A different, valid OIN used to act as an unauthorized caller.
 OTHER_OIN = Oin("00000099000000002000")
 OTHER_OIN_VALUE = OTHER_OIN.value
+
+TEST_CLIENT_HEADERS = {
+    "x-gf-sub": TEST_OIN_VALUE,
+    "x-gf-act-sub": TEST_CLIENT_ID,
+    "x-gf-act-cn": TEST_CLIENT_CN,
+    "x-gf-audience": "prs.service",
+}
 
 
 def test_create_first_version(
@@ -29,7 +39,7 @@ def test_create_first_version(
     response = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 201
@@ -53,12 +63,12 @@ def test_create_increments_version(
     first = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
     second = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert first.json()["version"] == 1
@@ -83,7 +93,7 @@ def test_create_with_explicit_window(
             "from_dt": from_dt.isoformat(),
             "until_dt": until_dt.isoformat(),
         },
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 201
@@ -96,7 +106,7 @@ def test_create_unknown_org_returns_404(client: TestClient, database: Database) 
     response = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 404
@@ -107,7 +117,7 @@ def test_create_invalid_oin_returns_422(client: TestClient, database: Database) 
     response = client.post(
         "/key-versions",
         json={"oin": "not-a-oin"},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 422
@@ -125,7 +135,7 @@ def test_create_persists_version(
     client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     service = HsmKeyVersionService(database)
@@ -144,14 +154,14 @@ def test_update_sets_removed_and_until_dt(
     created = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     ).json()
 
     until_dt = datetime(2027, 1, 1, tzinfo=timezone.utc)
     response = client.put(
         f"/key-versions/{created['id']}",
         json={"removed": True, "until_dt": until_dt.isoformat()},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 200
@@ -177,13 +187,13 @@ def test_update_clears_until_dt(
     created = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE, "until_dt": until_dt.isoformat()},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     ).json()
 
     response = client.put(
         f"/key-versions/{created['id']}",
         json={"removed": False},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 200
@@ -198,7 +208,7 @@ def test_update_unknown_version_returns_404(
     response = client.put(
         f"/key-versions/{uuid.uuid4()}",
         json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 404
@@ -210,7 +220,7 @@ def test_update_invalid_id_returns_422(client: TestClient, database: Database) -
     response = client.put(
         "/key-versions/not-a-uuid",
         json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 422
@@ -227,17 +237,17 @@ def test_list_versions_returns_all_for_org(
     client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
     client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     response = client.get(
         f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 200
@@ -257,17 +267,17 @@ def test_list_versions_includes_removed(
     created = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     ).json()
     client.put(
         f"/key-versions/{created['id']}",
         json={"removed": True},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     response = client.get(
         f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 200
@@ -287,7 +297,7 @@ def test_list_versions_empty_for_org_without_versions(
 
     response = client.get(
         f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 200
@@ -299,7 +309,7 @@ def test_list_versions_unknown_org_returns_404(
 ) -> None:
     response = client.get(
         f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     )
 
     assert response.status_code == 404
@@ -314,7 +324,7 @@ def test_create_for_other_org_is_forbidden(
     response = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers={**TEST_CLIENT_HEADERS, "x-gf-sub": OTHER_OIN_VALUE},
     )
 
     assert response.status_code == 403
@@ -326,7 +336,7 @@ def test_list_for_other_org_is_forbidden(
     # Caller is verified as OTHER_OIN but tries to list TEST_OIN's key versions.
     response = client.get(
         f"/key-versions/{TEST_OIN_VALUE}",
-        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers={**TEST_CLIENT_HEADERS, "x-gf-sub": OTHER_OIN_VALUE},
     )
 
     assert response.status_code == 403
@@ -344,14 +354,14 @@ def test_update_other_orgs_version_is_forbidden(
     created = client.post(
         "/key-versions",
         json={"oin": TEST_OIN_VALUE},
-        headers={"x-gf-oin": TEST_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers=TEST_CLIENT_HEADERS,
     ).json()
 
     # ...cannot be updated by a caller verified as a different organization.
     response = client.put(
         f"/key-versions/{created['id']}",
         json={"removed": True},
-        headers={"x-gf-oin": OTHER_OIN_VALUE, "x-gf-audience": "prs.service"},
+        headers={**TEST_CLIENT_HEADERS, "x-gf-sub": OTHER_OIN_VALUE},
     )
 
     assert response.status_code == 403

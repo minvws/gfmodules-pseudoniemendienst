@@ -1,8 +1,8 @@
 import logging
 from typing import Callable, List
 
-from pytest import MonkeyPatch
 from fastapi.testclient import TestClient
+from pytest import MonkeyPatch
 
 RecordLogs = Callable[[str], List[logging.LogRecord]]
 

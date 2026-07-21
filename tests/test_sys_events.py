@@ -91,7 +91,9 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
                 "recipientScope": "nvi",
             },
             headers={
-                "x-gf-oin": "00000099000000001000",
+                "x-gf-sub": "00000099000000001000",
+                "x-gf-act-sub": "00000099000000001000",
+                "x-gf-act-cn": "00000099000000001000",
                 "x-gf-audience": "prs.service",
             },
         )

@@ -1,13 +1,13 @@
 import logging
 import uuid
-from typing import Sequence, Optional
+from typing import Optional, Sequence
 
+from sqlalchemy import literal, or_, select
 from sqlalchemy.dialects.postgresql.json import JSONB
 
 from app.db.decorator import repository
 from app.db.entities.organization_key import OrganizationKey
 from app.db.repositories.repository_base import RepositoryBase
-from sqlalchemy import select, or_, literal
 
 logger = logging.getLogger(__name__)
 
