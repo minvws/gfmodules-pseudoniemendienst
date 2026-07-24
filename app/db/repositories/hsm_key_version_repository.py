@@ -3,9 +3,9 @@ import uuid
 from datetime import datetime
 from typing import Optional, Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, insert, literal, or_, select, update
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.orm import joinedload
-
 from app.db.decorator import repository
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
@@ -17,38 +17,71 @@ logger = logging.getLogger(__name__)
 
 @repository(HsmKeyVersion)
 class HsmKeyVersionRepository(RepositoryBase):
+    @staticmethod
+    def _active_filter(at: datetime) -> ColumnElement[bool]:
+        return and_(
+            HsmKeyVersion.removed.is_(False),
+            HsmKeyVersion.from_dt <= at,
+            or_(HsmKeyVersion.until_dt.is_(None), HsmKeyVersion.until_dt > at),
+        )
+
+    @staticmethod
+    def _expired_filter(at: datetime) -> ColumnElement[bool]:
+        return and_(
+            HsmKeyVersion.removed.is_(False),
+            HsmKeyVersion.until_dt.is_not(None),
+            HsmKeyVersion.until_dt <= at,
+        )
+
     def get_active_versions(
-        self, at: datetime, oin: Oin | None = None
+        self,
+        at: datetime,
+        organization_id: uuid.UUID,
     ) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that are active at the given moment, i.e. not
         removed, already started (from_dt <= at) and not yet ended (until_dt is
-        unset or still in the future). When a OIN is supplied, only the versions
-        belonging to that organization are returned.
+        unset or still in the future), restricted to organization_id.
         """
         query = (
             select(HsmKeyVersion)
-            .options(joinedload(HsmKeyVersion.organization))
             .where(
-                HsmKeyVersion.removed.is_(False),
-                HsmKeyVersion.from_dt <= at,
-                or_(HsmKeyVersion.until_dt.is_(None), HsmKeyVersion.until_dt >= at),
+                HsmKeyVersion.organization_id == organization_id,
+                HsmKeyVersionRepository._active_filter(at),
             )
+            .order_by(HsmKeyVersion.version)
         )
-        if oin is not None:
-            query = query.join(Organization).where(Organization.oin == oin)
         return self.db_session.execute(query).scalars().all()
 
-    def get_by_oin(self, oin: Oin) -> Sequence[HsmKeyVersion]:
+    def get_active_versions_by_organization_oin(
+        self,
+        at: datetime,
+        organization_oin: Oin,
+    ) -> Sequence[HsmKeyVersion]:
         """
-        Returns all key versions belonging to the organization with the given OIN,
-        regardless of date or removed state, ordered by version number.
+        Returns all active key versions for the organization with the provided OIN.
         """
         query = (
             select(HsmKeyVersion)
-            .options(joinedload(HsmKeyVersion.organization))
-            .join(Organization)
-            .where(Organization.oin == oin)
+            .join(HsmKeyVersion.organization)
+            .where(
+                Organization.oin == organization_oin,
+                HsmKeyVersionRepository._active_filter(at),
+            )
+            .order_by(HsmKeyVersion.version)
+        )
+        return self.db_session.execute(query).scalars().all()
+
+    def get_by_organization_id(
+        self, organization_id: uuid.UUID
+    ) -> Sequence[HsmKeyVersion]:
+        """
+        Returns all key versions for the given organization UUID, regardless of
+        date or removed state, ordered by version number.
+        """
+        query = (
+            select(HsmKeyVersion)
+            .where(HsmKeyVersion.organization_id == organization_id)
             .order_by(HsmKeyVersion.version)
         )
         return self.db_session.execute(query).scalars().all()
@@ -56,102 +89,184 @@ class HsmKeyVersionRepository(RepositoryBase):
     def get_expired_versions(self, at: datetime) -> Sequence[HsmKeyVersion]:
         """
         Returns all key versions that have passed their end date (until_dt is set
-        and in the past) but have not been removed yet. The organization is eagerly
-        loaded so its OIN stays available after the session is closed.
+        and in the past) but have not been removed yet.
         """
         query = (
             select(HsmKeyVersion)
-            .options(joinedload(HsmKeyVersion.organization))
             .where(
-                HsmKeyVersion.removed.is_(False),
-                HsmKeyVersion.until_dt.is_not(None),
-                HsmKeyVersion.until_dt < at,
+                HsmKeyVersionRepository._expired_filter(at),
             )
+            .options(joinedload(HsmKeyVersion.organization))
         )
         return self.db_session.execute(query).scalars().all()
 
-    def get_max_version(self, organization_id: uuid.UUID) -> int:
+    def get_active_or_create_version_numbers_by_organization_id(
+        self,
+        organization_id: uuid.UUID,
+        at: datetime,
+    ) -> Sequence[int]:
         """
-        Returns the highest version number currently stored for the given
-        organization, or 0 when no versions exist yet.
+        Returns active version numbers at `at` for the organization. When no
+        active version exists, atomically creates a new one and returns its
+        version number.
         """
-        query = select(func.max(HsmKeyVersion.version)).where(
-            HsmKeyVersion.organization_id == organization_id
+        active_versions = (
+            select(HsmKeyVersion.version)
+            .where(
+                HsmKeyVersion.organization_id == organization_id,
+                HsmKeyVersionRepository._active_filter(at),
+            )
+            .order_by(HsmKeyVersion.version)
+            .cte("active_versions")
         )
-        return self.db_session.execute(query).scalar() or 0
+
+        next_version = (
+            select(func.max(HsmKeyVersion.version) + 1)
+            .where(HsmKeyVersion.organization_id == organization_id)
+            .scalar_subquery()
+        )
+
+        created_versions = (
+            insert(HsmKeyVersion)
+            .from_select(
+                [
+                    HsmKeyVersion.id,
+                    HsmKeyVersion.organization_id,
+                    HsmKeyVersion.version,
+                    HsmKeyVersion.from_dt,
+                    HsmKeyVersion.until_dt,
+                    HsmKeyVersion.removed,
+                ],
+                select(
+                    literal(uuid.uuid4()),
+                    literal(organization_id),
+                    func.coalesce(next_version, 1),
+                    literal(at),
+                    literal(None),
+                    literal(False),
+                ).where(~select(active_versions.c.version).limit(1).exists()),
+            )
+            .returning(HsmKeyVersion.version)
+            .cte("created_version")
+        )
+
+        rows = (
+            select(active_versions.c.version)
+            .union_all(select(created_versions.c.version))
+            .order_by(active_versions.c.version)
+        )
+
+        return (
+            self.db_session.execute(select(HsmKeyVersion.version).from_statement(rows))
+            .scalars()
+            .all()
+        )
 
     def create(
         self,
         organization_id: uuid.UUID,
-        version: int,
         from_dt: datetime,
         until_dt: Optional[datetime] = None,
     ) -> HsmKeyVersion:
         """
-        Inserts a new key version entry for the given organization.
+        Inserts a new key version entry for the given organization id.
         """
-        entry = HsmKeyVersion(
-            organization_id=organization_id,
-            version=version,
-            from_dt=from_dt,
-            until_dt=until_dt,
+        next_version = (
+            select(func.max(HsmKeyVersion.version) + 1)
+            .where(HsmKeyVersion.organization_id == organization_id)
+            .scalar_subquery()
         )
-        self.db_session.add(entry)
-        self.db_session.flush()
 
-        logger.info(
-            "created hsm key version %s for organization %s", version, organization_id
+        statement = (
+            insert(HsmKeyVersion)
+            .values(
+                organization_id=organization_id,
+                version=func.coalesce(next_version, 1),
+                from_dt=from_dt,
+                until_dt=until_dt,
+            )
+            .returning(HsmKeyVersion)
         )
+
+        entry: HsmKeyVersion = self.db_session.execute(statement).scalars().one()
+        logger.info("created hsm key version for organization %s", organization_id)
         return entry
 
     def get_by_id(self, version_id: uuid.UUID) -> Optional[HsmKeyVersion]:
         """
-        Fetches a single key version by its unique ID, eagerly loading the
-        organization so it remains available after the session is closed.
+        Fetches a single key version by its unique ID.
         """
-        query = (
-            select(HsmKeyVersion)
-            .options(joinedload(HsmKeyVersion.organization))
-            .where(HsmKeyVersion.id == version_id)
-        )
+        query = select(HsmKeyVersion).where(HsmKeyVersion.id == version_id)
         return self.db_session.execute(query).scalars().first()
 
     def update(
         self,
         version_id: uuid.UUID,
+        organization_id: uuid.UUID,
         until_dt: Optional[datetime],
-        removed: bool,
     ) -> Optional[HsmKeyVersion]:
         """
-        Updates the end date and removed flag of an existing key version.
-        Returns None when no version exists for the given ID.
+        Updates the end date of an existing active key version for the
+        organization identified by organization_id.
         """
-        entry = self.get_by_id(version_id)
+        statement = (
+            update(HsmKeyVersion)
+            .where(
+                and_(
+                    HsmKeyVersion.id == version_id,
+                    HsmKeyVersion.removed.is_(False),
+                    HsmKeyVersion.organization_id == organization_id,
+                )
+            )
+            .values(until_dt=until_dt)
+            .returning(HsmKeyVersion)
+        )
+
+        entry: Optional[HsmKeyVersion] = (
+            self.db_session.execute(statement).scalars().one_or_none()
+        )
         if entry is None:
-            logger.warning("hsm key version with id %s does not exist", version_id)
+            logger.warning(
+                "hsm key version %s for organization_id %s does not exist",
+                version_id,
+                organization_id,
+            )
             return None
 
-        entry.until_dt = until_dt
-        entry.removed = removed
-        self.db_session.add(entry)
-        self.db_session.flush()
-
-        logger.info("updated hsm key version %s", version_id)
+        logger.info(
+            "updated hsm key version %s for organization_id %s",
+            version_id,
+            organization_id,
+        )
         return entry
 
-    def mark_removed(self, version_id: uuid.UUID) -> Optional[HsmKeyVersion]:
+    def mark_removed(
+        self,
+        version_id: uuid.UUID,
+    ) -> Optional[HsmKeyVersion]:
         """
         Flags an existing key version as removed, leaving its dates untouched.
-        Returns None when no version exists for the given ID.
+        Returns ``None`` when no version exists for that ID.
         """
-        entry = self.get_by_id(version_id)
+        statement = (
+            update(HsmKeyVersion)
+            .where(
+                and_(
+                    HsmKeyVersion.id == version_id,
+                    HsmKeyVersion.removed.is_(False),
+                )
+            )
+            .values(removed=True)
+            .returning(HsmKeyVersion)
+        )
+
+        entry: Optional[HsmKeyVersion] = (
+            self.db_session.execute(statement).scalars().one_or_none()
+        )
         if entry is None:
-            logger.warning("hsm key version with id %s does not exist", version_id)
+            logger.warning("hsm key version %s does not exist", version_id)
             return None
 
-        entry.removed = True
-        self.db_session.add(entry)
-        self.db_session.flush()
-
         logger.info("marked hsm key version %s as removed", version_id)
+
         return entry

@@ -38,9 +38,12 @@ class HsmKeyCleanupService:
         cleaned = 0
         for version in expired:
             try:
-                label = HsmKeyLabel(version.oin, version.version)
+                label = HsmKeyLabel(version.organization.oin, version.version)
             except ValueError:
-                logger.exception("Value %r is not a correct OIN number", version.oin)
+                logger.exception(
+                    "Value %r is not a correct OIN number",
+                    version.organization.oin,
+                )
                 continue
 
             try:

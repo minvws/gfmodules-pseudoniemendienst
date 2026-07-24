@@ -3,7 +3,7 @@ import uuid
 from typing import List, Optional, Sequence
 
 from jwcrypto import jwk
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.db.db import Database
 from app.db.entities.organization_key import OrganizationKey
@@ -25,7 +25,8 @@ def _normalize_scope(items: List[str]) -> List[str]:
 
 
 class KeyRequest(BaseModel):
-    organization: str = Field(..., min_length=2)
+    model_config = ConfigDict(extra="forbid")
+
     scope: List[str] = Field(...)
     pub_key: str = Field(..., min_length=32)
     max_key_usage: Optional[RidUsage] = None
@@ -46,8 +47,7 @@ class KeyRequest(BaseModel):
     @classmethod
     def validate_pub_key(cls, v: str) -> str:
         try:
-            v = v.strip()
-            key = jwk.JWK.from_pem(v.encode("ascii"))
+            key = jwk.JWK.from_pem(v.strip().encode("ascii"))
         except Exception as e:
             logger.exception("invalid PEM encoded public key")
             raise ValueError(f"must be a valid PEM encoded public key: {e}")
@@ -98,13 +98,17 @@ class KeyResolver:
         self, org_id: uuid.UUID, scope: list[str], key_id: Optional[str], key_data: str
     ) -> OrganizationKey:
         scope = _normalize_scope(scope)
-        key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
             try:
-                entry = session.get_repository(OrganizationKeyRepository).create(
-                    org_id, scope, key_data, key_id
-                )
+                repository = session.get_repository(OrganizationKeyRepository)
+                if repository.has_overlapping_scope(org_id, scope):
+                    raise AlreadyExistsError(
+                        f"key for org/scope already exists: scope {scope}"
+                    )
+                entry = repository.create(org_id, scope, key_data, key_id)
+            except AlreadyExistsError:
+                raise
             except Exception as e:
                 logger.exception(
                     "failed to create key entry for org %s and scope %r",
@@ -116,15 +120,40 @@ class KeyResolver:
             return entry
 
     def update(
-        self, key_id: uuid.UUID, scope: list[str], key_data: str
+        self,
+        key_id: uuid.UUID,
+        organization_id: uuid.UUID,
+        scope: list[str],
+        key_data: str,
     ) -> Optional[OrganizationKey]:
         scope = _normalize_scope(scope)
-        key_data = key_data.strip()
 
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).update(
-                key_id, scope, key_data
+            repository = session.get_repository(OrganizationKeyRepository)
+
+            existing = repository.has_overlapping_scope(organization_id, scope, key_id)
+            if existing:
+                raise AlreadyExistsError(
+                    f"key for org/scope already exists: scope {scope}"
+                )
+
+            entry = repository.update(
+                key_id,
+                organization_id,
+                scope,
+                key_data,
             )
+            if entry is None:
+                current = repository.get_by_id(key_id)
+                if current is not None:
+                    logger.warning(
+                        "caller org %s attempted to update key %s owned by org %s",
+                        organization_id,
+                        key_id,
+                        current.organization_id,
+                    )
+
+                return None
             session.commit()
             return entry
 
@@ -140,11 +169,21 @@ class KeyResolver:
             )
             return entries
 
-    def delete(self, key_id: uuid.UUID) -> bool:
+    def delete(self, key_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
         with self.db.get_db_session() as session:
-            entry = session.get_repository(OrganizationKeyRepository).get_by_id(key_id)
-            if entry is None:
+            repository = session.get_repository(OrganizationKeyRepository)
+            deleted = repository.delete(key_id, organization_id)
+            if not deleted:
+                entry = repository.get_by_id(key_id)
+                if entry is not None:
+                    logger.warning(
+                        "caller org %s attempted to delete key %s owned by org %s",
+                        organization_id,
+                        key_id,
+                        entry.organization_id,
+                    )
+
                 return False
-            session.delete(entry)
+
             session.commit()
             return True
