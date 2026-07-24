@@ -14,9 +14,11 @@ from sqlalchemy.exc import DatabaseError, OperationalError
 from app import container
 from app.config import ConfigOprf, get_config
 from app.db.db import Database
-from app.models.oin import RecipientOrganizationOin
+from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
+from app.rid import RidUsage
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.org_service import OrgService
 
 RecordLogs = Callable[[str], List[logging.LogRecord]]
 
@@ -144,14 +146,27 @@ def test_db_retry_emits_connection_events(
     assert gave_up.retry_attempt == 2  # type: ignore[attr-defined]
 
 
-def test_hsm_unreachable_emits_sys_event(record_logs: RecordLogs) -> None:
+def test_hsm_unreachable_emits_sys_event(
+    record_logs: RecordLogs,
+    org_service: OrgService,
+) -> None:
     records = record_logs("app.services.oprf.oprf_service")
     hsm_key_version_service = MagicMock()
-    hsm_key_version_service.get_active_versions.return_value = [MagicMock(version=1)]
+    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id.return_value = [
+        1
+    ]
+
+    org_service.create(
+        oin=Oin("00000099000000001000"),
+        name="recipient org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
+    )
+
     service = OprfService(
         server_key=None,
         hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
         hsm_key_version_service=hsm_key_version_service,
+        org_service=org_service,
     )
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())

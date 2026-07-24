@@ -71,7 +71,10 @@ def container_config(binder: inject.Binder) -> None:
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
 
-    hsm_key_cleanup_service = HsmKeyCleanupService(config.oprf, hsm_key_version_service)
+    hsm_key_cleanup_service = HsmKeyCleanupService(
+        config.oprf,
+        hsm_key_version_service,
+    )
     binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
 
     auth_header_service = AuthHeaderService(
@@ -84,6 +87,7 @@ def container_config(binder: inject.Binder) -> None:
             server_key=None,
             hsm_config=config.oprf,
             hsm_key_version_service=hsm_key_version_service,
+            org_service=org_service,
         )
     else:
         try:

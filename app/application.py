@@ -26,8 +26,8 @@ from app.logging.middleware import RequestContextMiddleware
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
-from app.routers.hsm_key_version import router as hsm_key_version_router
-from app.routers.key import router as key_router
+from app.routers.administration.hsm_key_version import router as hsm_key_version_router
+from app.routers.administration.key import router as key_router
 from app.routers.oprf import router as oprf_router
 from app.routers.test_oprf import router as test_oprf_router
 
@@ -337,8 +337,6 @@ def setup_fastapi() -> FastAPI:
     # OAuth protected routes
     routers = [
         oprf_router,
-        key_router,
-        hsm_key_version_router,
     ]
     if config.app.enable_exchange_services_routes:
         routers.append(exchange_router)
@@ -347,5 +345,19 @@ def setup_fastapi() -> FastAPI:
 
     for router in routers:
         fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])
+
+    # OAuth protected administration routes
+    # TODO: Add protection based on scopes for these routes so not all organization
+    # clients are allowed to use these
+    administration_routers = [
+        key_router,
+        hsm_key_version_router,
+    ]
+    for router in administration_routers:
+        fastapi.include_router(
+            router,
+            prefix="/administration",
+            dependencies=[Depends(get_auth_ctx)],
+        )
 
     return fastapi

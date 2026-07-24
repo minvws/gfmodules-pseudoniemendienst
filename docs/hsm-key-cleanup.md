@@ -1,13 +1,13 @@
 # Expired HSM key cleanup
 
 HSM key versions are stored in the `hsm_key_version` table with an optional
-`until_dt` (end date). When a version's `until_dt` is in the past it is no longer
+`until_dt` (end date). When a version's `until_dt` is in the past (or exactly now) it is no longer
 used for [OPRF evaluation](./oprf-eval-flow.md), but the key still physically
 exists in the HSM. A standalone cleanup program removes those expired keys.
 
 ## What it does
 
-For every key version that has expired (`until_dt` set and in the past) and is
+For every key version that has expired (`until_dt` set and at or before now) and is
 not yet marked `removed`, the program:
 
 1. Destroys the corresponding key in the HSM via

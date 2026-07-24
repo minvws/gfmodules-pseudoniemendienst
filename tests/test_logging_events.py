@@ -2,6 +2,7 @@ import base64
 import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from jwcrypto import jwk
@@ -117,34 +118,20 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     assert exc.value.error_type == "invalid_blinded_input"
 
 
-def test_eval_blind_without_active_versions_raises_secret_version_destroyed(
-    pub_key: jwk.JWK,
-) -> None:
-    hsm_key_version_service = MagicMock()
-    hsm_key_version_service.get_active_versions.return_value = []
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=hsm_key_version_service,
-    )
-
-    with pytest.raises(OprfEvaluationError) as exc:
-        service.eval_blind(_blind_request(), pub_key, None)
-
-    assert exc.value.error_type == "secret_version_destroyed"
-
-
 def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     pub_key: jwk.JWK,
 ) -> None:
     hsm_key_version_service = MagicMock()
-    hsm_key_version_service.get_active_versions.return_value = [
-        SimpleNamespace(version=1)
+    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id.return_value = [
+        1
     ]
+    org_service = MagicMock()
+    org_service.get_by_oin.return_value = SimpleNamespace(id=uuid4())
     service = OprfService(
         server_key=None,
         hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
         hsm_key_version_service=hsm_key_version_service,
+        org_service=org_service,
     )
 
     with (
