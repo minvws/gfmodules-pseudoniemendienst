@@ -29,6 +29,7 @@ from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
+from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
@@ -118,16 +119,17 @@ def test_new_key_version_is_added_to_jwe(
     # Route OPRF evaluation through a (mocked) HSM that reads its active key
     # versions from the same database the endpoint writes to.
     hsm_oprf = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+        evaluator=HsmOprfEvaluator(
+            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            hsm_key_version_service=HsmKeyVersionService(database),
+            org_service=org_service,
+        )
     )
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
 
     try:
         with patch(
-            "app.services.oprf.oprf_service.requests.post", side_effect=_fake_hsm_post
+            "app.services.oprf.evaluators.requests.post", side_effect=_fake_hsm_post
         ):
             # 2. Create version 1 of the HSM key.
             resp = client.post(

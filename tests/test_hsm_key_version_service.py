@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from jwcrypto import jwk
 
 from app.config import ConfigOprf
 from app.db.db import Database
@@ -14,7 +15,12 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.oprf_service import OprfService
+from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.evaluators import (
+    HsmKeyLabel,
+    HsmOprfEvaluator,
+    LocalOprfEvaluator,
+)
 from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
@@ -211,20 +217,19 @@ def test_eval_via_hsm_returns_entry_per_active_version(
         removed=True,
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
 
     with (
-        patch.object(service, "_label_exists", return_value=True) as label_exists,
+        patch.object(evaluator, "_label_exists", return_value=True) as label_exists,
         patch.object(
-            service, "_evaluate_label", return_value=b"evaluated"
+            evaluator, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(TEST_OIN_78000, b"blinded")
+        result = evaluator.evaluate(TEST_OIN_78000, b"blinded")
 
     assert result == {2: b"evaluated", 7: b"evaluated"}
 
@@ -253,21 +258,20 @@ def test_eval_generates_keys_if_needed(
         from_dt=now - timedelta(days=2),
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
 
     with (
-        patch.object(service, "_label_exists", return_value=False) as label_exists,
-        patch.object(service, "_generate_key") as generate_key,
+        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
+        patch.object(evaluator, "_generate_key") as generate_key,
         patch.object(
-            service, "_evaluate_label", return_value=b"evaluated"
+            evaluator, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(TEST_OIN_79000, b"blinded")
+        result = evaluator.evaluate(TEST_OIN_79000, b"blinded")
 
     assert result == {1: b"evaluated"}
 
@@ -311,12 +315,12 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         from_dt=now - timedelta(days=1),
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
+    service = OprfService(evaluator)
 
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
@@ -343,7 +347,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
+    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub, None)
 
     assert result.key_versions == (2, 7)
@@ -407,12 +411,12 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         until_dt=None,
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
+    service = OprfService(evaluator)
 
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
@@ -439,7 +443,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
+    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub, None)
 
     assert result.key_versions == (3, 5)
@@ -471,21 +475,20 @@ def test_eval_via_hsm_without_active_version_creates_one(
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
 
     with (
-        patch.object(service, "_label_exists", return_value=False) as label_exists,
-        patch.object(service, "_generate_key") as generate_key,
+        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
+        patch.object(evaluator, "_generate_key") as generate_key,
         patch.object(
-            service, "_evaluate_label", return_value=b"evaluated"
+            evaluator, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(TEST_OIN, b"blinded")
+        result = evaluator.evaluate(TEST_OIN, b"blinded")
 
     assert result == {1: b"evaluated"}
 
@@ -516,12 +519,12 @@ def test_eval_blind_without_active_versions_creates_active_version(
         max_key_usage=RidUsage.ReversiblePseudonym,
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
-        org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
+    service = OprfService(evaluator)
 
     from jwcrypto import jwk
 
@@ -534,10 +537,10 @@ def test_eval_blind_without_active_versions_creates_active_version(
     )
 
     with (
-        patch.object(service, "_label_exists", return_value=False) as label_exists,
-        patch.object(service, "_generate_key") as generate_key,
+        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
+        patch.object(evaluator, "_generate_key") as generate_key,
         patch.object(
-            service, "_evaluate_label", return_value=b"evaluated"
+            evaluator, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
         result = service.eval_blind(req, pub, None)
@@ -562,23 +565,58 @@ def test_eval_blind_without_active_versions_creates_active_version(
 def test_eval_via_hsm_without_service_raises() -> None:
     org_service = MagicMock()
     org_service.get_by_oin.return_value = SimpleNamespace(id=SimpleNamespace())
-    with pytest.raises(ValueError, match="HSM key version service not configured"):
-        OprfService(
-            server_key=None,
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-            org_service=org_service,
+    evaluator = HsmOprfEvaluator(
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=None,  # type: ignore[arg-type]
+        org_service=org_service,
+    )
+
+    with pytest.raises(
+        AttributeError,
+        match="has no attribute 'get_active_or_create_version_numbers_by_organization_id'",
+    ):
+        evaluator.evaluate(TEST_OIN, b"blinded")
+
+
+def test_eval_generate_key_without_result_raises_value_error() -> None:
+    evaluator = HsmOprfEvaluator(
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=MagicMock(),
+        org_service=MagicMock(),
+    )
+
+    with (
+        patch.object(evaluator, "_hsm_post", return_value={}) as hsm_post,
+        pytest.raises(ValueError, match="could not generate the OPRF secret in HSM"),
+    ):
+        evaluator._generate_key(
+            HsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1)
         )
+
+    assert hsm_post.call_count == 1
 
 
 def test_eval_via_hsm_without_org_service_raises() -> None:
-    with pytest.raises(ValueError, match="org service not configured"):
-        OprfService(
-            server_key=None,
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-            hsm_key_version_service=MagicMock(),
-        )
+    evaluator = HsmOprfEvaluator(
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=MagicMock(),
+        org_service=None,  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(AttributeError, match="has no attribute 'get_by_oin'"):
+        evaluator.evaluate(TEST_OIN, b"blinded")
 
 
 def test_local_mode_without_server_key_raises() -> None:
-    with pytest.raises(ValueError, match="server key not configured"):
-        OprfService(server_key=None)
+    with pytest.raises(OprfEvaluationError) as exc:
+        service = OprfService(LocalOprfEvaluator(b""))
+        service.eval_blind(
+            BlindRequest(
+                encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+                recipientOrganization=RecipientOrganizationOin(TEST_OIN_WITH_PREFIX),
+                recipientScope="scope",
+            ),
+            pub_key=jwk.JWK.generate(kty="RSA", size=2048),
+            pub_key_id=None,
+        )
+    assert exc.value.error_type == "invalid_blinded_input"

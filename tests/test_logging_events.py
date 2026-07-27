@@ -25,6 +25,7 @@ from app.logging.events import (
 from app.logging.filters import LoggingStreams
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
+from app.services.oprf.evaluators import HsmOprfEvaluator, LocalOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
 
@@ -110,7 +111,11 @@ def _blind_request() -> BlindRequest:
 def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     pub_key: jwk.JWK,
 ) -> None:
-    service = OprfService(server_key=OprfService.generate_server_key())
+    service = OprfService(
+        evaluator=LocalOprfEvaluator(
+            base64.urlsafe_b64decode(OprfService.generate_server_key())
+        ),
+    )
 
     with pytest.raises(OprfEvaluationError) as exc:
         service.eval_blind(_blind_request(), pub_key, None)
@@ -128,15 +133,16 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     org_service = MagicMock()
     org_service.get_by_oin.return_value = SimpleNamespace(id=uuid4())
     service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=hsm_key_version_service,
-        org_service=org_service,
+        evaluator=HsmOprfEvaluator(
+            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            hsm_key_version_service=hsm_key_version_service,
+            org_service=org_service,
+        )
     )
 
     with (
         patch(
-            "app.services.oprf.oprf_service.requests.post",
+            "app.services.oprf.evaluators.requests.post",
             side_effect=RuntimeError("HSM unreachable"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

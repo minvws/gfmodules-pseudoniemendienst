@@ -4,7 +4,7 @@ import requests
 
 from app.config import ConfigOprf
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.oprf_service import HsmKeyLabel
+from app.services.oprf.evaluators import HsmKeyLabel
 
 logger = logging.getLogger(__name__)
 

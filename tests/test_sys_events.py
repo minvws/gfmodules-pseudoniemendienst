@@ -18,6 +18,7 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.org_service import OrgService
 
 RecordLogs = Callable[[str], List[logging.LogRecord]]
@@ -150,7 +151,7 @@ def test_hsm_unreachable_emits_sys_event(
     record_logs: RecordLogs,
     org_service: OrgService,
 ) -> None:
-    records = record_logs("app.services.oprf.oprf_service")
+    records = record_logs("app.services.oprf.evaluators")
     hsm_key_version_service = MagicMock()
     hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id.return_value = [
         1
@@ -163,17 +164,18 @@ def test_hsm_unreachable_emits_sys_event(
     )
 
     service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=hsm_key_version_service,
-        org_service=org_service,
+        evaluator=HsmOprfEvaluator(
+            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            hsm_key_version_service=hsm_key_version_service,
+            org_service=org_service,
+        )
     )
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
     with (
         patch(
-            "app.services.oprf.oprf_service.requests.post",
+            "app.services.oprf.evaluators.requests.post",
             side_effect=requests.exceptions.ConnectionError("connection refused"),
         ),
         pytest.raises(OprfEvaluationError) as exc,
