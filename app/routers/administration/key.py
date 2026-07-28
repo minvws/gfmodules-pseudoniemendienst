@@ -72,27 +72,28 @@ def list_keys_for_org(
 
 
 @router.put(
-    "/keys/{key_id}",
+    "/keys/{id}",
     summary="Update a key for the authorized organization",
     tags=["Key Registration Services"],
 )
 def put_key(
-    key_id: Annotated[UUID, Path(title="The ID of the key to update")],
+    id: Annotated[UUID, Path(title="The ID of the key to update")],
     req: KeyRequest,
     auth_org: Annotated[Organization, Depends(authenticated_organization)],
     key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
     try:
         updated = key_resolver.update(
-            key_id,
+            id,
             auth_org.id,
             req.scope,
             req.pub_key,
+            req.key_id,
         )
     except KeyNotFoundError:
         logger.warning(
             "key %s not found for organization %s",
-            key_id,
+            id,
             auth_org.id,
         )
         raise HTTPException(status_code=403, detail="forbidden")
@@ -104,28 +105,26 @@ def put_key(
             status_code=409, detail="key for this org/scope already exists"
         )
     except Exception:
-        logger.exception("failed to update key %s", key_id)
+        logger.exception("failed to update key %s", id)
         raise HTTPException(status_code=500, detail="failed to update key")
 
     return JSONResponse(status_code=200, content=updated.to_dict())
 
 
 @router.delete(
-    "/keys/{key_id}",
+    "/keys/{id}",
     summary="Delete a key for the authorized organization",
     tags=["Key Registration Services"],
 )
 def delete_key(
-    key_id: Annotated[UUID, Path(title="The ID of the key to delete")],
+    id: Annotated[UUID, Path(title="The ID of the key to delete")],
     auth_org: Annotated[Organization, Depends(authenticated_organization)],
     key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
 ) -> JSONResponse:
-    deleted = key_resolver.delete(key_id, auth_org.id)
+    deleted = key_resolver.delete(id, auth_org.id)
     if not deleted:
-        logger.warning(
-            "key %s for organization %s was not deleted", key_id, auth_org.id
-        )
+        logger.warning("key %s for organization %s was not deleted", id, auth_org.id)
         raise HTTPException(status_code=403, detail="forbidden")
 
-    logger.info("key with id %s deleted successfully", key_id)
+    logger.info("key with id %s deleted successfully", id)
     return JSONResponse(status_code=200, content={"message": "key deleted"})

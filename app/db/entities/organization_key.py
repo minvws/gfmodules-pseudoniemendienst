@@ -43,5 +43,5 @@ class OrganizationKey(Base):
             # We omit organization_id since this is an internal detail.
             "scope": self.scope,
             "key_data": self.key_data,
-            "key_id": self.key_id or "",
+            "key_id": self.key_id,
         }

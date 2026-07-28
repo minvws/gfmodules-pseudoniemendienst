@@ -96,10 +96,11 @@ class OrganizationKeyRepository(RepositoryBase):
 
     def update(
         self,
-        key_id: uuid.UUID,
+        id: uuid.UUID,
         organization_id: uuid.UUID,
         scope: list[str],
         key_data: str,
+        key_id: str | None,
     ) -> OrganizationKey | None:
         """
         Updates an existing key entry.
@@ -108,11 +109,11 @@ class OrganizationKeyRepository(RepositoryBase):
             update(OrganizationKey)
             .where(
                 and_(
-                    OrganizationKey.id == key_id,
+                    OrganizationKey.id == id,
                     OrganizationKey.organization_id == organization_id,
                 )
             )
-            .values(scope=scope, key_data=key_data)
+            .values(scope=scope, key_data=key_data, key_id=key_id)
             .returning(OrganizationKey)
         )
 
@@ -125,7 +126,7 @@ class OrganizationKeyRepository(RepositoryBase):
         if entry is None:
             logger.warning(
                 "key entry %s for organization_id %s does not exist",
-                key_id,
+                id,
                 organization_id,
             )
             return None

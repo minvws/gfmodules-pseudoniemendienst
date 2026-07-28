@@ -189,7 +189,7 @@ def test_list_keys_for_org_without_keys_returns_empty(
     assert response.json() == []
 
 
-def test_update_key_updates_scope_and_data_for_authenticated_org(
+def test_update_key_clears_key_id_when_not_provided(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
@@ -219,11 +219,80 @@ def test_update_key_updates_scope_and_data_for_authenticated_org(
     assert body["id"] == str(created.id)
     assert body["scope"] == ["brp", "nvi"]
     assert body["key_data"] == new_key_data
-    assert body["key_id"] == "old"
+    assert body["key_id"] is None
 
     updated = key_resolver.get_by_id(created.id)
     assert updated is not None
     assert updated.key_data == new_key_data
+    assert updated.key_id is None
+
+
+def test_update_key_updates_key_id_for_authenticated_org(
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    valid_headers: Dict[str, str],
+) -> None:
+    auth_org = org_service.create(
+        Oin("00000099000000001000"),
+        "MyOrg A",
+        RidUsage.IrreversiblePseudonym,
+    )
+    old_key_data = _generate_rsa_public_key()
+    created = key_resolver.create(auth_org.id, ["nvi"], "old", old_key_data)
+
+    response = client.put(
+        f"/administration/keys/{created.id}",
+        json={
+            "scope": ["nvi"],
+            "pub_key": old_key_data,
+            "key_id": "new",
+        },
+        headers=_auth_headers(valid_headers, auth_org.oin),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(created.id)
+    assert body["key_id"] == "new"
+
+    updated = key_resolver.get_by_id(created.id)
+    assert updated is not None
+    assert updated.key_id == "new"
+
+
+def test_update_key_clears_key_id_when_null(
+    client: TestClient,
+    org_service: OrgService,
+    key_resolver: KeyResolver,
+    valid_headers: Dict[str, str],
+) -> None:
+    auth_org = org_service.create(
+        Oin("00000099000000001000"),
+        "MyOrg A",
+        RidUsage.IrreversiblePseudonym,
+    )
+    old_key_data = _generate_rsa_public_key()
+    created = key_resolver.create(auth_org.id, ["nvi"], "old", old_key_data)
+
+    response = client.put(
+        f"/administration/keys/{created.id}",
+        json={
+            "scope": ["nvi"],
+            "pub_key": old_key_data,
+            "key_id": None,
+        },
+        headers=_auth_headers(valid_headers, auth_org.oin),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(created.id)
+    assert body["key_id"] is None
+
+    updated = key_resolver.get_by_id(created.id)
+    assert updated is not None
+    assert updated.key_id is None
 
 
 def test_update_unknown_key_is_unauthorized(

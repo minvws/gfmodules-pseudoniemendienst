@@ -105,8 +105,7 @@ def test_resolver_create_without_key_id(
     stored = key_resolver.get_by_id(entry.id)
     assert stored is not None
     assert stored.key_id is None
-    # to_dict() represents a missing key_id as an empty string
-    assert stored.to_dict()["key_id"] == ""
+    assert stored.to_dict()["key_id"] is None
 
 
 def test_key_request_rejects_extra_field_with_validation_error() -> None:
@@ -147,6 +146,7 @@ def test_update_repository_level_does_not_modify_other_organization_key(
                 other_org.id,
                 ["nvi"],
                 TEST_PUBKEY,
+                None,
             )
             is None
         )
