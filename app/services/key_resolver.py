@@ -7,7 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.db.db import Database
 from app.db.entities.organization_key import OrganizationKey
-from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.db.repositories.org_key_repository import (
+    OrganizationKeyRepository,
+)
 from app.db.repositories.org_repository import OrgRepository
 from app.models.oin import Oin
 from app.rid import RidUsage
@@ -32,7 +34,8 @@ class KeyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scope: List[str] = Field(...)
-    pub_key: str = Field(..., min_length=32)
+    key_data: str = Field(..., min_length=32)
+    key_id: Optional[str] = None
     max_key_usage: Optional[RidUsage] = None
 
     @field_validator("scope")
@@ -47,9 +50,9 @@ class KeyRequest(BaseModel):
             raise ValueError("scope contains only empty/invalid items")
         return norm
 
-    @field_validator("pub_key")
+    @field_validator("key_data")
     @classmethod
-    def validate_pub_key(cls, v: str) -> str:
+    def validate_key_data(cls, v: str) -> str:
         try:
             key = jwk.JWK.from_pem(v.strip().encode("ascii"))
         except Exception as e:
@@ -125,40 +128,42 @@ class KeyResolver:
 
     def update(
         self,
-        key_id: uuid.UUID,
+        id: uuid.UUID,
         organization_id: uuid.UUID,
         scope: list[str],
         key_data: str,
+        key_id: str | None,
     ) -> OrganizationKey:
         scope = _normalize_scope(scope)
 
         with self.db.get_db_session() as session:
             repository = session.get_repository(OrganizationKeyRepository)
 
-            existing = repository.has_overlapping_scope(organization_id, scope, key_id)
+            existing = repository.has_overlapping_scope(organization_id, scope, id)
             if existing:
                 raise AlreadyExistsError(
                     f"key for org/scope already exists: scope {scope}"
                 )
 
             entry = repository.update(
-                key_id,
+                id,
                 organization_id,
                 scope,
                 key_data,
+                key_id,
             )
             if entry is None:
-                current = repository.get_by_id(key_id)
+                current = repository.get_by_id(id)
                 if current is not None and current.organization_id != organization_id:
                     logger.warning(
                         "caller org %s attempted to update key %s owned by org %s",
                         organization_id,
-                        key_id,
+                        id,
                         current.organization_id,
                     )
 
                 raise KeyNotFoundError(
-                    f"key {key_id} not found for organization {organization_id}"
+                    f"key {id} not found for organization {organization_id}"
                 )
             session.commit()
             return entry

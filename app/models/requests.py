@@ -1,7 +1,7 @@
 import base64
 import logging
 from datetime import datetime, timezone
-from typing import Any, List, Literal
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class RegisterRequest(BaseModel):
     scope: List[str]
-    key_id: str | None
+    key_id: Optional[str] = None
 
 
 class HsmKeyVersionRequest(BaseModel):

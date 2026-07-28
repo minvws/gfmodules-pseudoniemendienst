@@ -6,53 +6,93 @@ This document lists the main service endpoints. The testing/helper endpoints (`/
 
 A recipient organization is always identified by a OIN in the form `oin:<20 digits>` (e.g. `oin:00000099000000001000`).
 
-## Organizational Services
+## Administration Services
 
-#### `POST /orgs`
-Create a new organization.
+These endpoints are under `/administration` and require OAuth authorization. `POST /administration/register/certificate` additionally uses mTLS: the public key is taken from the caller's TLS client certificate.
 
-```json
-{
-  "oin": "00000099000000001000",
-  "name": "Example Organization",
-  "max_key_usage": "irp"
-}
-```
-
-`max_key_usage` is one of `bsn`, `rp`, or `irp` and caps which pseudonym types the organization may exchange.
-
-#### `GET /org/{oin}`
-Return the organization for the given OIN (digits only, e.g. `00000099000000001000`).
-
-#### `PUT /org/{oin}`
-Update an organization's `name` and `max_key_usage`.
-
-#### `DELETE /org/{oin}`
-Delete an organization (and its keys).
-
-## Key Registration Services
-
-These endpoints are protected by mutual TLS. The organization and its public key are derived from the client certificate, so they are not part of the request body.
-
-#### `POST /register/certificate`
+#### `POST /administration/register/certificate`
 Register the public key (taken from the mTLS client certificate) for one or more scopes of the calling organization.
 
 ```json
 {
-  "scope": ["bar"]
+  "scope": ["bar"],
+  "key_id": "k1"
 }
 ```
 
+`scope` must contain at least one entry. A `*` scope is a wildcard and matches all recipient scopes.
+
+`scope` values are normalized to lowercase and deduplicated.
+
+`key_id` is optional. It is included as the `kid` header in the `/oprf/eval` JWE response.
+
 Returns `201` on success, `409` if a key for that organization/scope already exists.
 
-#### `GET /keys/{oin}`
-List the registered public keys for an organization.
+#### `GET /administration/keys`
+List the registered public keys for the authenticated organization.
 
-#### `PUT /keys/{key_id}`
-Update the scope/key data for a specific key.
+```json
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "scope": ["bar"],
+    "key_data": "-----BEGIN PUBLIC KEY----- ... -----END PUBLIC KEY-----\\n",
+    "key_id": "k1"
+  }
+]
+```
 
-#### `DELETE /keys/{key_id}`
+#### `PUT /administration/keys/{id}`
+Update the scope/key data for a specific key. Include `key_id` to change the key identifier; set it to `null` (or omit it) to clear it.
+
+```json
+{
+  "scope": ["bar", "baz"],
+  "key_id": "k2",
+  "key_data": "-----BEGIN PUBLIC KEY----- ... -----END PUBLIC KEY-----\\n"
+}
+```
+
+#### `DELETE /administration/keys/{id}`
 Delete a specific key.
+
+#### `POST /administration/key-versions`
+Create a new HSM key version for the authenticated organization.
+
+```json
+{
+  "from_dt": "2026-01-01T00:00:00+00:00",
+  "until_dt": "2027-01-01T00:00:00+01:00"
+}
+```
+
+`from_dt` and `until_dt` are optional when omitted; when provided they must include a timezone offset.
+
+```json
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "version": 1,
+  "from_dt": "2026-01-01T00:00:00+00:00",
+  "until_dt": "2027-01-01T00:00:00+01:00",
+  "removed": false
+}
+```
+
+Returns `201` on success.
+
+#### `GET /administration/key-versions`
+List all HSM key versions for the authenticated organization.
+
+#### `PUT /administration/key-versions/{id}`
+Update the end date for one key version.
+
+```json
+{
+  "until_dt": "2027-01-01T00:00:00+03:00"
+}
+```
+
+`until_dt` may also be set to `null` to clear the existing end date.
 
 ## Exchange Services
 

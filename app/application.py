@@ -60,14 +60,6 @@ TAGS_METADATA = [
         ),
     },
     {
-        "name": "Organizational Services",
-        "description": (
-            "Manage recipient organizations. An organization is identified by its "
-            "OIN and has a `max_key_usage` (`bsn`, `rp`, or `irp`) that caps which "
-            "pseudonym types it is allowed to exchange."
-        ),
-    },
-    {
         "name": "Key Registration Services",
         "description": (
             "Register and manage the public keys that pseudonyms and RIDs are "
