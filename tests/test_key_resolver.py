@@ -32,9 +32,9 @@ def test_resolver_create_and_resolve_roundtrip(
     # create
     req = KeyRequest(
         scope=["NVI", " lmr "],
-        pub_key=TEST_PUBKEY,
+        key_data=TEST_PUBKEY,
     )
-    entry = key_resolver.create(org.id, req.scope, "my-key-id", req.pub_key)
+    entry = key_resolver.create(org.id, req.scope, "my-key-id", req.key_data)
 
     assert entry.organization_id == org.id
     assert sorted(entry.scope) == ["lmr", "nvi"]
@@ -113,13 +113,20 @@ def test_key_request_rejects_extra_field_with_validation_error() -> None:
         KeyRequest.model_validate(
             {
                 "scope": ["nvi"],
-                "pub_key": TEST_PUBKEY,
+                "key_data": TEST_PUBKEY,
                 "organization": TEST_OIN,
             }
         )
 
     e = exc.value
     assert "extra_forbidden" in str(e)
+
+
+def test_key_request_rejects_pub_key_field_after_rename() -> None:
+    with pytest.raises(ValidationError) as exc:
+        KeyRequest.model_validate({"scope": ["nvi"], "pub_key": TEST_PUBKEY})
+
+    assert "extra_forbidden" in str(exc.value)
 
 
 def test_update_repository_level_does_not_modify_other_organization_key(

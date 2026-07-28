@@ -34,7 +34,7 @@ class KeyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scope: List[str] = Field(...)
-    pub_key: str = Field(..., min_length=32)
+    key_data: str = Field(..., min_length=32)
     key_id: Optional[str] = None
     max_key_usage: Optional[RidUsage] = None
 
@@ -50,9 +50,9 @@ class KeyRequest(BaseModel):
             raise ValueError("scope contains only empty/invalid items")
         return norm
 
-    @field_validator("pub_key")
+    @field_validator("key_data")
     @classmethod
-    def validate_pub_key(cls, v: str) -> str:
+    def validate_key_data(cls, v: str) -> str:
         try:
             key = jwk.JWK.from_pem(v.strip().encode("ascii"))
         except Exception as e:

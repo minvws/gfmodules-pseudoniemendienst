@@ -87,7 +87,7 @@ def put_key(
             id,
             auth_org.id,
             req.scope,
-            req.pub_key,
+            req.key_data,
             req.key_id,
         )
     except KeyNotFoundError:

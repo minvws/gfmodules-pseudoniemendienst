@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class RegisterRequest(BaseModel):
     scope: List[str]
-    key_id: Optional[str]
+    key_id: Optional[str] = None
 
 
 class HsmKeyVersionRequest(BaseModel):

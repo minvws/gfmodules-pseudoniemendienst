@@ -49,7 +49,7 @@ Update the scope/key data for a specific key. Include `key_id` to change the key
 {
   "scope": ["bar", "baz"],
   "key_id": "k2",
-  "pub_key": "-----BEGIN PUBLIC KEY----- ... -----END PUBLIC KEY-----\\n"
+  "key_data": "-----BEGIN PUBLIC KEY----- ... -----END PUBLIC KEY-----\\n"
 }
 ```
 

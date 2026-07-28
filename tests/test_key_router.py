@@ -209,7 +209,7 @@ def test_update_key_clears_key_id_when_not_provided(
         f"/administration/keys/{created.id}",
         json={
             "scope": ["nvi", "brp"],
-            "pub_key": new_key_data,
+            "key_data": new_key_data,
         },
         headers=_auth_headers(valid_headers, auth_org.oin),
     )
@@ -245,7 +245,7 @@ def test_update_key_updates_key_id_for_authenticated_org(
         f"/administration/keys/{created.id}",
         json={
             "scope": ["nvi"],
-            "pub_key": old_key_data,
+            "key_data": old_key_data,
             "key_id": "new",
         },
         headers=_auth_headers(valid_headers, auth_org.oin),
@@ -279,7 +279,7 @@ def test_update_key_clears_key_id_when_null(
         f"/administration/keys/{created.id}",
         json={
             "scope": ["nvi"],
-            "pub_key": old_key_data,
+            "key_data": old_key_data,
             "key_id": None,
         },
         headers=_auth_headers(valid_headers, auth_org.oin),
@@ -310,7 +310,7 @@ def test_update_unknown_key_is_unauthorized(
         f"/administration/keys/{uuid.uuid4()}",
         json={
             "scope": ["nvi"],
-            "pub_key": _generate_rsa_public_key(),
+            "key_data": _generate_rsa_public_key(),
         },
         headers=_auth_headers(valid_headers, auth_org.oin),
     )
@@ -343,7 +343,7 @@ def test_update_other_org_is_unauthorized(
         f"/administration/keys/{created.id}",
         json={
             "scope": ["nvi"],
-            "pub_key": _generate_rsa_public_key(),
+            "key_data": _generate_rsa_public_key(),
         },
         headers=_auth_headers(valid_headers, auth_org.oin),
     )
@@ -446,7 +446,7 @@ def test_update_rejects_invalid_key_id_with_422(
         "/administration/keys/not-a-uuid",
         json={
             "scope": ["nvi"],
-            "pub_key": _generate_rsa_public_key(),
+            "key_data": _generate_rsa_public_key(),
         },
         headers=_auth_headers(valid_headers, auth_org.oin),
     )
@@ -473,7 +473,7 @@ def test_update_rejects_extra_field_with_422(
         f"/administration/keys/{created.id}",
         json={
             "scope": ["nvi"],
-            "pub_key": _generate_rsa_public_key(),
+            "key_data": _generate_rsa_public_key(),
             "organization": auth_org.oin.value,
         },
         headers=_auth_headers(valid_headers, auth_org.oin),

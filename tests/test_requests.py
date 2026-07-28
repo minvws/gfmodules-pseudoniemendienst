@@ -126,12 +126,10 @@ def test_register_request_key_id_may_be_none() -> None:
     assert request.key_id is None
 
 
-def test_register_request_key_id_is_required() -> None:
-    try:
-        RegisterRequest(scope=["nvi"])  # type: ignore[call-arg]
-        assert False, "Expected ValidationError when key_id is missing"
-    except ValidationError as e:
-        assert "key_id" in str(e)
+def test_register_request_key_id_defaults_to_none() -> None:
+    request = RegisterRequest(scope=["nvi"])
+
+    assert request.key_id is None
 
 
 def test_hsm_key_version_request_from_dt_must_not_be_in_the_past() -> None:
