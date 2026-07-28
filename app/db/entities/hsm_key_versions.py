@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.entities.base import Base
 from app.db.entities.organization import Organization
-from app.models.oin import Oin
 
 
 class HsmKeyVersion(Base):
@@ -37,14 +36,9 @@ class HsmKeyVersion(Base):
 
     organization: Mapped[Organization] = relationship("Organization")
 
-    @property
-    def oin(self) -> Oin:
-        return self.organization.oin
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
-            "oin": self.oin.value,
             "version": self.version,
             "from_dt": self.from_dt,
             "until_dt": self.until_dt,

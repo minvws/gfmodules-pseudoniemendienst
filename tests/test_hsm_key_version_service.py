@@ -1,17 +1,27 @@
 import base64
 import json
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from jwcrypto import jwk
 
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.entities.organization import Organization
 from app.models.oin import Oin, RecipientOrganizationOin
+from app.models.requests import BlindRequest
+from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.oprf_service import OprfService
+from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.evaluators import (
+    HsmKeyLabel,
+    HsmOprfEvaluator,
+    LocalOprfEvaluator,
+)
+from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
@@ -24,21 +34,29 @@ TEST_OIN_78000 = Oin("00000000012345678000")
 TEST_OIN_79000 = Oin("00000000012345679000")
 
 
-def _add(db: Database, oin: Oin, **kwargs: object) -> None:
+def add_hsm_key_version(
+    db: Database, oin: Oin, **kwargs: object
+) -> tuple[HsmKeyVersion, Organization]:
     with db.get_db_session() as session:
         org = session.query(Organization).filter(Organization.oin == oin.value).first()
         if org is None:
-            org = Organization(oin=oin, name=f"org-{oin.value}", max_rid_usage="irp")
+            org = Organization(
+                oin=oin,
+                name=f"org-{oin.value}",
+                max_rid_usage=RidUsage.IrreversiblePseudonym.value,
+            )
             session.add(org)
             session.flush()
-        session.add(HsmKeyVersion(organization_id=org.id, **kwargs))
+        version = HsmKeyVersion(organization_id=org.id, **kwargs)
+        session.add(version)
         session.commit()
+    return version, org
 
 
 def test_get_active_versions_filters_by_date_and_removed(database: Database) -> None:
     now = datetime.now(timezone.utc)
     # active: started, no end date
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_111,
         version=1,
@@ -46,7 +64,7 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
         until_dt=None,
     )
     # active: within window
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_222,
         version=2,
@@ -54,7 +72,7 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
         until_dt=now + timedelta(days=1),
     )
     # inactive: not started yet
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_333,
         version=3,
@@ -62,7 +80,7 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
         until_dt=None,
     )
     # inactive: already ended
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_444,
         version=4,
@@ -70,7 +88,7 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
         until_dt=now - timedelta(days=1),
     )
     # inactive: removed
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_555,
         version=5,
@@ -80,27 +98,118 @@ def test_get_active_versions_filters_by_date_and_removed(database: Database) -> 
     )
 
     service = HsmKeyVersionService(database)
-    active = {v.oin for v in service.get_active_versions()}
+    test_oins = [TEST_OIN_111, TEST_OIN_222, TEST_OIN_333, TEST_OIN_444, TEST_OIN_555]
 
-    assert active == {TEST_OIN_111, TEST_OIN_222}
+    with database.get_db_session() as session:
+        org_ids = [
+            org.id
+            for org in session.query(Organization)
+            .filter(Organization.oin.in_([oin.value for oin in test_oins]))
+            .all()
+        ]
+
+    active_versions = {
+        v.version
+        for org_id in org_ids
+        for v in service.get_active_versions_by_organization_id(org_id)
+    }
+
+    assert active_versions == {1, 2}
 
 
-def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> None:
+def test_get_active_versions_excludes_version_ending_now(database: Database) -> None:
     now = datetime.now(timezone.utc)
-    _add(
+    _, org = add_hsm_key_version(
+        database,
+        oin=TEST_OIN_111,
+        version=1,
+        from_dt=now - timedelta(hours=1),
+        until_dt=now,
+    )
+
+    service = HsmKeyVersionService(database)
+    active = {
+        v.version
+        for v in service.get_active_versions_by_organization_id(org.id, at=now)
+    }
+
+    assert active == set()
+
+    # The same row is considered expired at this exact boundary.
+    expired = {v.version for v in service.get_expired_versions(at=now)}
+    assert expired == {1}
+
+
+def test_get_active_or_create_version_numbers_returns_existing_active(
+    database: Database,
+) -> None:
+    now = datetime.now(timezone.utc)
+    _, org = add_hsm_key_version(
+        database,
+        oin=TEST_OIN_111,
+        version=1,
+        from_dt=now - timedelta(days=1),
+        until_dt=None,
+    )
+    org_id = org.id
+    add_hsm_key_version(
+        database,
+        oin=TEST_OIN_111,
+        version=2,
+        from_dt=now - timedelta(hours=1),
+        until_dt=None,
+    )
+
+    service = HsmKeyVersionService(database)
+    versions = service.get_active_or_create_version_numbers_by_organization_id(org_id)
+
+    assert versions == [1, 2]
+
+
+def test_get_active_or_create_version_numbers_creates_when_none_active(
+    database: Database,
+) -> None:
+    now = datetime.now(timezone.utc)
+    _, org = add_hsm_key_version(
+        database,
+        oin=TEST_OIN_111,
+        version=1,
+        from_dt=now - timedelta(days=10),
+        until_dt=now - timedelta(days=1),
+    )
+    org_id = org.id
+
+    service = HsmKeyVersionService(database)
+    versions = service.get_active_or_create_version_numbers_by_organization_id(org_id)
+
+    assert versions == [2]
+
+    all_versions = service.get_versions_by_organization_id(org_id)
+    assert [v.version for v in all_versions] == [1, 2]
+
+    created_version = next(v for v in all_versions if v.version == 2)
+    assert created_version.from_dt >= now
+
+
+def test_eval_via_hsm_returns_entry_per_active_version(
+    database: Database,
+    org_service: OrgService,
+) -> None:
+    now = datetime.now(timezone.utc)
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_78000,
         version=2,
         from_dt=now - timedelta(days=2),
     )
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_78000,
         version=7,
         from_dt=now - timedelta(days=1),
     )
     # a removed version must be ignored
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_78000,
         version=9,
@@ -108,19 +217,19 @@ def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> No
         removed=True,
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
 
     with (
-        patch.object(service, "_label_exists", return_value=True) as label_exists,
+        patch.object(evaluator, "_label_exists", return_value=True) as label_exists,
         patch.object(
-            service, "_evaluate_label", return_value=b"evaluated"
+            evaluator, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(TEST_OIN_78000, b"blinded")
+        result = evaluator.evaluate(TEST_OIN_78000, b"blinded")
 
     assert result == {2: b"evaluated", 7: b"evaluated"}
 
@@ -138,29 +247,31 @@ def test_eval_via_hsm_returns_entry_per_active_version(database: Database) -> No
     assert evaluate_label.call_count == 2
 
 
-def test_eval_generates_keys_if_needed(database: Database) -> None:
+def test_eval_generates_keys_if_needed(
+    database: Database, org_service: OrgService
+) -> None:
     now = datetime.now(timezone.utc)
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_79000,
         version=1,
         from_dt=now - timedelta(days=2),
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
 
     with (
-        patch.object(service, "_label_exists", return_value=False) as label_exists,
-        patch.object(service, "_generate_key") as generate_key,
+        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
+        patch.object(evaluator, "_generate_key") as generate_key,
         patch.object(
-            service, "_evaluate_label", return_value=b"evaluated"
+            evaluator, "_evaluate_label", return_value=b"evaluated"
         ) as evaluate_label,
     ):
-        result = service._eval_via_hsm(TEST_OIN_79000, b"blinded")
+        result = evaluator.evaluate(TEST_OIN_79000, b"blinded")
 
     assert result == {1: b"evaluated"}
 
@@ -181,31 +292,35 @@ def test_eval_generates_keys_if_needed(database: Database) -> None:
     assert generate_key.call_count == 1
 
 
-def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) -> None:
+def test_eval_blind_subject_is_latest_with_extra_versions(
+    database: Database,
+    org_service: OrgService,
+) -> None:
     from jwcrypto import jwe as jwelib
     from jwcrypto import jwk
 
     from app.models.requests import BlindRequest
 
     now = datetime.now(timezone.utc)
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_78000,
         version=2,
         from_dt=now - timedelta(days=2),
     )
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN_78000,
         version=7,
         from_dt=now - timedelta(days=1),
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
+    service = OprfService(evaluator)
 
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
@@ -232,7 +347,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
+    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub, None)
 
     assert result.key_versions == (2, 7)
@@ -255,6 +370,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(database: Database) ->
 
 def test_eval_blind_jwe_contains_only_versions_active_at_date(
     database: Database,
+    org_service: OrgService,
 ) -> None:
     from jwcrypto import jwe as jwelib
     from jwcrypto import jwk
@@ -263,7 +379,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
 
     now = datetime.now(timezone.utc)
     # expired: ended yesterday -> excluded
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN,
         version=1,
@@ -271,7 +387,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         until_dt=now - timedelta(days=1),
     )
     # active: started, no end date
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN,
         version=3,
@@ -279,7 +395,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         until_dt=None,
     )
     # active: within window
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN,
         version=5,
@@ -287,7 +403,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         until_dt=now + timedelta(days=2),
     )
     # future: not started yet -> excluded
-    _add(
+    add_hsm_key_version(
         database,
         oin=TEST_OIN,
         version=8,
@@ -295,11 +411,12 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         until_dt=None,
     )
 
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
     )
+    service = OprfService(evaluator)
 
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
@@ -326,7 +443,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.oprf_service.requests.post", side_effect=fake_post):
+    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub, None)
 
     assert result.key_versions == (3, 5)
@@ -348,20 +465,158 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     }
 
 
-def test_eval_via_hsm_without_active_version_raises(database: Database) -> None:
-    service = OprfService(
-        server_key=None,
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
-        hsm_key_version_service=HsmKeyVersionService(database),
+def test_eval_via_hsm_without_active_version_creates_one(
+    database: Database,
+    org_service: OrgService,
+) -> None:
+    org_service.create(
+        oin=TEST_OIN,
+        name=f"Integration OPRF Service Org {TEST_OIN}",
+        max_key_usage=RidUsage.ReversiblePseudonym,
     )
-    with pytest.raises(ValueError, match=f"no active key version for oin {TEST_OIN}"):
-        service._eval_via_hsm(TEST_OIN, b"blinded")
+
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
+    )
+
+    with (
+        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
+        patch.object(evaluator, "_generate_key") as generate_key,
+        patch.object(
+            evaluator, "_evaluate_label", return_value=b"evaluated"
+        ) as evaluate_label,
+    ):
+        result = evaluator.evaluate(TEST_OIN, b"blinded")
+
+    assert result == {1: b"evaluated"}
+
+    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
+        "oin-00000099000000001000-v1",
+    ]
+
+    assert [str(c.args[0]) for c in generate_key.call_args_list] == [
+        "oin-00000099000000001000-v1",
+    ]
+
+    assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
+        ("oin-00000099000000001000-v1", b"blinded"),
+    ]
+
+    assert label_exists.call_count == 1
+    assert evaluate_label.call_count == 1
+    assert generate_key.call_count == 1
+
+
+def test_eval_blind_without_active_versions_creates_active_version(
+    database: Database,
+    org_service: OrgService,
+) -> None:
+    org = org_service.create(
+        oin=TEST_OIN,
+        name="Evaluation OPRF Service Org",
+        max_key_usage=RidUsage.ReversiblePseudonym,
+    )
+
+    evaluator = HsmOprfEvaluator(
+        ConfigOprf(hsm_url="https://hsm.local"),
+        HsmKeyVersionService(database),
+        org_service,
+    )
+    service = OprfService(evaluator)
+
+    from jwcrypto import jwk
+
+    key = jwk.JWK.generate(kty="RSA", size=2048)
+    pub = jwk.JWK.from_json(key.export_public())
+    req = BlindRequest(
+        encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+        recipientOrganization=RecipientOrganizationOin(TEST_OIN_WITH_PREFIX),
+        recipientScope="scope",
+    )
+
+    with (
+        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
+        patch.object(evaluator, "_generate_key") as generate_key,
+        patch.object(
+            evaluator, "_evaluate_label", return_value=b"evaluated"
+        ) as evaluate_label,
+    ):
+        result = service.eval_blind(req, pub, None)
+
+    assert result.key_versions == (1,)
+
+    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
+        f"oin-{RecipientOrganizationOin(TEST_OIN_WITH_PREFIX)}-v1",
+    ]
+    assert [str(c.args[0]) for c in generate_key.call_args_list] == [
+        f"oin-{RecipientOrganizationOin(TEST_OIN_WITH_PREFIX)}-v1",
+    ]
+    assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
+        (f"oin-{RecipientOrganizationOin(TEST_OIN_WITH_PREFIX)}-v1", b"blinded"),
+    ]
+
+    version_service = HsmKeyVersionService(database)
+    versions = version_service.get_versions_by_organization_id(org.id)
+    assert [v.version for v in versions] == [1]
 
 
 def test_eval_via_hsm_without_service_raises() -> None:
-    service = OprfService(
-        server_key=None, hsm_config=ConfigOprf(hsm_url="https://hsm.local")
+    org_service = MagicMock()
+    org_service.get_by_oin.return_value = SimpleNamespace(id=SimpleNamespace())
+    evaluator = HsmOprfEvaluator(
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=None,  # type: ignore[arg-type]
+        org_service=org_service,
     )
 
-    with pytest.raises(ValueError, match="HSM key version service not configured"):
-        service._eval_via_hsm(TEST_OIN_78000, b"blinded")
+    with pytest.raises(
+        AttributeError,
+        match="has no attribute 'get_active_or_create_version_numbers_by_organization_id'",
+    ):
+        evaluator.evaluate(TEST_OIN, b"blinded")
+
+
+def test_eval_generate_key_without_result_raises_value_error() -> None:
+    evaluator = HsmOprfEvaluator(
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=MagicMock(),
+        org_service=MagicMock(),
+    )
+
+    with (
+        patch.object(evaluator, "_hsm_post", return_value={}) as hsm_post,
+        pytest.raises(ValueError, match="could not generate the OPRF secret in HSM"),
+    ):
+        evaluator._generate_key(
+            HsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1)
+        )
+
+    assert hsm_post.call_count == 1
+
+
+def test_eval_via_hsm_without_org_service_raises() -> None:
+    evaluator = HsmOprfEvaluator(
+        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_key_version_service=MagicMock(),
+        org_service=None,  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(AttributeError, match="has no attribute 'get_by_oin'"):
+        evaluator.evaluate(TEST_OIN, b"blinded")
+
+
+def test_local_mode_without_server_key_raises() -> None:
+    with pytest.raises(OprfEvaluationError) as exc:
+        service = OprfService(LocalOprfEvaluator(b""))
+        service.eval_blind(
+            BlindRequest(
+                encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+                recipientOrganization=RecipientOrganizationOin(TEST_OIN_WITH_PREFIX),
+                recipientScope="scope",
+            ),
+            pub_key=jwk.JWK.generate(kty="RSA", size=2048),
+            pub_key_id=None,
+        )
+    assert exc.value.error_type == "invalid_blinded_input"

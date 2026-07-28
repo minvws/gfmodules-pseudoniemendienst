@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from sqlalchemy import select
 
@@ -13,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 @repository(Organization)
 class OrgRepository(RepositoryBase):
-    def get_by_oin(self, oin: Oin) -> Optional[Organization]:
+    def get_by_oin(self, oin: Oin) -> Organization | None:
         """
         Fetches the organization by its unique ID.
         """

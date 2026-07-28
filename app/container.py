@@ -10,6 +10,11 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.mtls_service import MtlsService
+from app.services.oprf.evaluators import (
+    OprfEvaluator,
+    HsmOprfEvaluator,
+    LocalOprfEvaluator,
+)
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService
@@ -71,7 +76,10 @@ def container_config(binder: inject.Binder) -> None:
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
 
-    hsm_key_cleanup_service = HsmKeyCleanupService(config.oprf, hsm_key_version_service)
+    hsm_key_cleanup_service = HsmKeyCleanupService(
+        config.oprf,
+        hsm_key_version_service,
+    )
     binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
 
     auth_header_service = AuthHeaderService(
@@ -79,11 +87,10 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(AuthHeaderService, auth_header_service)
 
+    oprf_evaluator: OprfEvaluator
     if config.oprf.hsm_url:
-        oprf_service = OprfService(
-            server_key=None,
-            hsm_config=config.oprf,
-            hsm_key_version_service=hsm_key_version_service,
+        oprf_evaluator = HsmOprfEvaluator(
+            config.oprf, hsm_key_version_service, org_service
         )
     else:
         try:
@@ -97,7 +104,9 @@ def container_config(binder: inject.Binder) -> None:
             raise FileNotFoundError(
                 "OPRF server key file not found. Generate it using the 'make generate-oprf-key' command."
             )
-        oprf_service = OprfService(server_key=key)
+        oprf_evaluator = LocalOprfEvaluator(base64.urlsafe_b64decode(key))
+
+    oprf_service = OprfService(oprf_evaluator)
     binder.bind(OprfService, oprf_service)
 
     # This should be done through an HSM
