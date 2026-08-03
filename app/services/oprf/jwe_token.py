@@ -31,7 +31,7 @@ class BlindJwe:
 
         protected_headers = {
             "kid": pub_key_id if pub_key_id else pub_key.thumbprint(),
-            "alg": "RSA-OAEP-256",
+            "alg": "RSA-OAEP",
             "enc": "A256GCM",
             "cty": "application/json",
         }

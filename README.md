@@ -334,7 +334,7 @@ To use this system:
       "jwe": {
         "headers": {
           "kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
-          "alg": "RSA-OAEP-256",
+          "alg": "RSA-OAEP",
           "enc": "A256GCM",
           "cty": "application/json"
         },

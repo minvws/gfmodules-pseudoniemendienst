@@ -166,7 +166,7 @@ def test_decode_as_receiver(
     headers, data = decode_jwe(jwe, MOCK_ORGS[TEST_OIN_WITH_PREFIX][2])
 
     assert headers["enc"] == "A256GCM"
-    assert headers["alg"] == "RSA-OAEP-256"
+    assert headers["alg"] == "RSA-OAEP"
     assert headers["kid"] is not None
 
     assert data["subject"].startswith("rid:")
