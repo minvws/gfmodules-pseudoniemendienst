@@ -60,7 +60,7 @@ Response:
   "jwe": {
     "headers": {
       "kid": "apcsz4HE6UYny5RiSh6aEIp7N_Cb2EGStknChLJTuug",
-      "alg": "RSA-OAEP-256",
+      "alg": "RSA-OAEP",
       "enc": "A256GCM",
       "cty": "application/json"
     },
@@ -129,7 +129,7 @@ Response:
   "jwe": {
     "headers": {
       "kid": "apcsz4HE6UYny5RiSh6aEIp7N_Cb2EGStknChLJTuug",
-      "alg": "RSA-OAEP-256",
+      "alg": "RSA-OAEP",
       "enc": "A256GCM",
       "cty": "application/json"
     },
