@@ -8,7 +8,6 @@ from sqlalchemy.exc import IntegrityError
 from app.db.db import Database
 from app.db.entities.hsm_key_versions import HsmKeyVersion
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
-from app.db.repositories.org_repository import OrgRepository
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 class HsmKeyVersionNotFoundError(ValueError):
     """Raised when the key version does not exist, is already removed, or mismatches."""
 
-    def __init__(self, version_id: uuid.UUID, organization_id: uuid.UUID):
+    def __init__(self, version_id: uuid.UUID, organization_id: Oin):
         super().__init__(
             f"key version {version_id} for organization {organization_id} not found"
         )
@@ -52,7 +51,7 @@ class HsmKeyVersionService:
 
     def get_versions_by_organization_id(
         self,
-        organization_id: uuid.UUID,
+        organization_id: Oin,
     ) -> List[HsmKeyVersion]:
         """
         Returns all key versions for the given organization id, regardless of
@@ -60,7 +59,7 @@ class HsmKeyVersionService:
         """
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
-            versions = repo.get_by_organization_id(organization_id)
+            versions = repo.get_by_organization_id(organization_id.value)
             return versions
 
     def get_active_versions_by_organization_id(
@@ -96,7 +95,7 @@ class HsmKeyVersionService:
 
     def get_active_or_create_version_numbers_by_organization_id(
         self,
-        organization_id: uuid.UUID,
+        organization_id: Oin,
     ) -> List[int]:
         """
         Returns active version numbers for the organization at the current moment.
@@ -139,7 +138,7 @@ class HsmKeyVersionService:
 
     def create_version(
         self,
-        oin: Oin,
+        organization_id: Oin,
         from_dt: datetime | None = None,
         until_dt: datetime | None = None,
     ) -> HsmKeyVersion:
@@ -150,21 +149,17 @@ class HsmKeyVersionService:
         the version becomes active immediately.
 
         Raises a ValueError when no organization exists for the given OIN.
+        TODO GB: Update doc
         """
-        with self.__db.get_db_session() as session:
-            org = session.get_repository(OrgRepository).get_by_oin(oin)
-            if org is None:
-                raise ValueError(f"organization with oin {oin} not found")
-
         return self.create_version_by_organization_id(
-            org.id,
+            organization_id,
             from_dt=from_dt,
             until_dt=until_dt,
         )
 
     def create_version_by_organization_id(
         self,
-        organization_id: uuid.UUID,
+        organization_id: Oin,
         from_dt: datetime | None = None,
         until_dt: datetime | None = None,
     ) -> HsmKeyVersion:
@@ -179,7 +174,7 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             try:
                 entry = repo.create(
-                    organization_id=organization_id,
+                    organization_id=organization_id.value,
                     from_dt=from_dt,
                     until_dt=until_dt,
                 )
@@ -203,7 +198,7 @@ class HsmKeyVersionService:
     def update_version_by_organization_id(
         self,
         version_id: uuid.UUID,
-        organization_id: uuid.UUID,
+        organization_id: Oin,
         until_dt: datetime | None = None,
     ) -> HsmKeyVersion:
         """

@@ -1,3 +1,5 @@
+from app.services.authorization_service import AuthorizationService
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 import base64
 import logging
 
@@ -8,15 +10,12 @@ from app.db.db import Database
 from app.services.auth.header import AuthHeaderService
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.key_resolver import KeyResolver
-from app.services.mtls_service import MtlsService
 from app.services.oprf.evaluators import (
     OprfEvaluator,
     HsmOprfEvaluator,
     LocalOprfEvaluator,
 )
 from app.services.oprf.oprf_service import OprfService
-from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService
 from app.services.rid_service import RidService
 
@@ -64,14 +63,11 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(Database, db)
 
-    key_resolver = KeyResolver(db)
-    binder.bind(KeyResolver, key_resolver)
+    organization_public_key_service = OrganizationPublicKeyService(db)
+    binder.bind(OrganizationPublicKeyService, organization_public_key_service)
 
-    org_service = OrgService(db)
-    binder.bind(OrgService, org_service)
-
-    mtls_service = MtlsService(config.app.mtls_override_cert, org_service)
-    binder.bind(MtlsService, mtls_service)
+    authorization_service = AuthorizationService(db)
+    binder.bind(AuthorizationService, authorization_service)
 
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
@@ -89,9 +85,7 @@ def container_config(binder: inject.Binder) -> None:
 
     oprf_evaluator: OprfEvaluator
     if config.oprf.hsm_url:
-        oprf_evaluator = HsmOprfEvaluator(
-            config.oprf, hsm_key_version_service, org_service
-        )
+        oprf_evaluator = HsmOprfEvaluator(config.oprf, hsm_key_version_service)
     else:
         try:
             with open(config.oprf.server_key_file, "r") as f:
@@ -119,14 +113,6 @@ def container_config(binder: inject.Binder) -> None:
     binder.bind(RidService, rid_service)
 
 
-def get_mtls_service() -> MtlsService:
-    return inject.instance(MtlsService)
-
-
-def get_org_service() -> OrgService:
-    return inject.instance(OrgService)
-
-
 def get_rid_service() -> RidService:
     return inject.instance(RidService)
 
@@ -135,8 +121,12 @@ def get_pseudonym_service() -> PseudonymService:
     return inject.instance(PseudonymService)
 
 
-def get_key_resolver() -> KeyResolver:
-    return inject.instance(KeyResolver)
+def get_organization_public_key_service() -> OrganizationPublicKeyService:
+    return inject.instance(OrganizationPublicKeyService)
+
+
+def get_authorization_service() -> AuthorizationService:
+    return inject.instance(AuthorizationService)
 
 
 def get_oprf_service() -> OprfService:

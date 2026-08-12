@@ -76,6 +76,7 @@ class ConfigDatabase(BaseModel):
 
 class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
+    document_gf_headers: bool = Field(default=False)
     docs_url: str = Field(default="/docs")
     redoc_url: str = Field(default="/redoc")
     host: str = Field(default="0.0.0.0")
