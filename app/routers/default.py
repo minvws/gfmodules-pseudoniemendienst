@@ -30,10 +30,10 @@ def index() -> Response:
     try:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
             data = json.load(file)
-            content += "\nVersion: %s\nCommit: %s" % (data["version"], data["git_ref"])
+            content += "\nVersion: {}\nCommit: {}".format(data["version"], data["git_ref"])
     except (OSError, json.JSONDecodeError, KeyError) as e:
         content += "\nNo version information found"
-        logger.info("version info could not be loaded: %s" % e)
+        logger.info(f"version info could not be loaded: {e}")
 
     return PlainTextResponse(content)
 
@@ -48,7 +48,7 @@ def version_json() -> Response:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
             content = json.load(file)
     except (OSError, json.JSONDecodeError) as e:
-        logger.info("version info could not be loaded: %s" % e)
+        logger.info(f"version info could not be loaded: {e}")
         return Response(status_code=404)
 
     return JSONResponse(content)

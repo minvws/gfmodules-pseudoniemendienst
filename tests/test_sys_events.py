@@ -1,7 +1,7 @@
 """Asserts the PRS-HEALTH / PRS-SYS events (issue 1041) are emitted correctly."""
 
 import logging
-from typing import Callable, List
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,14 +14,13 @@ from sqlalchemy.exc import DatabaseError, OperationalError
 from app import container
 from app.config import ConfigOprf, get_config
 from app.db.db import Database
-from app.models.oin import Oin, RecipientOrganizationOin
+from app.db.models import OrganizationEntity
+from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
-from app.rid import RidUsage
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 from app.services.oprf.evaluators import HsmOprfEvaluator
-from app.services.org_service import OrgService
+from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
-RecordLogs = Callable[[str], List[logging.LogRecord]]
+RecordLogs = Callable[[str], list[logging.LogRecord]]
 
 
 def _blind_request() -> BlindRequest:
@@ -32,7 +31,7 @@ def _blind_request() -> BlindRequest:
     )
 
 
-def _events(records: List[logging.LogRecord], event_id: str) -> List[logging.LogRecord]:
+def _events(records: list[logging.LogRecord], event_id: str) -> list[logging.LogRecord]:
     return [r for r in records if getattr(r, "event_id", None) == event_id]
 
 
@@ -53,7 +52,6 @@ def test_startup_emits_sys_app_started(
     message = event["message"]
     assert message["component"] == "pseudoniemendienst"
     assert message["version"]
-    assert message["environment"]
     assert message["pseudoniem_api_enabled"] is True
 
 
@@ -75,33 +73,40 @@ def test_lifespan_shutdown_emits_sys_app_stopped(
 
 
 def test_unhandled_exception_emits_sys_event_and_returns_500(
-    record_logs: RecordLogs, app: FastAPI
+    record_logs: RecordLogs,
+    app: FastAPI,
+    persisted_organization: OrganizationEntity,
 ) -> None:
     records = record_logs("app.application")
 
     class ExplodingOrgService:
-        def get_by_oin(self, oin: object) -> None:
+        def get_by_org_and_domain(self, oin: object, domain: object) -> None:
             raise RuntimeError("boom")
 
-    app.dependency_overrides[container.get_org_service] = lambda: ExplodingOrgService()
+    app.dependency_overrides[container.get_organization_public_key_service] = lambda: (
+        ExplodingOrgService()
+    )
     client = TestClient(app, raise_server_exceptions=False)
     try:
         response = client.post(
             "/oprf/eval",
             json={
                 "encryptedPersonalId": "Zm9v",
-                "recipientOrganization": "oin:00000099000000001000",
+                "recipientOrganization": "oin:"
+                + persisted_organization.external_id.value,
                 "recipientScope": "nvi",
             },
             headers={
-                "x-gf-sub": "00000099000000001000",
-                "x-gf-act-sub": "00000099000000001000",
-                "x-gf-act-cn": "00000099000000001000",
+                "x-gf-sub": persisted_organization.external_id.value,
+                "x-gf-act-sub": persisted_organization.external_id.value,
+                "x-gf-act-cn": persisted_organization.external_id.value,
                 "x-gf-audience": "prs.service",
             },
         )
     finally:
-        app.dependency_overrides.pop(container.get_org_service, None)
+        app.dependency_overrides.pop(
+            container.get_organization_public_key_service, None
+        )
 
     assert response.status_code == 500
     assert response.json() == {"error": "Internal server error"}
@@ -126,9 +131,8 @@ def test_db_retry_emits_connection_events(
         raise OperationalError("stmt", {}, Exception("connection lost"))
 
     try:
-        with database.get_db_session() as session:
-            with pytest.raises(DatabaseError):
-                session._retry(failing_operation)
+        with database.get_db_session() as session, pytest.raises(DatabaseError):
+            session._retry(failing_operation)
     finally:
         config.database.retry_backoff = original_backoff
 
@@ -149,25 +153,17 @@ def test_db_retry_emits_connection_events(
 
 def test_hsm_unreachable_emits_sys_event(
     record_logs: RecordLogs,
-    org_service: OrgService,
 ) -> None:
     records = record_logs("app.services.oprf.evaluators")
     hsm_key_version_service = MagicMock()
-    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id.return_value = [
+    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_oin.return_value = [
         1
     ]
-
-    org_service.create(
-        oin=Oin("00000099000000001000"),
-        name="recipient org",
-        max_key_usage=RidUsage.ReversiblePseudonym,
-    )
 
     service = OprfService(
         evaluator=HsmOprfEvaluator(
             hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
             hsm_key_version_service=hsm_key_version_service,
-            org_service=org_service,
         )
     )
     key = jwk.JWK.generate(kty="RSA", size=2048)

@@ -1,20 +1,18 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from uuid import UUID
 
 import pytest
 import requests
 
 from app.config import ConfigOprf
 from app.db.db import Database
-from app.db.entities.hsm_key_versions import HsmKeyVersion
-from app.db.entities.organization import Organization
-from app.db.repositories.org_repository import OrgRepository
+from app.db.models import HsmKeyVersionEntity, OrganizationEntity
+from app.db.repositories.organization_repository import OrganizationRepository
 from app.db.session import DbSession
 from app.models.oin import Oin
-from app.rid import RidUsage
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
@@ -31,16 +29,17 @@ class HsmKeyVersionData:
     version: int
     from_delta: timedelta
     until_delta: timedelta | None
-    removed: bool
+    removed_at: datetime | None
 
 
-def _get_or_create_organization(session: DbSession, oin: Oin) -> Organization:
-    org: Organization | None = session.get_repository(OrgRepository).get_by_oin(oin)
+def _get_or_create_organization(session: DbSession, oin: Oin) -> OrganizationEntity:
+    org: OrganizationEntity | None = session.get_repository(
+        OrganizationRepository
+    ).get_one_by_external_id(oin)
     if org is None:
-        org = Organization(
-            oin=oin,
+        org = OrganizationEntity(
+            external_id=oin,
             name=f"org-{oin.value}",
-            max_rid_usage=RidUsage.IrreversiblePseudonym.value,
         )
         session.add(org)
         session.flush()
@@ -49,10 +48,10 @@ def _get_or_create_organization(session: DbSession, oin: Oin) -> Organization:
 
 def _add(
     db: Database, oin: Oin, **kwargs: object
-) -> tuple[HsmKeyVersion, Organization]:
+) -> tuple[HsmKeyVersionEntity, OrganizationEntity]:
     with db.get_db_session() as session:
         org = _get_or_create_organization(session, oin)
-        version = HsmKeyVersion(organization_id=org.id, **kwargs)
+        version = HsmKeyVersionEntity(organization_id=org.id, **kwargs)
         session.add(version)
         session.commit()
     return version, org
@@ -70,18 +69,22 @@ def _hsm_config() -> ConfigOprf:
         pytest.param(
             [
                 HsmKeyVersionData(
-                    TEST_OIN, 1, timedelta(days=10), timedelta(days=1), False
+                    TEST_OIN, 1, timedelta(days=10), timedelta(days=1), None
                 ),
                 HsmKeyVersionData(
                     TEST_OIN_EXPIRED_OTHER,
                     1,
                     timedelta(days=10),
                     timedelta(days=2),
-                    False,
+                    None,
                 ),
-                HsmKeyVersionData(TEST_OIN_ACTIVE, 2, timedelta(days=1), None, False),
+                HsmKeyVersionData(TEST_OIN_ACTIVE, 2, timedelta(days=1), None, None),
                 HsmKeyVersionData(
-                    TEST_OIN_ACTIVE, 3, timedelta(days=5), timedelta(days=1), True
+                    TEST_OIN_ACTIVE,
+                    3,
+                    timedelta(days=5),
+                    timedelta(days=1),
+                    datetime.now(timezone.utc),
                 ),
             ],
             2,
@@ -94,7 +97,7 @@ def _hsm_config() -> ConfigOprf:
             id="mixed_with_active_key",
         ),
         pytest.param(
-            [HsmKeyVersionData(TEST_OIN, 1, timedelta(days=1), timedelta(0), False)],
+            [HsmKeyVersionData(TEST_OIN, 1, timedelta(days=1), timedelta(0), None)],
             1,
             {f"oin-{TEST_OIN}-v1"},
             {},
@@ -112,7 +115,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
     removed_version_indexes: tuple[int, ...],
 ) -> None:
     now = datetime.now(timezone.utc)
-    versions: list[HsmKeyVersion] = []
+    versions: list[HsmKeyVersionEntity] = []
     organization_ids: dict[Oin, UUID] = {}
 
     for row in rows:
@@ -122,7 +125,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
             version=row.version,
             from_dt=now - row.from_delta,
             until_dt=now - row.until_delta if row.until_delta is not None else None,
-            removed=row.removed,
+            removed_at=row.removed_at,
         )
         organization_ids.setdefault(row.oin, org.id)
         versions.append(created)
@@ -154,12 +157,10 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
     assert urls == {"https://hsm.local/hsm/softhsm/SoftHSMLabel/destroy"}
 
     version_service = HsmKeyVersionService(database)
-    for oin in organization_ids:
+    for oin, id in organization_ids.items():
         active = {
             v.version
-            for v in version_service.get_active_versions_by_organization_id(
-                organization_ids[oin]
-            )
+            for v in version_service.get_active_versions_by_organization_id(id)
         }
         assert active == expected_active_versions.get(oin, set())
 
@@ -169,7 +170,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
     for index in removed_version_indexes:
         removed_version = version_service.get_version(versions[index].id)
         assert removed_version is not None
-        assert removed_version.removed is True
+        assert removed_version.removed_at is not None
 
 
 def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
@@ -253,18 +254,18 @@ def test_get_expired_versions_filters(database: Database) -> None:
         version=1,
         from_dt=now - timedelta(days=2),
         until_dt=now - timedelta(days=1),
-        removed=True,
+        removed_at=datetime.now(timezone.utc),
     )  # expired but already removed
 
     expired = HsmKeyVersionService(database).get_expired_versions()
     assert len(expired) == 1
     with database.get_db_session() as session:
         org = (
-            session.query(Organization)
-            .filter(Organization.id == expired[0].organization_id)
+            session.query(OrganizationEntity)
+            .filter(OrganizationEntity.id == expired[0].organization_id)
             .one()
         )
-    assert org.oin == TEST_OIN_111
+    assert org.external_id == TEST_OIN_111
 
 
 @pytest.mark.parametrize("hsm_url", ["", None])

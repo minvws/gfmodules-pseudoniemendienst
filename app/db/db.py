@@ -1,27 +1,25 @@
 import logging
 
-from sqlalchemy import MetaData, StaticPool, create_engine, text
+from sqlalchemy import StaticPool, create_engine, text
 from sqlalchemy.orm import Session
 
-from app.db.entities.base import Base
+from app.config import ConfigDatabase
+from app.db.models.base import Base
 from app.db.session import DbSession
 
 logger = logging.getLogger(__name__)
 
 
 class Database:
-    def __init__(
-        self,
-        dsn: str,
-        pool_size: int = 5,
-        max_overflow: int = 10,
-        pool_pre_ping: bool = False,
-        pool_recycle: int = 3600,
-    ):
+    _config_database: ConfigDatabase
+
+    def __init__(self, config_database: ConfigDatabase):
+        self._config_database = config_database
+
         try:
-            if "sqlite://" in dsn:
+            if "sqlite://" in config_database.dsn.get_secret_value():
                 self.engine = create_engine(
-                    dsn,
+                    config_database.dsn.get_secret_value(),
                     connect_args={"check_same_thread": False},
                     # This + static pool is needed for sqlite in-memory tables
                     poolclass=StaticPool,
@@ -29,16 +27,16 @@ class Database:
                 )
             else:
                 self.engine = create_engine(
-                    dsn,
+                    config_database.dsn.get_secret_value(),
                     echo=False,
-                    pool_size=pool_size,
-                    max_overflow=max_overflow,
-                    pool_pre_ping=pool_pre_ping,
-                    pool_recycle=pool_recycle,
+                    pool_size=config_database.pool_size,
+                    max_overflow=config_database.max_overflow,
+                    pool_pre_ping=config_database.pool_pre_ping,
+                    pool_recycle=config_database.pool_recycle,
                 )
-        except BaseException as e:
+        except BaseException:
             logger.exception("error while connecting to database")
-            raise e
+            raise
 
     def generate_tables(self) -> None:
         logger.info("generating tables...")
@@ -47,16 +45,16 @@ class Database:
     def truncate_tables(self) -> None:
         logger.info("truncating all tables...")
         try:
-            metadata = MetaData()
+            metadata = Base.metadata
             metadata.reflect(bind=self.engine)
             with Session(self.engine) as session:
                 for table in reversed(metadata.sorted_tables):
-                    session.execute(text(f"DELETE FROM {table.name}"))
+                    session.execute(text(f"DELETE FROM {table.schema}.{table.name}"))
                 session.commit()
             logger.info("all tables truncated successfully.")
-        except Exception as e:
+        except Exception:
             logger.exception("error while truncating tables")
-            raise e
+            raise
 
     def health_error(self) -> str | None:
         """
@@ -80,5 +78,5 @@ class Database:
         """
         return self.health_error() is None
 
-    def get_db_session(self) -> DbSession:
-        return DbSession(self.engine)
+    def get_db_session(self, commit: bool = False) -> DbSession:
+        return DbSession(self.engine, commit)

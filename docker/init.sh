@@ -27,7 +27,8 @@ else
 fi
 
 echo "Migrating"
-DSN=$(grep dsn $APP_PATH | sed -r 's/dsn=postgresql\+psycopg/postgresql/' ) tools/./migrate_db.sh
+DSN=$(grep dsn $APP_PATH | sed -r 's/dsn=postgresql\+psycopg/postgresql/') tools/./migrate_db.sh
+python -m tools.seed
 
 echo "Start main process"
 python -m app.main
