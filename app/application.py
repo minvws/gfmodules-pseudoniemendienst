@@ -1,3 +1,6 @@
+from fastapi.openapi.utils import get_openapi
+from fastapi.openapi.models import HTTPBearer
+from fastapi.security import APIKeyHeader
 import json
 import logging
 import signal
@@ -9,7 +12,7 @@ from types import TracebackType
 from typing import Any, AsyncIterator
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
 
 from app.auth import get_auth_ctx
@@ -292,6 +295,7 @@ def setup_logging() -> None:
 
 
 def setup_fastapi() -> FastAPI:
+
     config = get_config()
 
     openapi_tags = list(TAGS_METADATA)
@@ -319,19 +323,19 @@ def setup_fastapi() -> FastAPI:
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
 
     # Non-OAuth routes
-    public_routers = [
-        default_router,
-        health_router,
-    ]
-    for router in public_routers:
-        fastapi.include_router(router)
+    # public_routers = [
+    #    default_router,
+    #    health_router,
+    # ]
+    # for router in public_routers:
+    #    fastapi.include_router(router)
 
     # OAuth protected routes
     routers = [
         oprf_router,
     ]
-    if config.app.enable_exchange_services_routes:
-        routers.append(exchange_router)
+    # if config.app.enable_exchange_services_routes:
+    #    routers.append(exchange_router)
     if config.app.enable_test_routes:
         routers.append(test_oprf_router)
 
@@ -351,5 +355,74 @@ def setup_fastapi() -> FastAPI:
             prefix="/administration",
             dependencies=[Depends(get_auth_ctx)],
         )
-
+    set_authorization_headers_openapi(fastapi, config.uvicorn.document_gf_headers)
     return fastapi
+
+
+def set_authorization_headers_openapi(fastapi: FastAPI, document_gf_headers: bool):
+    def custom_openapi() -> dict[str, Any] | None:
+        if fastapi.openapi_schema:
+            return fastapi.openapi_schema
+
+        openapi_schema = get_openapi(
+            title=fastapi.title,
+            version=fastapi.version,
+            routes=fastapi.routes,
+        )
+
+        security_schemes = openapi_schema["components"].get("securitySchemes", {})
+        if document_gf_headers:
+            security_schemes.update(
+                {
+                    "AudienceHeader": {
+                        "type": "apiKey",
+                        "in": "header",
+                        "name": "x-gf-audience",
+                        "description": "The accepted audience, e.g.: `https://localhost:6502`",
+                    },
+                    "SubjectHeader": {
+                        "type": "apiKey",
+                        "in": "header",
+                        "name": "x-gf-sub",
+                        "description": "The organization name (should be an OIN), e.g.: `00000003123456780000`",
+                    },
+                    "ActorCnHeader": {
+                        "type": "apiKey",
+                        "in": "header",
+                        "name": "x-gf-act-cn",
+                        "description": "The client's (actor) CN, e.g.: `www.example.com`",
+                    },
+                    "ActorSubjectHeader": {
+                        "type": "apiKey",
+                        "in": "header",
+                        "name": "x-gf-act-sub",
+                        "description": "The client's (actor) subject (should be an OIN), e.g.: `00000003123456780000`",
+                    },
+                }
+            )
+        else:
+            security_schemes.update(
+                {
+                    "BearerAuth": {
+                        "type": "http",
+                        "scheme": "bearer",
+                        "bearerFormat": "JWT",  # Optional, helps UI display context
+                    }
+                }
+            )
+
+        # Add the security scheme definition
+        openapi_schema["components"]["securitySchemes"] = security_schemes
+
+        # Optional: Apply security globally in the schema (UI only)
+        # so the "lock" icon appears on all endpoints,
+        # but WITHOUT enforcing it in the code.
+        security = {}
+        for name in security_schemes.keys():
+            security[name] = []
+        openapi_schema["security"] = [security]
+
+        fastapi.openapi_schema = openapi_schema
+        return fastapi.openapi_schema
+
+    fastapi.openapi = custom_openapi

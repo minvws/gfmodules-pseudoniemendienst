@@ -8,7 +8,6 @@ from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.orm import joinedload
 from app.db.decorator import repository
 from app.db.entities.hsm_key_versions import HsmKeyVersion
-from app.db.entities.organization import Organization
 from app.db.repositories.repository_base import RepositoryBase
 from app.models.oin import Oin
 
@@ -20,7 +19,7 @@ class HsmKeyVersionRepository(RepositoryBase):
     @staticmethod
     def _active_filter(at: datetime) -> ColumnElement[bool]:
         return and_(
-            HsmKeyVersion.removed.is_(False),
+            HsmKeyVersion.removed_at.is_(None),
             HsmKeyVersion.from_dt <= at,
             or_(HsmKeyVersion.until_dt.is_(None), HsmKeyVersion.until_dt > at),
         )
@@ -28,7 +27,7 @@ class HsmKeyVersionRepository(RepositoryBase):
     @staticmethod
     def _expired_filter(at: datetime) -> ColumnElement[bool]:
         return and_(
-            HsmKeyVersion.removed.is_(False),
+            HsmKeyVersion.removed_at.is_(None),
             HsmKeyVersion.until_dt.is_not(None),
             HsmKeyVersion.until_dt <= at,
         )
@@ -63,9 +62,8 @@ class HsmKeyVersionRepository(RepositoryBase):
         """
         query = (
             select(HsmKeyVersion)
-            .join(HsmKeyVersion.organization)
             .where(
-                Organization.oin == organization_oin,
+                HsmKeyVersion.organization_id == organization_oin,
                 HsmKeyVersionRepository._active_filter(at),
             )
             .order_by(HsmKeyVersion.version)
@@ -133,7 +131,7 @@ class HsmKeyVersionRepository(RepositoryBase):
                     HsmKeyVersion.version,
                     HsmKeyVersion.from_dt,
                     HsmKeyVersion.until_dt,
-                    HsmKeyVersion.removed,
+                    HsmKeyVersion.removed_at,
                 ],
                 select(
                     literal(uuid.uuid4()),
@@ -212,7 +210,7 @@ class HsmKeyVersionRepository(RepositoryBase):
             .where(
                 and_(
                     HsmKeyVersion.id == version_id,
-                    HsmKeyVersion.removed.is_(False),
+                    HsmKeyVersion.removed_at.is_(None),
                     HsmKeyVersion.organization_id == organization_id,
                 )
             )
