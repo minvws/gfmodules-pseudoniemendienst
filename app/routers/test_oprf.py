@@ -11,7 +11,6 @@ from app import container
 from app.models.requests import InputRequest, JweReceiverRequest, ReceiverRequest
 from app.personal_id import PersonalId, PersonalIdJSONEncoder
 from app.rid import RidUsage
-from app.services.mtls_service import MtlsService
 from app.services.oprf.oprf_service import OprfService
 from app.services.pseudonym_service import PseudonymService
 
@@ -156,98 +155,97 @@ def post_test_jwe_decode(
     return JSONResponse(res)
 
 
-@router.post(
-    "/test/pseudonym/reversible",
-    summary="Reverse a pseudonym",
-    tags=["OPRF Testing Services"],
-    description="""
-This endpoint is for testing purposes only. It reverses a reversible pseudonym. Note that this endpoint DOES check
-if the calling organization is authorized to reverse pseudonyms (max_key_usage == BSN).
-""",
-)
-def post_test_reversible_pseudonym(
-    request: Request,
-    pseudonym: str,
-    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
-) -> JSONResponse:
-    # Check if we as an organization are allowed to reverse pseudonyms (max_key_usage == BSN)
-    org = mtls_service.get_org_from_request(request)
-    if org.max_rid_usage != RidUsage.Bsn:
-        return JSONResponse(
-            {"error": "Organization is not authorized to reverse pseudonyms."},
-            status_code=403,
-        )
+# @router.post(
+#    "/test/pseudonym/reversible",
+#    summary="Reverse a pseudonym",
+#    tags=["OPRF Testing Services"],
+#    description="""
+# This endpoint is for testing purposes only. It reverses a reversible pseudonym. Note that this endpoint DOES check
+# if the calling organization is authorized to reverse pseudonyms (max_key_usage == BSN).
+# """,
+# )
+# def post_test_reversible_pseudonym(
+#    request: Request,
+#    pseudonym: str,
+#    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
+# ) -> JSONResponse:
+#    # Check if we as an organization are allowed to reverse pseudonyms (max_key_usage == BSN)
+#    org = mtls_service.get_org_from_request(request)
+#    if org.max_rid_usage != RidUsage.Bsn:
+#        return JSONResponse(
+#            {"error": "Organization is not authorized to reverse pseudonyms."},
+#            status_code=403,
+#        )
+#
+#    parts = pseudonym.split(":")
+#    if len(parts) == 3 and parts[0] == "pseudonym" and parts[1] == "reversible":
+#        pseudonym = parts[2]
+#    else:
+#        return JSONResponse(
+#            {
+#                "error": "Invalid pseudonym format. Expected format: pseudonym:reversible:<value>"
+#            },
+#            status_code=400,
+#        )
+#
+#    try:
+#        decoded = pseudonym_service.decrypt_reversible_pseudonym(
+#            pseudonym, str(org.oin)
+#        )
+#    except Exception as e:
+#        return JSONResponse(
+#            {"error": f"Failed to reverse pseudonym: {str(e)}"}, status_code=400
+#        )
+#
+#    return JSONResponse(
+#        content=jsonable_encoder(
+#            {
+#                "pseudonym": pseudonym,
+#                "decoded": decoded,
+#            },
+#            custom_encoder={
+#                PersonalId: lambda v: json.loads(
+#                    json.dumps(v, cls=PersonalIdJSONEncoder)
+#                )
+#            },
+#        )
+#    )
 
-    parts = pseudonym.split(":")
-    if len(parts) == 3 and parts[0] == "pseudonym" and parts[1] == "reversible":
-        pseudonym = parts[2]
-    else:
-        return JSONResponse(
-            {
-                "error": "Invalid pseudonym format. Expected format: pseudonym:reversible:<value>"
-            },
-            status_code=400,
-        )
 
-    try:
-        decoded = pseudonym_service.decrypt_reversible_pseudonym(
-            pseudonym, str(org.oin)
-        )
-    except Exception as e:
-        return JSONResponse(
-            {"error": f"Failed to reverse pseudonym: {str(e)}"}, status_code=400
-        )
-
-    return JSONResponse(
-        content=jsonable_encoder(
-            {
-                "pseudonym": pseudonym,
-                "decoded": decoded,
-            },
-            custom_encoder={
-                PersonalId: lambda v: json.loads(
-                    json.dumps(v, cls=PersonalIdJSONEncoder)
-                )
-            },
-        )
-    )
-
-
-@router.get(
-    "/test/mtls",
-    summary="Returns MTLS information about the calling organization",
-    tags=["OPRF Testing Services"],
-    description="""
-This endpoint is for testing purposes only. It will return information about the organization
-that called this endpoint using MTLS.
-""",
-)
-def test_mtls(
-    request: Request,
-    mtls_service: MtlsService = Depends(container.get_mtls_service),
-) -> JSONResponse:
-    org = mtls_service.get_org_from_request(request)
-
-    cert_pem = mtls_service.get_mtls_cert(request)
-    cert = mtls_service.get_oin_cert(request)
-
-    ret = {
-        "cert_pem": cert_pem,
-        "cert": {
-            "subject": str(cert.subject),
-            "issuer": str(cert.issuer),
-            "not_valid_before": cert.not_valid_before.isoformat(),
-            "not_valid_after": cert.not_valid_after.isoformat(),
-        },
-        "oin": mtls_service.get_oin_from_cert(cert),
-    }
-
-    if org:
-        ret["organization"] = {
-            "name": org.name,
-            "id": org.id,
-            "max_rid_usage": org.max_rid_usage,
-        }
-
-    return JSONResponse(content=jsonable_encoder(ret))
+# @router.get(
+#    "/test/mtls",
+#    summary="Returns MTLS information about the calling organization",
+#    tags=["OPRF Testing Services"],
+#    description="""
+# This endpoint is for testing purposes only. It will return information about the organization
+# that called this endpoint using MTLS.
+# """,
+# )
+# def test_mtls(
+#    request: Request,
+#    mtls_service: MtlsService = Depends(container.get_mtls_service),
+# ) -> JSONResponse:
+#    org = mtls_service.get_org_from_request(request)
+#
+#    cert_pem = mtls_service.get_mtls_cert(request)
+#    cert = mtls_service.get_oin_cert(request)
+#
+#    ret = {
+#        "cert_pem": cert_pem,
+#        "cert": {
+#            "subject": str(cert.subject),
+#            "issuer": str(cert.issuer),
+#            "not_valid_before": cert.not_valid_before.isoformat(),
+#            "not_valid_after": cert.not_valid_after.isoformat(),
+#        },
+#        "oin": mtls_service.get_oin_from_cert(cert),
+#    }
+#
+#    if org:
+#        ret["organization"] = {
+#            "name": org.name,
+#            "id": org.id,
+#            "max_rid_usage": org.max_rid_usage,
+#        }
+#
+#    return JSONResponse(content=jsonable_encoder(ret))

@@ -10,7 +10,6 @@ from app.config import ConfigOprf
 from app.logging.events import SYS_HSM_UNREACHABLE, log_event
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
 
@@ -45,23 +44,17 @@ class HsmOprfEvaluator:
         self,
         hsm_config: ConfigOprf,
         hsm_key_version_service: HsmKeyVersionService,
-        org_service: OrgService,
     ):
         self._hsm_config = hsm_config
         self._hsm_key_version_service = hsm_key_version_service
-        self._org_service = org_service
 
     def evaluate(
         self,
         recipient_org_oin: Oin,
         blinded_bytes: bytes,
     ) -> dict[int, bytes]:
-        organization = self._org_service.get_by_oin(recipient_org_oin)
-        if organization is None:
-            raise ValueError(f"organization not found for oin {recipient_org_oin}")
-
         active_versions = self._hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id(
-            organization.id
+            recipient_org_oin
         )
 
         ret: dict[int, bytes] = {}

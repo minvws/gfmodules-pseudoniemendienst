@@ -1,3 +1,5 @@
+from app.auth import get_auth_ctx
+from app.models.auth.context import AuthContext
 import logging
 from typing import Annotated
 from uuid import UUID
@@ -7,8 +9,6 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import authenticated_organization
-from app.db.entities.organization import Organization
 from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
 from app.services.hsm_key_version_service import (
     HsmKeyVersionNotFoundError,
@@ -28,12 +28,12 @@ def post_key_version(
     hsm_key_version_service: Annotated[
         HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
     ],
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
     req: HsmKeyVersionRequest | None = None,
 ) -> JSONResponse:
     try:
         entry = hsm_key_version_service.create_version_by_organization_id(
-            auth_org.id,
+            auth_ctx.claims.organization_id,
             req.from_dt if req else None,
             req.until_dt if req else None,
         )
@@ -56,9 +56,11 @@ def list_key_versions(
     hsm_key_version_service: Annotated[
         HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
     ],
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
 ) -> JSONResponse:
-    versions = hsm_key_version_service.get_versions_by_organization_id(auth_org.id)
+    versions = hsm_key_version_service.get_versions_by_organization_id(
+        auth_ctx.claims.organization_id
+    )
     return JSONResponse(
         status_code=200, content=jsonable_encoder([v.to_dict() for v in versions])
     )
@@ -75,19 +77,19 @@ def put_key_version(
     hsm_key_version_service: Annotated[
         HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
     ],
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
+    auth_ctx: AuthContext = Depends(get_auth_ctx),
 ) -> JSONResponse:
     try:
         entry = hsm_key_version_service.update_version_by_organization_id(
             id,
-            auth_org.id,
+            auth_ctx.claims.organization_id,
             req.until_dt,
         )
     except HsmKeyVersionNotFoundError:
         logger.warning(
             "key version %s not found for organization %s",
             id,
-            auth_org.id,
+            auth_ctx.claims.organization_id,
         )
         raise HTTPException(status_code=403, detail="forbidden")
     except Exception:

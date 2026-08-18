@@ -13,11 +13,6 @@ from app.rid import RidUsage
 logger = logging.getLogger(__name__)
 
 
-class RegisterRequest(BaseModel):
-    scope: List[str]
-    key_id: Optional[str] = None
-
-
 class HsmKeyVersionRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
