@@ -7,6 +7,7 @@ import pyoprf
 import requests
 
 from app.config import ConfigOprf
+from app.logging.context import correlation_headers
 from app.logging.events import SYS_HSM_UNREACHABLE, log_event
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -81,6 +82,7 @@ class HsmOprfEvaluator:
             response = requests.post(
                 url,
                 json=payload,
+                headers=correlation_headers(),
                 timeout=10,
                 verify=cfg.hsm_ca_cert_file or True,
                 cert=(
