@@ -20,6 +20,8 @@ application_id=pseudoniemendienst
 include_traces=True
 # Log everything as plain text to the console (for local development)
 debug_logs_in_console=True
+# Log an error when a request arrives without an X-GF-Correlation-ID header
+correlation_id_expected=False
 
 [database]
 dsn=postgresql+psycopg://postgres:postgres@postgres:5432/postgres
