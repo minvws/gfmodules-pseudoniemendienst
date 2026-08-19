@@ -3,6 +3,7 @@ import logging
 import requests
 
 from app.config import ConfigOprf
+from app.logging.context import correlation_headers
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmKeyLabel
 
@@ -67,6 +68,7 @@ class HsmKeyCleanupService:
         response = requests.post(
             url,
             json={"label": str(label)},
+            headers=correlation_headers(),
             timeout=10,
             verify=cfg.hsm_ca_cert_file or True,
             cert=(
