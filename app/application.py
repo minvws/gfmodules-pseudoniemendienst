@@ -315,7 +315,10 @@ def setup_fastapi() -> FastAPI:
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     )
 
-    fastapi.add_middleware(RequestContextMiddleware)
+    fastapi.add_middleware(
+        RequestContextMiddleware,
+        correlation_id_expected=config.logging.correlation_id_expected,
+    )
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
 
     # Non-OAuth routes

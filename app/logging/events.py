@@ -120,6 +120,15 @@ SYS_UNHANDLED_EXCEPTION = PRSEvent(  # PRS-SYS-004
         _SIEM: ("exception_type", "endpoint", "method"),
     },
 )
+SYS_MISSING_CORRELATION_ID = PRSEvent(  # PRS-SYS-007
+    "270407",
+    logging.ERROR,
+    (_APP, _SIEM),
+    {
+        _APP: ("endpoint", "method"),
+        _SIEM: ("endpoint", "method"),
+    },
+)
 SYS_HSM_UNREACHABLE = PRSEvent(  # PRS-SYS-006
     "270406",
     logging.CRITICAL,
