@@ -22,7 +22,7 @@ from app.logging.events import (
     SYS_UNHANDLED_EXCEPTION,
     log_event,
 )
-from app.logging.middleware import RequestContextMiddleware
+from app.logging.middleware import RequestContextMiddleware, bind_request_context
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
@@ -266,16 +266,24 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    log_event(
-        logger,
-        SYS_UNHANDLED_EXCEPTION,
-        "Unhandled exception",
-        exc_info=exc,
-        exception_type=type(exc).__name__,
-        endpoint=request.url.path,
-        method=request.method,
-    )
-    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+    # This handler runs in ServerErrorMiddleware, outside RequestContextMiddleware, so the
+    # per-request context has already been torn down; rebind it to log and answer with it.
+    with bind_request_context(request) as context:
+        log_event(
+            logger,
+            SYS_UNHANDLED_EXCEPTION,
+            "Unhandled exception",
+            exc_info=exc,
+            exception_type=type(exc).__name__,
+            endpoint=request.url.path,
+            method=request.method,
+        )
+        response = JSONResponse(
+            status_code=500, content={"error": "Internal server error"}
+        )
+        if context is not None:
+            context.apply_to(response)
+        return response
 
 
 def setup_logging() -> None:
