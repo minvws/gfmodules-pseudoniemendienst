@@ -2,10 +2,12 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import wraps
+from typing import TypeVar
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -29,6 +31,8 @@ from app.logging.events import ACCESS_REQUEST, SYS_MISSING_CORRELATION_ID, log_e
 _SAFE_HEADER_VALUE = re.compile(r"[^a-zA-Z0-9\-_]")
 _access_logger = logging.getLogger("app.access")
 _logger = logging.getLogger(__name__)
+
+_REQUEST_CONTEXT_STATE_KEY = "request_context"
 
 
 def _sanitize(value: str) -> str:
@@ -85,6 +89,28 @@ def _bind(context: RequestContext) -> Generator[None]:
             var.reset(token)
 
 
+_ResponseT = TypeVar("_ResponseT", bound=Response)
+
+
+def restore_request_context(
+    handler: Callable[[Request, Exception], _ResponseT],
+) -> Callable[[Request, Exception], _ResponseT]:
+    @wraps(handler)
+    def wrapper(request: Request, exc: Exception) -> _ResponseT:
+        context: RequestContext | None = getattr(
+            request.state, _REQUEST_CONTEXT_STATE_KEY, None
+        )
+        if context is None:
+            return handler(request, exc)
+
+        with _bind(context):
+            response = handler(request, exc)
+            context.apply_to(response)
+            return response
+
+    return wrapper
+
+
 class RequestContextMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, correlation_id_expected: bool = False) -> None:
         super().__init__(app)
@@ -94,6 +120,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         context = RequestContext.from_request(request)
+        setattr(request.state, _REQUEST_CONTEXT_STATE_KEY, context)
 
         response: Response | None = None
         start = time.perf_counter()

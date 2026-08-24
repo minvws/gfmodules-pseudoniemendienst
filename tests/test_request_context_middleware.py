@@ -5,7 +5,9 @@ from typing import Any, Iterator
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 from app.logging.context import (
     CLIENT_TRACE_ID_HEADER,
@@ -16,13 +18,25 @@ from app.logging.context import (
     correlation_id_var,
     endpoint_var,
     method_var,
+    request_id_var,
 )
 from app.logging.events import SYS_APP_STARTED, log_event
 from app.logging.filters import AppFilter, LoggingStreams
 from app.logging.formatter import JsonFormatter
-from app.logging.middleware import RequestContextMiddleware
+from app.logging.middleware import RequestContextMiddleware, restore_request_context
 
 CORRELATION_ID = "some-generated-id"
+
+
+@restore_request_context
+def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "correlation_id": correlation_id_var.get(),
+            "request_id": request_id_var.get(),
+        },
+    )
 
 
 @pytest.fixture
@@ -38,9 +52,14 @@ def middleware_client() -> Iterator[TestClient]:
             "outgoing": correlation_headers(),
         }
 
-    app.add_middleware(RequestContextMiddleware)
+    @app.get("/boom")
+    def boom() -> dict[str, Any]:
+        raise RuntimeError("kaboom")
 
-    with TestClient(app) as test_client:
+    app.add_middleware(RequestContextMiddleware)
+    app.add_exception_handler(Exception, _unhandled_exception_handler)
+
+    with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
 
 
@@ -146,6 +165,27 @@ def test_correlation_headers_are_empty_outside_a_request() -> None:
     assert correlation_headers() == {}
 
 
+def test_context_is_restored_for_an_unhandled_exception(
+    middleware_client: TestClient,
+) -> None:
+    response = middleware_client.get(
+        "/boom", headers={CORRELATION_ID_HEADER: CORRELATION_ID}
+    )
+
+    assert response.status_code == 500
+    assert response.json()["correlation_id"] == CORRELATION_ID
+    assert response.json()["request_id"] != UNSET
+
+
+def test_correlation_id_is_echoed_on_a_500(middleware_client: TestClient) -> None:
+    response = middleware_client.get(
+        "/boom", headers={CORRELATION_ID_HEADER: CORRELATION_ID}
+    )
+
+    assert response.headers[CORRELATION_ID_HEADER] == CORRELATION_ID
+    assert response.headers[REQUEST_ID_HEADER]
+
+
 def test_context_does_not_leak_between_requests(middleware_client: TestClient) -> None:
     middleware_client.get("/echo", headers={CORRELATION_ID_HEADER: CORRELATION_ID})
 
@@ -158,6 +198,23 @@ def test_each_request_gets_a_distinct_request_id(middleware_client: TestClient) 
     second = middleware_client.get("/echo").headers[REQUEST_ID_HEADER]
 
     assert first != second
+
+
+def test_handler_still_responds_when_no_context_was_bound() -> None:
+    # Without RequestContextMiddleware there is nothing to rebind; the handler must not blow up.
+    app = FastAPI()
+
+    @app.get("/boom")
+    def boom() -> dict[str, Any]:
+        raise RuntimeError("kaboom")
+
+    app.add_exception_handler(Exception, _unhandled_exception_handler)
+
+    response = TestClient(app, raise_server_exceptions=False).get("/boom")
+
+    assert response.status_code == 500
+    assert response.json()["correlation_id"] == UNSET
+    assert REQUEST_ID_HEADER not in response.headers
 
 
 def test_correlation_id_reaches_the_formatted_log_record() -> None:
