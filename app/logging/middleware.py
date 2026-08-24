@@ -2,10 +2,12 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import wraps
+from typing import TypeVar
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -87,16 +89,26 @@ def _bind(context: RequestContext) -> Generator[None]:
             var.reset(token)
 
 
-@contextmanager
-def bind_request_context(request: Request) -> Generator[RequestContext | None]:
-    context: RequestContext | None = getattr(
-        request.state, _REQUEST_CONTEXT_STATE_KEY, None
-    )
-    if context is None:
-        yield None
-        return
-    with _bind(context):
-        yield context
+_ResponseT = TypeVar("_ResponseT", bound=Response)
+
+
+def restore_request_context(
+    handler: Callable[[Request, Exception], _ResponseT],
+) -> Callable[[Request, Exception], _ResponseT]:
+    @wraps(handler)
+    def wrapper(request: Request, exc: Exception) -> _ResponseT:
+        context: RequestContext | None = getattr(
+            request.state, _REQUEST_CONTEXT_STATE_KEY, None
+        )
+        if context is None:
+            return handler(request, exc)
+
+        with _bind(context):
+            response = handler(request, exc)
+            context.apply_to(response)
+            return response
+
+    return wrapper
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
