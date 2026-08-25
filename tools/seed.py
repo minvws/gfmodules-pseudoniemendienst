@@ -12,14 +12,13 @@ if __name__ == "__main__":
     config = get_config()
     db = Database(config.database.dsn)
     oin = "00000003123456780000"
-    organization_id = uuid.uuid4()
+    organization_id = uuid.UUID("daff00e0-559e-4939-82b2-8f53efe33f35")
     with db.get_db_session() as session:
         session.execute(
             text(
                 f"insert into admin.organizations (id, external_id, name, created_at) values ('{organization_id}', '{oin}', 'seeded org', '{datetime.datetime.now()}')"
             )
         )
-
         session.add(
             HsmKeyVersion(
                 organization_id=organization_id,
@@ -27,19 +26,4 @@ if __name__ == "__main__":
                 from_dt=datetime.datetime.now(),
             )
         )
-
-        # session.add(
-        #    Authorization(
-        #        organization_id=oin,
-        #        action="receive",
-        #        object="oprf",
-        #    )
-        # )
-        # session.add(
-        #    Authorization(
-        #        organization_id=oin,
-        #        action="request",
-        #        object="oprf",
-        #    )
-        # )
         session.commit()

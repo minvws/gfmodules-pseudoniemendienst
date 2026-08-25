@@ -1,15 +1,9 @@
-from httpx import Auth
-from app.db.entities.authorization import Authorization
 import logging
-import uuid
-from datetime import datetime
-from typing import List
 
-from sqlalchemy import and_, func, insert, literal, or_, select, update, Exists, exists
-from sqlalchemy.sql.elements import ColumnElement
-from sqlalchemy.orm import joinedload
+from sqlalchemy import and_, exists, select
+
 from app.db.decorator import repository
-from app.db.entities.hsm_key_versions import HsmKeyVersion
+from app.db.entities.authorization import Authorization
 from app.db.repositories.repository_base import RepositoryBase
 from app.models.oin import Oin
 

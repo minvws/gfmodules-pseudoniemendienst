@@ -1,6 +1,5 @@
 import logging
 import uuid
-from typing import List
 
 from sqlalchemy import and_, delete, literal, or_, select, update
 from sqlalchemy.dialects.postgresql.json import JSONB
@@ -25,7 +24,7 @@ class OrganizationPublicKeyRepository(RepositoryBase):
         query = select(OrganizationPublicKey).where(OrganizationPublicKey.id == key_id)
         return self.db_session.execute(query).scalars().first()
 
-    def get_by_org(self, org_id: uuid.UUID) -> List[OrganizationPublicKey]:
+    def get_by_org(self, org_id: uuid.UUID) -> list[OrganizationPublicKey]:
         """
         Fetches key entrie for a given organization id and matching domain.
         """

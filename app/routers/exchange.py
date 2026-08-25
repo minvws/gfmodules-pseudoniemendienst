@@ -1,21 +1,8 @@
-import json
 import logging
-from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from fastapi import APIRouter, HTTPException
 
-from app import container
-from app.auth import get_auth_ctx
-from app.models.auth.context import AuthContext
 from app.models.oin import Oin
-from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
-from app.personal_id import PersonalId
-from app.rid import ALLOWED_BY_RID_USAGE, REQUIRED_MIN_USAGE, USAGE_RANK, RidUsage
-from app.services.oprf.jwe_token import BlindJwe
-from app.services.pseudonym_service import PseudonymService, PseudonymType
-from app.services.rid_service import RidService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

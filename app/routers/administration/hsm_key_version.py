@@ -1,5 +1,3 @@
-from app.auth import get_auth_ctx
-from app.models.auth.context import AuthContext
 import logging
 from typing import Annotated
 from uuid import UUID
@@ -9,6 +7,8 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
+from app.auth import get_auth_ctx
+from app.models.auth.context import AuthContext
 from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
 from app.services.hsm_key_version_service import (
     HsmKeyVersionNotFoundError,
@@ -28,11 +28,11 @@ def post_key_version(
     hsm_key_version_service: Annotated[
         HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
     ],
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
     req: HsmKeyVersionRequest | None = None,
 ) -> JSONResponse:
     try:
-        entry = hsm_key_version_service.create_version_by_organization_id(
+        entry = hsm_key_version_service.create_version_by_organization_external_id(
             auth_ctx.claims.organization_id,
             req.from_dt if req else None,
             req.until_dt if req else None,
@@ -40,7 +40,7 @@ def post_key_version(
     except Exception:
         logger.exception(
             "failed to create key version for organization_id %s",
-            auth_org.id,
+            auth_ctx.claims.organization_id,
         )
         raise HTTPException(status_code=500, detail="failed to create key version")
 
@@ -56,7 +56,7 @@ def list_key_versions(
     hsm_key_version_service: Annotated[
         HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
     ],
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
 ) -> JSONResponse:
     versions = hsm_key_version_service.get_versions_by_organization_id(
         auth_ctx.claims.organization_id
@@ -77,7 +77,7 @@ def put_key_version(
     hsm_key_version_service: Annotated[
         HsmKeyVersionService, Depends(container.get_hsm_key_version_service)
     ],
-    auth_ctx: AuthContext = Depends(get_auth_ctx),
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
 ) -> JSONResponse:
     try:
         entry = hsm_key_version_service.update_version_by_organization_id(

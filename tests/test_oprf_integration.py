@@ -1,11 +1,13 @@
 import base64
 import json
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Dict, Generator, List, Tuple
 
 import pyoprf
 import pytest
+from app.services.key_resolver import KeyResolver
+from app.services.org_service import OrgService
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -17,20 +19,18 @@ from app import container
 from app.logging.filters import LoggingStreams
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfEvaluationError
-from app.services.org_service import OrgService
 
 
 @dataclass(frozen=True)
 class OprfIntegrationContext:
-    personal_identifier: Dict[str, str]
+    personal_identifier: dict[str, str]
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
 
 
-def generate_rsa_keypair() -> Tuple[str, str]:
+def generate_rsa_keypair() -> tuple[str, str]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
 
@@ -67,10 +67,10 @@ def setup_org_and_key(
 def run_oprf_eval_and_unblind(
     client: TestClient,
     private_key_pem: str,
-    personal_identifier: Dict[str, str],
+    personal_identifier: dict[str, str],
     recipient_organization: str,
     recipient_scope: str,
-    headers: Dict[str, str],
+    headers: dict[str, str],
 ) -> str:
     blind_factor_raw, blinded_input_raw = derive_blind_factor_and_input(
         personal_identifier=personal_identifier,
@@ -111,11 +111,11 @@ def run_oprf_eval_and_unblind(
 
 
 def derive_blind_factor_and_input(
-    personal_identifier: Dict[str, str],
+    personal_identifier: dict[str, str],
     recipient_organization: str,
     recipient_scope: str,
-) -> Tuple[bytes, bytes]:
-    info = f"{recipient_organization}|{recipient_scope}|v1".encode("utf-8")
+) -> tuple[bytes, bytes]:
+    info = f"{recipient_organization}|{recipient_scope}|v1".encode()
     hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
     personal_id = json.dumps(personal_identifier, separators=(",", ":"))
     derived_personal_id = hkdf.derive(personal_id.encode("utf-8"))
@@ -153,7 +153,7 @@ def oprf_context(
 def test_oprf_integration_roundtrip_is_stable_for_same_input(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
 
     pseudonym_1 = run_oprf_eval_and_unblind(
@@ -179,7 +179,7 @@ def test_oprf_integration_roundtrip_is_stable_for_same_input(
 def test_oprf_eval_invalid_scope_returns_not_found(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     _, blinded_input_raw = derive_blind_factor_and_input(
         personal_identifier=oprf_context.personal_identifier,
@@ -206,7 +206,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
 
 def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
@@ -226,7 +226,7 @@ def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
 
 def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_error(
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     eval_response = client.post(
         "/oprf/eval",
@@ -246,7 +246,7 @@ def test_oprf_eval_invalid_prefixed_recipient_organization_returns_expected_erro
 
 def test_oprf_eval_unknown_oin_returns_not_found(
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     valid_headers["x-gf-sub"] = "00000099000000003000"
     eval_response = client.post(
@@ -266,14 +266,14 @@ def test_oprf_eval_unknown_oin_returns_not_found(
 class _RecordingHandler(logging.Handler):
     def __init__(self) -> None:
         super().__init__()
-        self.records: List[logging.LogRecord] = []
+        self.records: list[logging.LogRecord] = []
 
     def emit(self, record: logging.LogRecord) -> None:
         self.records.append(record)
 
 
 @pytest.fixture
-def oprf_event_records() -> Generator[List[logging.LogRecord], None, None]:
+def oprf_event_records() -> Generator[list[logging.LogRecord], None, None]:
     handler = _RecordingHandler()
     target = logging.getLogger("app.routers.oprf")
     target.addHandler(handler)
@@ -283,15 +283,15 @@ def oprf_event_records() -> Generator[List[logging.LogRecord], None, None]:
         target.removeHandler(handler)
 
 
-def _events(records: List[logging.LogRecord], event_id: str) -> List[logging.LogRecord]:
+def _events(records: list[logging.LogRecord], event_id: str) -> list[logging.LogRecord]:
     return [r for r in records if getattr(r, "event_id", None) == event_id]
 
 
 def test_oprf_eval_success_emits_audit_event(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    oprf_event_records: List[logging.LogRecord],
-    valid_headers: Dict[str, str],
+    oprf_event_records: list[logging.LogRecord],
+    valid_headers: dict[str, str],
     valid_client_organization_id: Oin,
 ) -> None:
     run_oprf_eval_and_unblind(
@@ -316,8 +316,8 @@ def test_oprf_eval_success_emits_audit_event(
 def test_oprf_eval_unknown_scope_emits_refused_event(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    oprf_event_records: List[logging.LogRecord],
-    valid_headers: Dict[str, str],
+    oprf_event_records: list[logging.LogRecord],
+    valid_headers: dict[str, str],
     valid_client_organization_id: Oin,
 ) -> None:
     response = client.post(
@@ -344,8 +344,8 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    oprf_event_records: List[logging.LogRecord],
-    valid_headers: Dict[str, str],
+    oprf_event_records: list[logging.LogRecord],
+    valid_headers: dict[str, str],
     valid_client_organization_id: Oin,
 ) -> None:
     class FailingOprfService:
@@ -384,7 +384,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     class FailingOprfService:
         def eval_blind(

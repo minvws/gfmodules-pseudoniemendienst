@@ -1,13 +1,3 @@
-from app.models.organization_public_key import (
-    OrganizationPublicKeyRequest,
-)
-from app.services.organization_public_key_service import (
-    OrganizationPublicKeyService,
-    AlreadyExistsError,
-    KeyNotFoundError,
-)
-from app.models.auth.context import AuthContext
-from app.auth import get_auth_ctx
 import logging
 from typing import Annotated
 from uuid import UUID
@@ -16,6 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Path
 from starlette.responses import JSONResponse
 
 from app import container
+from app.auth import get_auth_ctx
+from app.models.auth.context import AuthContext
+from app.models.organization_public_key import (
+    OrganizationPublicKeyRequest,
+)
+from app.services.organization_public_key_service import (
+    AlreadyExistsError,
+    KeyNotFoundError,
+    OrganizationPublicKeyService,
+)
 
 logger = logging.getLogger(__name__)
 

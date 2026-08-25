@@ -2,17 +2,12 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends
-from fastapi.encoders import jsonable_encoder
 from jwcrypto import jwe, jwk
-from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import container
 from app.models.requests import InputRequest, JweReceiverRequest, ReceiverRequest
-from app.personal_id import PersonalId, PersonalIdJSONEncoder
-from app.rid import RidUsage
 from app.services.oprf.oprf_service import OprfService
-from app.services.pseudonym_service import PseudonymService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

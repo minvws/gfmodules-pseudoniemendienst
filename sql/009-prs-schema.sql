@@ -1,3 +1,7 @@
+DROP TABLE organization_key;
+DROP TABLE hsm_key_version;
+DROP TABLE organization;
+
 CREATE SCHEMA IF NOT EXISTS prs;
 
 CREATE SCHEMA IF NOT EXISTS admin;
@@ -18,46 +22,65 @@ WHERE deleted_at is NULL;
 
 CREATE TABLE admin.clients (
     id UUID PRIMARY KEY,
-    external_id varchar(100),
     organization_id UUID NOT NULL REFERENCES admin.organizations(id),
-    common_name VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
-CREATE UNIQUE INDEX idx_admin_clients_unique_external_id
-ON admin.clients (external_id, organization_id, common_name)
+
+CREATE TABLE admin.certificates (
+    id UUID PRIMARY KEY,
+    organization_identifier varchar(100),
+    domain VARCHAR(255),
+    organization_id UUID NOT NULL REFERENCES admin.organizations(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+);
+
+CREATE UNIQUE INDEX idx_admin_certificates_unique
+ON admin.certificates (organization_identifier, domain, organization_id)
 WHERE deleted_at IS NULL;
 
+CREATE TABLE admin.client_certificates (
+  client_id UUID NOT NULL REFERENCES admin.clients(id),
+  certificate_id UUID NOT NULL REFERENCES admin.certificates(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (client_id, certificate_id)
+);
+
 CREATE TABLE admin.personal_id_types (
-    id varchar(100) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-INSERT INTO admin.personal_id_types (id) values ('oprf');
-INSERT INTO admin.personal_id_types (id) values ('oprf2');
+
+INSERT INTO admin.personal_id_types (name) values ('OPRF');
+INSERT INTO admin.personal_id_types (name) values ('REVERSIBLE_PSEUDONYM');
+INSERT INTO admin.personal_id_types (name) values ('IRREVERSIBLE_PSEUDONYM');
 
 CREATE TABLE admin.organization_receive_personal_id_types (
-    id UUID PRIMARY KEY,
     organization_id UUID NOT NULL REFERENCES admin.organizations(id),
-    personal_id_type varchar(100) NOT NULL REFERENCES admin.personal_id_types(id),
+    personal_id_type_id INTEGER NOT NULL REFERENCES admin.personal_id_types(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (organization_id, personal_id_type)
+    PRIMARY KEY (organization_id, personal_id_type_id)
 );
 
 CREATE TABLE admin.organization_request_personal_id_types (
-    id UUID PRIMARY KEY,
     organization_id UUID NOT NULL REFERENCES admin.organizations(id),
-    personal_id_type varchar(100) NOT NULL REFERENCES admin.personal_id_types(id),
+    personal_id_type_id INTEGER NOT NULL REFERENCES admin.personal_id_types(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (organization_id, personal_id_type)
+    PRIMARY KEY (organization_id, personal_id_type_id)
 );
 
 CREATE TABLE admin.client_request_personal_id_types (
-    id UUID PRIMARY KEY,
     client_id UUID NOT NULL REFERENCES admin.clients(id),
-    organization_request_personal_id_type_id UUID NOT NULL REFERENCES admin.organization_request_personal_id_types(id),
+    organization_id UUID NOT NULL,
+    personal_id_type_id INTEGER NOT NULL REFERENCES admin.personal_id_types(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (client_id, organization_request_personal_id_type_id)
+    PRIMARY KEY (client_id, personal_id_type_id),
+    FOREIGN KEY (organization_id, personal_id_type_id)
+      REFERENCES admin.organization_request_personal_id_types(organization_id, personal_id_type_id)
 );
 
 CREATE TABLE prs.hsm_key_versions (

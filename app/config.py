@@ -1,7 +1,7 @@
 import configparser
 import os
 from enum import Enum
-from typing import Any, List
+from typing import Any
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
@@ -107,11 +107,11 @@ class ConfigPseudonym(BaseModel):
 
 
 class ConfigAuthorizationHeaders(BaseModel):
-    expected_audiences: List[str]
+    expected_audiences: list[str]
 
     @field_validator("expected_audiences", mode="before")
     @classmethod
-    def validate_aud(cls, data: Any) -> List[str]:
+    def validate_aud(cls, data: Any) -> list[str]:
         if isinstance(data, str):
             return data.split()
 

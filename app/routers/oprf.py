@@ -1,23 +1,17 @@
 import json
-from jwcrypto.jwk import JWK
-from app.services.authorization_service import AuthorizationService
-from app.services.organization_public_key_service import OrganizationPublicKeyService
 import logging
 
 from fastapi import APIRouter, Depends
+from jwcrypto.jwk import JWK
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import get_auth_ctx
-from app.logging.events import (
-    OPRF_EVAL_FAILED,
-    OPRF_EVAL_OK,
-    OPRF_REFUSED_NO_ACTIVE_PUBKEY,
-    log_event,
-)
 from app.models.auth.context import AuthContext
 from app.models.requests import BlindRequest
+from app.services.authorization_service import AuthorizationService
 from app.services.oprf.oprf_service import OprfService
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

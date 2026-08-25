@@ -1,18 +1,17 @@
-from fastapi.openapi.utils import get_openapi
-from fastapi.openapi.models import HTTPBearer
-from fastapi.security import APIKeyHeader
 import json
 import logging
 import signal
 import sys
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from logging.config import dictConfig
 from pathlib import Path
 from types import TracebackType
-from typing import Any, AsyncIterator
+from typing import Any
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request, Security
+from fastapi import Depends, FastAPI, Request
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
 from app.auth import get_auth_ctx
@@ -29,6 +28,7 @@ from app.logging.middleware import RequestContextMiddleware, restore_request_con
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
+from app.logging.middleware import RequestContextMiddleware
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.administration.key import router as key_router
 from app.routers.oprf import router as oprf_router

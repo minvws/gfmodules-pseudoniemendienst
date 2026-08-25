@@ -1,12 +1,12 @@
 import pytest
+from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.services.key_resolver import KeyRequest, KeyResolver
+from app.services.org_service import OrgService
 from jwcrypto import jwk
 from pydantic import ValidationError
 
-from app.db.repositories.org_key_repository import OrganizationKeyRepository
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app.services.key_resolver import KeyRequest, KeyResolver
-from app.services.org_service import OrgService
 
 TEST_PUBKEY = """-----BEGIN PUBLIC KEY-----
 MIGeMA0GCSqGSIb3DQEBAQUAA4GMADCBiAKBgG04s6v5MQpqRk7QIUDnfrWqVO3N

@@ -1,23 +1,13 @@
+import logging
+import uuid
+
+from app.db.db import Database
+from app.db.entities.organization_key import OrganizationPublicKey
 from app.db.repositories.authorization_repository import AuthorizationRepository
-import json
-from datetime import datetime, timedelta, timezone
-from curses import raw
-from re import A
 from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
-from app.db.entities.organization_key import OrganizationPublicKey
-from jwcrypto.jws import JWS, InvalidJWSSignature, InvalidJWSObject
-from jwcrypto.jwk import JWK
-import logging
-import uuid
-from typing import List, Optional
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-from app.db.db import Database
 from app.models.oin import Oin
-from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,7 @@
 import uuid
-from typing import Dict
 
+from app.services.key_resolver import KeyResolver
+from app.services.org_service import OrgService
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
@@ -9,8 +10,6 @@ from starlette.testclient import TestClient
 from app import container
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver
-from app.services.org_service import OrgService
 
 
 def _generate_rsa_public_key() -> str:
@@ -22,7 +21,7 @@ def _generate_rsa_public_key() -> str:
     return public_key.decode("ascii")
 
 
-def _auth_headers(valid_headers: Dict[str, str], org_oin: Oin) -> Dict[str, str]:
+def _auth_headers(valid_headers: dict[str, str], org_oin: Oin) -> dict[str, str]:
     headers = dict(valid_headers)
     headers["x-gf-sub"] = org_oin.value
     return headers
@@ -33,7 +32,7 @@ def test_register_certificate_creates_key_for_authenticated_org(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -73,7 +72,7 @@ def test_register_certificate_rejects_duplicate_scope_with_conflict(
     app: FastAPI,
     client: TestClient,
     org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -112,7 +111,7 @@ def test_register_certificate_rejects_duplicate_scope_with_conflict(
 def test_register_certificate_for_unknown_org_is_unauthorized(
     app: FastAPI,
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     class _FakeMtlsService:
         def get_mtls_pub_key(self, _request: object) -> str:
@@ -136,7 +135,7 @@ def test_list_keys_returns_entries_for_authenticated_org(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -159,7 +158,7 @@ def test_list_keys_returns_entries_for_authenticated_org(
 
 def test_list_keys_for_unknown_org_is_unauthorized(
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     response = client.get(
         "/administration/keys",
@@ -173,7 +172,7 @@ def test_list_keys_for_unknown_org_is_unauthorized(
 def test_list_keys_for_org_without_keys_returns_empty(
     client: TestClient,
     org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -193,7 +192,7 @@ def test_update_key_clears_key_id_when_not_provided(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -231,7 +230,7 @@ def test_update_key_updates_key_id_for_authenticated_org(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -265,7 +264,7 @@ def test_update_key_clears_key_id_when_null(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -298,7 +297,7 @@ def test_update_key_clears_key_id_when_null(
 def test_update_unknown_key_is_unauthorized(
     client: TestClient,
     org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -323,7 +322,7 @@ def test_update_other_org_is_unauthorized(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     owner_org = org_service.create(
         Oin("00000099000000001000"),
@@ -360,7 +359,7 @@ def test_delete_key_removes_key_for_authenticated_org(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -384,7 +383,7 @@ def test_delete_key_removes_key_for_authenticated_org(
 def test_delete_key_not_found_is_unauthorized(
     client: TestClient,
     org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -405,7 +404,7 @@ def test_delete_other_org_is_unauthorized(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     owner_org = org_service.create(
         Oin("00000099000000001000"),
@@ -434,7 +433,7 @@ def test_delete_other_org_is_unauthorized(
 def test_update_rejects_invalid_key_id_with_422(
     client: TestClient,
     org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),
@@ -458,7 +457,7 @@ def test_update_rejects_extra_field_with_422(
     client: TestClient,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     auth_org = org_service.create(
         Oin("00000099000000001000"),

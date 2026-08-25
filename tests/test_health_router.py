@@ -1,10 +1,10 @@
 import logging
-from typing import Callable, List
+from collections.abc import Callable
 
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
-RecordLogs = Callable[[str], List[logging.LogRecord]]
+RecordLogs = Callable[[str], list[logging.LogRecord]]
 
 
 def test_health_check_all_components_healthy(

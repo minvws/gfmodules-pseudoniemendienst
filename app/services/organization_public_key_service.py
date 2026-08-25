@@ -1,22 +1,17 @@
 import json
+import logging
+import uuid
 from datetime import datetime, timedelta, timezone
-from curses import raw
-from re import A
+
+from jwcrypto.jwk import JWK
+from jwcrypto.jws import JWS, InvalidJWSObject, InvalidJWSSignature
+
+from app.db.db import Database
+from app.db.entities.organization_key import OrganizationPublicKey
 from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
-from app.db.entities.organization_key import OrganizationPublicKey
-from jwcrypto.jws import JWS, InvalidJWSSignature, InvalidJWSObject
-from jwcrypto.jwk import JWK
-import logging
-import uuid
-from typing import List, Optional
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-from app.db.db import Database
 from app.models.oin import Oin
-from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +24,7 @@ class KeyNotFoundError(Exception):
     pass
 
 
-def _normalize_scope(items: List[str]) -> List[str]:
+def _normalize_scope(items: list[str]) -> list[str]:
     cleaned = [s.strip().lower() for s in items if s and s.strip()]
     return sorted(set(cleaned))
 
@@ -42,7 +37,7 @@ class OrganizationPublicKeyService:
         jws = JWS()
         try:
             jws.deserialize(raw_jws)
-        except InvalidJWSObject as ijo:
+        except InvalidJWSObject:
             raise Exception("TODO CUSTOM ERROR, Invalid jws")
 
         if "jwk" not in jws.jose_header and "JWK" not in jws.jose_header:
@@ -55,11 +50,11 @@ class OrganizationPublicKeyService:
         jwk = JWK(**jws.jose_header.get("jwk", jws.jose_header.get("JWK")))
         try:
             jws.verify(jwk)
-        except InvalidJWSSignature as ijs:
+        except InvalidJWSSignature:
             raise Exception("TODO CUSTOM ERROR, Verification failed")
         try:
             payload = json.loads(jws.payload)
-        except Exception as e:
+        except Exception:
             raise Exception("TODO CUSTOM ERROR, JSON decode error")
         if "iat" not in payload:
             raise Exception("TODO CUSTOM ERROR, iat not in payload")
@@ -144,7 +139,7 @@ class OrganizationPublicKeyService:
             )
         return entry
 
-    def get_by_org(self, org_id: Oin) -> List[OrganizationPublicKey]:
+    def get_by_org(self, org_id: Oin) -> list[OrganizationPublicKey]:
         with self.db.get_db_session() as session:
             return session.get_repository(OrganizationPublicKeyRepository).get_by_org(
                 org_id
