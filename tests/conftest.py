@@ -13,6 +13,7 @@ import inject
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.config import get_config, set_config
 from app.db.db import Database
@@ -33,8 +34,8 @@ if not os.path.exists(oprf_path):
     with open(oprf_path, "w") as f:
         f.write(genkey(32))
 
-if not conf.pseudonym.master_key:
-    conf.pseudonym.master_key = genkey(32)
+if not conf.pseudonym.master_key.get_secret_value():
+    conf.pseudonym.master_key = SecretStr(genkey(32))
 set_config(conf)
 
 
@@ -96,7 +97,7 @@ def database() -> Database:
         return db
     except inject.InjectorException:
         pass
-    db = Database(dsn=get_config().database.dsn)
+    db = Database(dsn=get_config().database.dsn.get_secret_value())
     db.generate_tables()
     db.truncate_tables()
     return db

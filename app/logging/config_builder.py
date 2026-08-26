@@ -124,6 +124,13 @@ class LogConfigBuilder:
                     "level": "CRITICAL",
                     "propagate": False,
                 },
+                # inject logs every binding at DEBUG including full instance reprs,
+                # which would expose configuration secrets
+                "inject": {
+                    "handlers": ["console"],
+                    "level": "INFO",
+                    "propagate": False,
+                },
             },
             "root": {"handlers": ["console"], "level": self.loglevel},
         }
