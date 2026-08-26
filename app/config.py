@@ -3,7 +3,7 @@ import os
 from enum import Enum
 from typing import Any, List
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 _PATH = "app.conf"
 _ENVIRONMENT_CONFIG_PATH_NAME = "FASTAPI_CONFIG_PATH"
@@ -36,7 +36,8 @@ class ConfigLogging(BaseModel):
 
 
 class ConfigDatabase(BaseModel):
-    dsn: str
+    # SecretStr so the DSN password never appears in reprs or logs
+    dsn: SecretStr
     create_tables: bool = Field(default=False)
     retry_backoff: list[float] = Field(
         default=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 4.8, 6.4, 10.0]
@@ -100,7 +101,8 @@ class ConfigOprf(BaseModel):
 
 
 class ConfigPseudonym(BaseModel):
-    master_key: str = Field(default="")
+    # SecretStr so the key material never appears in reprs or logs
+    master_key: SecretStr = Field(default=SecretStr(""))
 
 
 class ConfigAuthorizationHeaders(BaseModel):

@@ -56,7 +56,7 @@ def container_config(binder: inject.Binder) -> None:
     config = get_config()
 
     db = Database(
-        dsn=config.database.dsn,
+        dsn=config.database.dsn.get_secret_value(),
         pool_size=config.database.pool_size,
         max_overflow=config.database.max_overflow,
         pool_pre_ping=config.database.pool_pre_ping,
@@ -110,7 +110,7 @@ def container_config(binder: inject.Binder) -> None:
     binder.bind(OprfService, oprf_service)
 
     # This should be done through an HSM
-    master_key = _load_master_key(config.pseudonym.master_key)
+    master_key = _load_master_key(config.pseudonym.master_key.get_secret_value())
 
     pseudonym_service = PseudonymService(master_key)
     binder.bind(PseudonymService, pseudonym_service)
