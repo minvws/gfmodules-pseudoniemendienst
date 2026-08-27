@@ -1,17 +1,13 @@
 import logging
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Depends, Security
 from jwcrypto import jwk
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import require_scopes
-from app.logging.events import (
-    OPRF_EVAL_FAILED,
-    OPRF_EVAL_OK,
-    OPRF_REFUSED_NO_ACTIVE_PUBKEY,
-    log_event,
-)
+from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
@@ -45,26 +41,30 @@ def post_eval(
     oin = req.recipientOrganization
     org = org_service.get_by_oin(oin)
     if org is None:
-        log_event(
+        gflog.emit(
             logger,
-            OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+            Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
             "OPRF refused: no organization found for target OIN",
-            handelende_oin=handelende_oin,
-            doel_oin=doel_oin,
-            endpoint=_ENDPOINT,
+            fields={
+                "handelende_oin": handelende_oin,
+                "doel_oin": doel_oin,
+                "endpoint": _ENDPOINT,
+            },
         )
         return JSONResponse(
             {"error": "No organization found for this OIN"}, status_code=404
         )
     key_entry = key_resolver.resolve_entry(org.id, req.recipientScope)
     if key_entry is None:
-        log_event(
+        gflog.emit(
             logger,
-            OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+            Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
             "OPRF refused: target organization has no active public key for scope",
-            handelende_oin=handelende_oin,
-            doel_oin=doel_oin,
-            endpoint=_ENDPOINT,
+            fields={
+                "handelende_oin": handelende_oin,
+                "doel_oin": doel_oin,
+                "endpoint": _ENDPOINT,
+            },
         )
         return JSONResponse(
             {"error": "No public key found for this organization and/or scope"},
@@ -75,24 +75,28 @@ def post_eval(
     try:
         result = oprf_service.eval_blind(req, pub_key_jwk, key_entry.key_id)
     except ValueError as e:
-        log_event(
+        gflog.emit(
             logger,
-            OPRF_EVAL_FAILED,
+            Log.OPRF_EVAL_FAILED,
             "OPRF evaluation failed",
-            handelende_oin=handelende_oin,
-            doel_oin=doel_oin,
-            error_type=getattr(e, "error_type", "crypto_evaluation_failure"),
-            endpoint=_ENDPOINT,
+            fields={
+                "handelende_oin": handelende_oin,
+                "doel_oin": doel_oin,
+                "error_type": getattr(e, "error_type", "crypto_evaluation_failure"),
+                "endpoint": _ENDPOINT,
+            },
         )
         return JSONResponse({"error": "Unable to evaluate blind"}, status_code=400)
 
-    log_event(
+    gflog.emit(
         logger,
-        OPRF_EVAL_OK,
+        Log.OPRF_EVAL_OK,
         "OPRF evaluation succeeded",
-        handelende_oin=handelende_oin,
-        doel_oin=doel_oin,
-        oprf_secret_versie=max(result.key_versions),
-        ontvanger_pubkey_id=key_entry.key_id,
+        fields={
+            "handelende_oin": handelende_oin,
+            "doel_oin": doel_oin,
+            "oprf_secret_versie": max(result.key_versions),
+            "ontvanger_pubkey_id": key_entry.key_id,
+        },
     )
     return JSONResponse({"jwe": result.jwe})

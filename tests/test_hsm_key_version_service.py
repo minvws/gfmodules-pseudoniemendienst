@@ -15,12 +15,12 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 from app.services.oprf.evaluators import (
     HsmKeyLabel,
     HsmOprfEvaluator,
     LocalOprfEvaluator,
 )
+from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 from app.services.org_service import OrgService
 
 TEST_OIN = Oin("00000099000000001000")

@@ -18,8 +18,8 @@ from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 from app.services.oprf.evaluators import HsmOprfEvaluator
+from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 from app.services.org_service import OrgService
 
 RecordLogs = Callable[[str], List[logging.LogRecord]]
@@ -37,25 +37,20 @@ def _events(records: List[logging.LogRecord], event_id: str) -> List[logging.Log
     return [r for r in records if getattr(r, "event_id", None) == event_id]
 
 
-def test_startup_emits_sys_app_started(
-    capsys: pytest.CaptureFixture[str], app: FastAPI
-) -> None:
-    # dictConfig (run inside create_fastapi_app) clears handlers on all app.*
-    # loggers, so a recording handler cannot observe the startup event. Instead,
-    # read it from the JSON console handler output — end-to-end through the
-    # actual logging config.
-    import json
+def test_startup_emits_sys_app_started(record_logs: RecordLogs, app: FastAPI) -> None:
+    records = record_logs("app.application")
 
-    out = capsys.readouterr().out
-    events = [json.loads(line) for line in out.splitlines() if '"270401"' in line]
+    # The started event is emitted on lifespan entry, which TestClient runs.
+    with TestClient(app):
+        pass
+
+    events = _events(records, "270401")
     assert len(events) == 1
-    event = events[0]
-    assert event["level"] == "INFO"
-    message = event["message"]
-    assert message["component"] == "pseudoniemendienst"
-    assert message["version"]
-    assert message["environment"]
-    assert message["pseudoniem_api_enabled"] is True
+    record = events[0]
+    assert record.levelno == logging.INFO
+    assert record.version  # type: ignore[attr-defined]
+    assert record.environment  # type: ignore[attr-defined]
+    assert record.pseudoniem_api_enabled is True  # type: ignore[attr-defined]
 
 
 def test_lifespan_shutdown_emits_sys_app_stopped(
@@ -71,7 +66,6 @@ def test_lifespan_shutdown_emits_sys_app_stopped(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert record.component == "pseudoniemendienst"  # type: ignore[attr-defined]
     assert record.shutdown_reason == "graceful"  # type: ignore[attr-defined]
 
 

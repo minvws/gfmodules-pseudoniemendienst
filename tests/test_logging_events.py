@@ -4,41 +4,31 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import gfmodules.logging as gflog
 import pytest
+from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
+from gfmodules.logging.testing import assert_catalogue_complete, capture_records
 from jwcrypto import jwk
 
 from app.config import ConfigOprf
-from app.logging.events import (
-    HEALTH_UNHEALTHY,
-    OPRF_EVAL_FAILED,
-    OPRF_EVAL_OK,
-    OPRF_REFUSED_NO_ACTIVE_PUBKEY,
-    SYS_APP_CRASHED,
-    SYS_APP_STARTED,
-    SYS_APP_STOPPED,
-    SYS_DB_CONNECTION_FAILED,
-    SYS_HSM_UNREACHABLE,
-    SYS_UNHANDLED_EXCEPTION,
-    PRSEvent,
-    log_event,
-)
-from app.logging.filters import LoggingStreams
+from app.logging.events import Log
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator, LocalOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
 
-def test_log_event_attaches_event_id_and_streams(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    logger = logging.getLogger("test.events")
-    logger.setLevel(logging.DEBUG)
-    with caplog.at_level(logging.DEBUG, logger="test.events"):
-        log_event(logger, OPRF_EVAL_OK, "evaluated", doel_oin="oin:x")
+def test_catalogue_defines_every_required_event() -> None:
+    assert_catalogue_complete(Log, access_logs=False)
 
-    record = caplog.records[-1]
-    assert record.event_id == OPRF_EVAL_OK.event_id  # type: ignore[attr-defined]
+
+def test_emit_attaches_event_id_and_streams() -> None:
+    logger = logging.getLogger("app.test_events")
+    with capture_records("app.test_events") as records:
+        gflog.emit(logger, Log.OPRF_EVAL_OK, "evaluated", fields={"doel_oin": "oin:x"})
+
+    record = records.entries[-1].record
+    assert record.event_id == Log.OPRF_EVAL_OK.event_id  # type: ignore[attr-defined]
     assert LoggingStreams.APP in record.stream  # type: ignore[attr-defined]
     assert LoggingStreams.SIEM in record.stream  # type: ignore[attr-defined]
     assert record.doel_oin == "oin:x"  # type: ignore[attr-defined]
@@ -48,50 +38,58 @@ def test_log_event_attaches_event_id_and_streams(
 @pytest.mark.parametrize(
     "event,expected_id,expected_level",
     [
-        (OPRF_EVAL_OK, "210400", logging.INFO),
-        (OPRF_EVAL_FAILED, "210402", logging.ERROR),
-        (OPRF_REFUSED_NO_ACTIVE_PUBKEY, "210403", logging.WARNING),
-        (HEALTH_UNHEALTHY, "270400", logging.ERROR),
-        (SYS_APP_STOPPED, "270402", logging.INFO),
-        (SYS_APP_CRASHED, "270402", logging.CRITICAL),
-        (SYS_DB_CONNECTION_FAILED, "270403", logging.ERROR),
-        (SYS_UNHANDLED_EXCEPTION, "270404", logging.ERROR),
-        (SYS_HSM_UNREACHABLE, "270406", logging.CRITICAL),
+        (Log.OPRF_EVAL_OK, "210400", logging.INFO),
+        (Log.OPRF_EVAL_FAILED, "210402", logging.ERROR),
+        (Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY, "210403", logging.WARNING),
+        (Log.HEALTH_UNHEALTHY, "270400", logging.ERROR),
+        (Log.SYS_APP_STOPPED, "270402", logging.INFO),
+        (Log.SYS_APP_CRASHED, "270402", logging.CRITICAL),
+        (Log.SYS_DB_CONNECTION_FAILED, "270403", logging.ERROR),
+        (Log.SYS_UNHANDLED_EXCEPTION, "270404", logging.ERROR),
+        (Log.SYS_MISSING_CORRELATION_ID, "270407", logging.ERROR),
+        (Log.SYS_HSM_UNREACHABLE, "270406", logging.CRITICAL),
     ],
 )
 def test_events_match_logging_spec(
-    caplog: pytest.LogCaptureFixture,
-    event: PRSEvent,
-    expected_id: str,
-    expected_level: int,
+    event: LogEvent, expected_id: str, expected_level: int
 ) -> None:
     assert event.event_id == expected_id
     assert LoggingStreams.APP in event.streams
     assert LoggingStreams.SIEM in event.streams
 
-    logger = logging.getLogger("test.events_levels")
-    logger.setLevel(logging.DEBUG)
-    with caplog.at_level(logging.DEBUG, logger="test.events_levels"):
-        log_event(logger, event, "msg")
-    assert caplog.records[-1].levelno == expected_level
+    logger = logging.getLogger("app.test_events_levels")
+    with capture_records("app.test_events_levels") as records:
+        gflog.emit(logger, event, "msg")
+
+    assert records.entries[-1].record.levelno == expected_level
 
 
 def test_sys_app_started_has_app_stream_only() -> None:
     # PRS-SYS-001: "stroom 3" is "-" in the spec, so no SIEM stream.
-    assert SYS_APP_STARTED.event_id == "270401"
-    assert SYS_APP_STARTED.streams == (LoggingStreams.APP,)
+    assert Log.SYS_APP_STARTED.event_id == "270401"
+    assert Log.SYS_APP_STARTED.streams == (LoggingStreams.APP,)
 
 
-def test_log_event_includes_exc_info(caplog: pytest.LogCaptureFixture) -> None:
-    logger = logging.getLogger("test.events_exc")
-    logger.setLevel(logging.DEBUG)
+def test_the_started_event_keeps_the_shared_allow_list_and_adds_this_services_own() -> (
+    None
+):
+    allowed = Log.SYS_APP_STARTED.fields[LoggingStreams.APP]
+
+    assert set(DefaultEventCatalogue.SYS_APP_STARTED.fields[LoggingStreams.APP]) <= set(
+        allowed
+    )
+    assert {"environment", "oauth_enabled", "pseudoniem_api_enabled"} <= set(allowed)
+
+
+def test_emit_includes_exc_info() -> None:
+    logger = logging.getLogger("app.test_events_exc")
     try:
         raise ValueError("boom")
     except ValueError as e:
-        with caplog.at_level(logging.DEBUG, logger="test.events_exc"):
-            log_event(logger, OPRF_EVAL_FAILED, "fail", exc_info=e)
+        with capture_records("app.test_events_exc") as records:
+            gflog.emit(logger, Log.OPRF_EVAL_FAILED, "fail", exc_info=e)
 
-    assert caplog.records[-1].exc_info is not None
+    assert records.entries[-1].record.exc_info is not None
 
 
 @pytest.fixture(scope="module")
