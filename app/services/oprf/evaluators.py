@@ -3,12 +3,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+import gfmodules.logging as gflog
 import pyoprf
 import requests
+from gfmodules.logging import correlation_headers
 
 from app.config import ConfigOprf
-from app.logging.context import correlation_headers
-from app.logging.events import SYS_HSM_UNREACHABLE, log_event
+from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.org_service import OrgService
@@ -92,11 +93,11 @@ class HsmOprfEvaluator:
                 ),
             )
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            log_event(
+            gflog.emit(
                 logger,
-                SYS_HSM_UNREACHABLE,
+                Log.SYS_HSM_UNREACHABLE,
                 "HSM/KMS unreachable",
-                error_reason=str(e),
+                fields={"error_reason": str(e)},
             )
             raise
         response.raise_for_status()

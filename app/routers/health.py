@@ -1,12 +1,13 @@
 import logging
 from typing import Annotated
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.container import get_database
 from app.db.db import Database
-from app.logging.events import HEALTH_UNHEALTHY, log_event
+from app.logging.events import Log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -75,12 +76,10 @@ def health(
     for name, error in errors.items():
         if error is None:
             continue
-        log_event(
+        gflog.emit(
             logger,
-            HEALTH_UNHEALTHY,
+            Log.HEALTH_UNHEALTHY,
             "Health check unhealthy",
-            component=name,
-            status="error",
-            error_detail=error,
+            fields={"component": name, "status": "error", "error_detail": error},
         )
     return JSONResponse(status_code=503, content=content)

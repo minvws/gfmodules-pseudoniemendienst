@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from uuid import UUID
 
 import pytest
 import requests

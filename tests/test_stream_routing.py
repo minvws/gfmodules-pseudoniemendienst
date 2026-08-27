@@ -1,115 +1,132 @@
-"""Verifies per-field stream routing (APP == stroom 2, SIEM == stroom 3) for the PRS events."""
-
-import io
-import json
 import logging
-from typing import Any, Iterator
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack
+from typing import Any
 
+import gfmodules.logging as gflog
 import pytest
+from gfmodules.logging import LogEvent, LoggingStreams, bind_context
+from gfmodules.logging.testing import assert_fields_absent, capture_stream
 
-from app.logging.events import (
-    HEALTH_UNHEALTHY,
-    OPRF_EVAL_OK,
-    SYS_APP_STARTED,
-    log_event,
-)
-from app.logging.filters import AppFilter, LoggingStreams, SiemFilter
-from app.logging.formatter import JsonFormatter
+from app.logging.events import Log
+
+_LOGGER_NAME = "app.test_stream_routing"
+_HANDELENDE_OIN = "00000099000000001000"
+_DOEL_OIN = "oin:00000099000000002000"
+
+Routed = dict[LoggingStreams, list[dict[str, Any]]]
+Route = Callable[..., Routed]
 
 
 @pytest.fixture
-def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO]]:
-    app_buf, siem_buf = io.StringIO(), io.StringIO()
+def route() -> Iterator[Route]:
+    logger = logging.getLogger(_LOGGER_NAME)
 
-    app_handler = logging.StreamHandler(app_buf)
-    app_handler.addFilter(AppFilter())
-    app_handler.setFormatter(
-        JsonFormatter(include_traces=False, stream=LoggingStreams.APP)
-    )
+    def _route(event: LogEvent, message: str = "event", **fields: Any) -> Routed:
+        with ExitStack() as stack:
+            routed: Routed = {
+                stream: stack.enter_context(capture_stream(stream, _LOGGER_NAME))
+                for stream in LoggingStreams
+            }
+            gflog.emit(logger, event, message, fields={**fields})
+        return routed
 
-    siem_handler = logging.StreamHandler(siem_buf)
-    siem_handler.addFilter(SiemFilter())
-    siem_handler.setFormatter(
-        JsonFormatter(include_traces=False, stream=LoggingStreams.SIEM)
-    )
-
-    logger = logging.getLogger("app.test_stream_routing")
-    logger.setLevel(logging.DEBUG)
-    logger.handlers = [app_handler, siem_handler]
-    logger.propagate = False
-
-    try:
-        yield logger, app_buf, siem_buf
-    finally:
-        logger.handlers = []
+    with bind_context(
+        {
+            "request_id": "req-1",
+            "ip": "10.0.0.1",
+            "endpoint": "/oprf/evaluate",
+            "method": "POST",
+            "correlation_id": "corr-1",
+        }
+    ):
+        yield _route
 
 
-def _messages(buf: io.StringIO) -> list[dict[str, Any]]:
-    return [json.loads(line)["message"] for line in buf.getvalue().splitlines()]
+class TestHealthUnhealthy:
+    @pytest.fixture
+    def routed(self, route: Route) -> Routed:
+        return route(
+            Log.HEALTH_UNHEALTHY,
+            "unhealthy",
+            component="database",
+            status="error",
+            error_detail="connection refused on 10.0.0.1:5432",
+        )
+
+    def test_siem_does_not_receive_the_error_detail(self, routed: Routed) -> None:
+        assert (
+            routed[LoggingStreams.APP][0]["error_detail"]
+            == "connection refused on 10.0.0.1:5432"
+        )
+        assert_fields_absent(routed[LoggingStreams.SIEM], "error_detail")
+
+    def test_both_streams_receive_the_component_and_status(
+        self, routed: Routed
+    ) -> None:
+        for message in (routed[LoggingStreams.APP][0], routed[LoggingStreams.SIEM][0]):
+            assert message["component"] == "database"
+            assert message["status"] == "error"
 
 
-def test_health_unhealthy_withholds_error_detail_from_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO],
-) -> None:
-    logger, app_buf, siem_buf = streams
-    log_event(
-        logger,
-        HEALTH_UNHEALTHY,
-        "unhealthy",
-        component="database",
-        status="error",
-        error_detail="connection refused on 10.0.0.1:5432",
-    )
+class TestAppStarted:
+    def test_goes_to_the_app_stream_only(self, route: Route) -> None:
+        routed = route(
+            Log.SYS_APP_STARTED,
+            "started",
+            version="v1.2.3",
+            environment="test",
+        )
 
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    assert app_msg["error_detail"] == "connection refused on 10.0.0.1:5432"
-    assert "error_detail" not in siem_msg  # not in SIEM allow-list for PRS-HEALTH-001
-    for msg in (app_msg, siem_msg):
-        assert msg["component"] == "database"
-        assert msg["status"] == "error"
+        assert routed[LoggingStreams.APP][0]["version"] == "v1.2.3"
+        assert routed[LoggingStreams.APP][0]["environment"] == "test"
+        # PRS-SYS-001 has no SIEM stream per spec.
+        assert routed[LoggingStreams.SIEM] == []
 
 
-def test_app_started_goes_to_app_stream_only(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO],
-) -> None:
-    logger, app_buf, siem_buf = streams
-    log_event(
-        logger,
-        SYS_APP_STARTED,
-        "started",
-        component="pseudoniemendienst",
-        version="v1.2.3",
-    )
+class TestAppStopped:
+    def test_siem_receives_the_reason_but_not_the_exception(self, route: Route) -> None:
+        routed = route(
+            Log.SYS_APP_STOPPED,
+            "stopped",
+            shutdown_reason="signal:SIGTERM",
+            last_exception_type="RuntimeError",
+        )
 
-    assert _messages(app_buf)[0]["component"] == "pseudoniemendienst"
-    assert _messages(siem_buf) == []  # PRS-SYS-001 has no SIEM stream per spec
+        siem = routed[LoggingStreams.SIEM][0]
+        assert siem["shutdown_reason"] == "signal:SIGTERM"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "last_exception_type")
 
 
-def test_oprf_eval_ok_withholds_key_versions_from_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO],
-) -> None:
-    logger, app_buf, siem_buf = streams
-    log_event(
-        logger,
-        OPRF_EVAL_OK,
-        "evaluated",
-        handelende_oin="00000099000000001000",
-        doel_oin="oin:00000099000000002000",
-        oprf_secret_versie=3,
-        ontvanger_pubkey_id="key-1",
-    )
+class TestOprfEvalOk:
+    @pytest.fixture
+    def routed(self, route: Route) -> Routed:
+        return route(
+            Log.OPRF_EVAL_OK,
+            "evaluated",
+            handelende_oin=_HANDELENDE_OIN,
+            doel_oin=_DOEL_OIN,
+            oprf_secret_versie=3,
+            ontvanger_pubkey_id="key-1",
+        )
 
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
+    def test_siem_does_not_receive_the_key_versions(self, routed: Routed) -> None:
+        app_message = routed[LoggingStreams.APP][0]
+        assert app_message["oprf_secret_versie"] == 3
+        assert app_message["ontvanger_pubkey_id"] == "key-1"
+        assert_fields_absent(
+            routed[LoggingStreams.SIEM], "oprf_secret_versie", "ontvanger_pubkey_id"
+        )
 
-    assert app_msg["oprf_secret_versie"] == 3
-    assert app_msg["ontvanger_pubkey_id"] == "key-1"
-    assert (
-        "oprf_secret_versie" not in siem_msg
-    )  # not in SIEM allow-list for PRS-OPRF-001
-    assert "ontvanger_pubkey_id" not in siem_msg
-    for msg in (app_msg, siem_msg):
-        assert msg["handelende_oin"] == "00000099000000001000"
-        assert msg["doel_oin"] == "oin:00000099000000002000"
+    def test_both_streams_receive_the_oins(self, routed: Routed) -> None:
+        for message in (routed[LoggingStreams.APP][0], routed[LoggingStreams.SIEM][0]):
+            assert message["handelende_oin"] == _HANDELENDE_OIN
+            assert message["doel_oin"] == _DOEL_OIN
+
+    def test_correlation_metadata_is_retained_in_every_routed_stream(
+        self, routed: Routed
+    ) -> None:
+        for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
+            message = routed[stream][0]
+            assert message["request_id"] == "req-1"
+            assert message["correlation_id"] == "corr-1"

@@ -10,11 +10,11 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import FastAPI
+from gfmodules.logging import LoggingStreams
 from jwcrypto import jwe, jwk
 from starlette.testclient import TestClient
 
 from app import container
-from app.logging.filters import LoggingStreams
 from app.models.oin import Oin
 from app.rid import RidUsage
 from app.services.key_resolver import KeyResolver
