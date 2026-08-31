@@ -132,15 +132,33 @@ def test_register_request_key_id_defaults_to_none() -> None:
     assert request.key_id is None
 
 
-def test_hsm_key_version_request_from_dt_must_not_be_in_the_past() -> None:
+def test_hsm_key_version_request_from_dt_may_be_in_the_past() -> None:
     past = datetime.now(timezone.utc) - timedelta(days=1)
 
+    request = HsmKeyVersionRequest(from_dt=past)
+
+    assert request.from_dt == past
+
+
+def test_hsm_key_version_request_from_dt_in_the_past_with_future_until_dt() -> None:
+    from_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    until_dt = datetime.now(timezone.utc) + timedelta(days=1)
+
+    request = HsmKeyVersionRequest(from_dt=from_dt, until_dt=until_dt)
+
+    assert request.from_dt == from_dt
+    assert request.until_dt == until_dt
+
+
+def test_hsm_key_version_request_until_dt_must_not_equal_from_dt() -> None:
+    from_dt = datetime.now(timezone.utc) + timedelta(days=1)
+
     try:
-        HsmKeyVersionRequest(from_dt=past)
-        assert False, "Expected ValidationError when from_dt is in the past"
+        HsmKeyVersionRequest(from_dt=from_dt, until_dt=from_dt)
+        assert False, "Expected ValidationError when until_dt equals from_dt"
     except ValidationError as e:
+        assert "until_dt" in str(e)
         assert "from_dt" in str(e)
-        assert "now" in str(e)
 
 
 def test_hsm_key_version_request_until_dt_must_not_be_before_from_dt() -> None:

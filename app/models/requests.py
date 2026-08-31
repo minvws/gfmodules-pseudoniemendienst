@@ -22,8 +22,8 @@ class HsmKeyVersionRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "x-temporal-constraints": [
-                "from_dt is validated against the current UTC timestamp",
-                "until_dt must be later than now and after from_dt (or current UTC when from_dt is omitted)",
+                "from_dt may lie in the past; when omitted the server uses the current UTC timestamp",
+                "until_dt must be later than now and later than from_dt",
                 "timezone offset is required for from_dt and until_dt (RFC3339 date-time format)",
             ],
             "x-supported-timezones": "Any RFC3339 timezone offset (for example: +01:00, -05:00, or Z)",
@@ -44,8 +44,8 @@ class HsmKeyVersionRequest(BaseModel):
     from_dt: datetime | None = Field(
         default=None,
         description=(
-            "Start of the key validity window as an ISO-8601 datetime. If omitted, "
-            "the server sets it to now and this value must not be in the past."
+            "Start of the key validity window as an ISO-8601 datetime. May lie in "
+            "the past; if omitted, the server sets it to now."
             " Values must include an explicit timezone offset (RFC3339 date-time)."
         ),
         json_schema_extra={
@@ -60,8 +60,7 @@ class HsmKeyVersionRequest(BaseModel):
         description=(
             "End of the key validity window as an ISO-8601 datetime. If provided, "
             "it must be later than the current UTC time and "
-            "it must be after `from_dt` (or after the implicit now if "
-            "from_dt is omitted). An explicit timezone offset is required (RFC3339"
+            "later than `from_dt`. An explicit timezone offset is required (RFC3339"
             " date-time)."
         ),
         json_schema_extra={
@@ -85,16 +84,12 @@ class HsmKeyVersionRequest(BaseModel):
     @model_validator(mode="after")
     def validate_temporal_window(self) -> "HsmKeyVersionRequest":
         now = datetime.now(timezone.utc)
-        effective_from_dt = self.from_dt or now
-
-        if self.from_dt and self.from_dt < now:
-            raise ValueError("from_dt must not be earlier than now")
 
         if self.until_dt and self.until_dt <= now:
             raise ValueError("until_dt must be later than now")
 
-        if self.until_dt and self.until_dt < effective_from_dt:
-            raise ValueError("until_dt must not be earlier than from_dt")
+        if self.until_dt and self.from_dt and self.until_dt <= self.from_dt:
+            raise ValueError("until_dt must be later than from_dt")
 
         return self
 
