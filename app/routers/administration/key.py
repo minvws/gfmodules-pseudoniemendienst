@@ -2,53 +2,100 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, HTTPException, Path
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import authenticated_organization
-from app.db.entities.organization import Organization
-from app.models.requests import RegisterRequest
-from app.services.key_resolver import (
+from app.auth import get_auth_ctx
+from app.models.auth.context import AuthContext
+from app.models.organization_public_key import (
+    OrganizationPublicKeyRequest,
+)
+from app.services.organization_public_key_service import (
     AlreadyExistsError,
     KeyNotFoundError,
-    KeyRequest,
-    KeyResolver,
+    OrganizationPublicKeyService,
 )
-from app.services.mtls_service import MtlsService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# TODO GB: https://github.com/minvws/generiekefuncties-architectuur/blob/main/docs/prs/concepts/to/PRS-DOC-DRFT.md#organisatie-decryptie-public-key-prs-do-mfn9
+# @router.post(
+#    "/register/certificate",
+#    summary="Insert public key information for the authorized organization",
+#    tags=["Key Registration Services"],
+# )
+# def post_key(
+#    req: RegisterRequest,
+#    request: Request,
+#    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+#    organization_public_key_service: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+# ) -> JSONResponse:
+#    mtls_pub_key = mtls_service.get_mtls_pub_key(request)
+#
+#    # Create the key entry
+#    try:
+#        organization_public_key_service.create(
+#            auth_ctx.claims.organization_id, req.scope, req.key_id, mtls_pub_key
+#        )
+#    except AlreadyExistsError:
+#        logger.warning(
+#            "key already exists for org_id=%s scope=%r",
+#            auth_ctx.claims.organization_id,
+#            req.scope,
+#        )
+#        raise HTTPException(
+#            status_code=409, detail="key for this org/scope already exists"
+#        )
+#    except Exception:
+#        logger.exception(
+#            "failed to create key entry for org_id=%s scope=%r",
+#            auth_ctx.claims.organization_id,
+#            req.scope,
+#        )
+#        raise HTTPException(status_code=500, detail="failed to create key entry")
+#
+#    return JSONResponse(
+#        status_code=201, content={"message": "Key created successfully"}
+#    )
+
 
 @router.post(
-    "/register/certificate",
-    summary="Insert public key information for the authorized organization",
+    "/keys",
+    summary="Register decryption key with JWS",
     tags=["Key Registration Services"],
 )
 def post_key(
-    req: RegisterRequest,
-    request: Request,
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
-    mtls_service: Annotated[MtlsService, Depends(container.get_mtls_service)],
-    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    req: OrganizationPublicKeyRequest,
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    organization_public_key_service: Annotated[
+        OrganizationPublicKeyService,
+        Depends(container.get_organization_public_key_service),
+    ],
 ) -> JSONResponse:
-    mtls_pub_key = mtls_service.get_mtls_pub_key(request)
-
     # Create the key entry
     try:
-        key_resolver.create(auth_org.id, req.scope, req.key_id, mtls_pub_key)
+        organization_public_key_service.create(
+            auth_ctx.claims.organization_id,
+            req.domain,
+            req.jws,
+        )
     except AlreadyExistsError:
         logger.warning(
-            "key already exists for org_id=%s scope=%r", auth_org.id, req.scope
+            "key already exists for org_id=%s scope=%r",
+            auth_ctx.claims.organization_id,
+            req.domain,
         )
         raise HTTPException(
             status_code=409, detail="key for this org/scope already exists"
         )
     except Exception:
         logger.exception(
-            "failed to create key entry for org_id=%s scope=%r", auth_org.id, req.scope
+            "failed to create key entry for org_id=%s scope=%r",
+            auth_ctx.claims.organization_id,
+            req.domain,
         )
         raise HTTPException(status_code=500, detail="failed to create key entry")
 
@@ -63,12 +110,17 @@ def post_key(
     tags=["Key Registration Services"],
 )
 def list_keys_for_org(
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
-    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    organization_public_key_service: Annotated[
+        OrganizationPublicKeyService,
+        Depends(container.get_organization_public_key_service),
+    ],
 ) -> JSONResponse:
-    entries = key_resolver.get_by_org(auth_org.id) or []
+    entries = organization_public_key_service.get_by_org(
+        auth_ctx.claims.organization_id
+    )
 
-    return JSONResponse(status_code=200, content=[k.to_dict() for k in entries])
+    return JSONResponse(status_code=200, content=entries)
 
 
 @router.put(
@@ -78,28 +130,32 @@ def list_keys_for_org(
 )
 def put_key(
     id: Annotated[UUID, Path(title="The ID of the key to update")],
-    req: KeyRequest,
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
-    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    req: OrganizationPublicKeyRequest,
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    organization_public_key_service: Annotated[
+        OrganizationPublicKeyService,
+        Depends(container.get_organization_public_key_service),
+    ],
 ) -> JSONResponse:
     try:
-        updated = key_resolver.update(
+        updated = organization_public_key_service.update(
             id,
-            auth_org.id,
-            req.scope,
-            req.key_data,
-            req.key_id,
+            auth_ctx.claims.organization_id,
+            req.domain,
+            req.jws,
         )
     except KeyNotFoundError:
         logger.warning(
             "key %s not found for organization %s",
             id,
-            auth_org.id,
+            auth_ctx.claims.organization_id,
         )
         raise HTTPException(status_code=403, detail="forbidden")
     except AlreadyExistsError:
         logger.warning(
-            "key already exists for org_id=%s scope=%r", auth_org.id, req.scope
+            "key already exists for org_id=%s scope=%r",
+            auth_ctx.claims.organization_id,
+            req.domain,
         )
         raise HTTPException(
             status_code=409, detail="key for this org/scope already exists"
@@ -108,7 +164,7 @@ def put_key(
         logger.exception("failed to update key %s", id)
         raise HTTPException(status_code=500, detail="failed to update key")
 
-    return JSONResponse(status_code=200, content=updated.to_dict())
+    return JSONResponse(status_code=200, content=updated)
 
 
 @router.delete(
@@ -118,12 +174,21 @@ def put_key(
 )
 def delete_key(
     id: Annotated[UUID, Path(title="The ID of the key to delete")],
-    auth_org: Annotated[Organization, Depends(authenticated_organization)],
-    key_resolver: Annotated[KeyResolver, Depends(container.get_key_resolver)],
+    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    organization_public_key_service: Annotated[
+        OrganizationPublicKeyService,
+        Depends(container.get_organization_public_key_service),
+    ],
 ) -> JSONResponse:
-    deleted = key_resolver.delete(id, auth_org.id)
+    deleted = organization_public_key_service.delete(
+        id, auth_ctx.claims.organization_id
+    )
     if not deleted:
-        logger.warning("key %s for organization %s was not deleted", id, auth_org.id)
+        logger.warning(
+            "key %s for organization %s was not deleted",
+            id,
+            auth_ctx.claims.organization_id,
+        )
         raise HTTPException(status_code=403, detail="forbidden")
 
     logger.info("key with id %s deleted successfully", id)

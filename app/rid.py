@@ -1,8 +1,7 @@
 from enum import Enum
-from typing import Dict, Set
 
 # Define which pseudonym types are allowed for each RID usage
-ALLOWED_BY_RID_USAGE: Dict[str, Set[str]] = {
+ALLOWED_BY_RID_USAGE: dict[str, set[str]] = {
     "bsn": {"bsn", "rp", "irp"},
     "rp": {"rp", "irp"},
     "irp": {"irp"},

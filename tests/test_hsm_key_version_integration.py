@@ -11,9 +11,11 @@ per key version, so we can assert exactly which versions end up in the JWE.
 
 import base64
 import json
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+from app.services.key_resolver import KeyResolver
+from app.services.org_service import OrgService
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
@@ -27,10 +29,8 @@ from app.db.db import Database
 from app.models.oin import Oin
 from app.rid import RidUsage
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.key_resolver import KeyResolver
-from app.services.oprf.oprf_service import OprfService
 from app.services.oprf.evaluators import HsmOprfEvaluator
-from app.services.org_service import OrgService
+from app.services.oprf.oprf_service import OprfService
 
 TEST_OIN = Oin("00000099000000001000")
 RECIPIENT_ORG = f"oin:{TEST_OIN}"
@@ -86,7 +86,7 @@ def _decrypt_jwe(jwe_str: str, private_key_pem: str) -> dict[str, Any]:
     return dict(json.loads(token.payload.decode("utf-8")))
 
 
-def _eval(client: TestClient, valid_headers: Dict[str, str]) -> Any:
+def _eval(client: TestClient, valid_headers: dict[str, str]) -> Any:
     blinded = base64.urlsafe_b64encode(b"blinded").decode("ascii")
     valid_headers["x-gf-sub"] = TEST_OIN.value
     return client.post(
@@ -106,7 +106,7 @@ def test_new_key_version_is_added_to_jwe(
     database: Database,
     org_service: OrgService,
     key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     # 1. Register an organization with a public key.
     org = org_service.create(

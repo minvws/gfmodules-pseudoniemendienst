@@ -80,5 +80,5 @@ class Database:
         """
         return self.health_error() is None
 
-    def get_db_session(self) -> DbSession:
-        return DbSession(self.engine)
+    def get_db_session(self, commit: bool = False) -> DbSession:
+        return DbSession(self.engine, commit)

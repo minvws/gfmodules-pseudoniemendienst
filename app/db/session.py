@@ -1,14 +1,15 @@
 import logging
 import random
+from collections.abc import Callable
 from time import sleep
-from typing import Any, Callable, Type, TypeVar
+from typing import Any, TypeVar
 
 from sqlalchemy import Engine, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
 
 from app.config import get_config
-from app.db.entities.base import Base
+from app.db.models.base import Base
 from app.db.repositories import repository_base
 from app.logging.events import SYS_DB_CONNECTION_FAILED, log_event
 
@@ -33,8 +34,12 @@ T = TypeVar("T")
 
 
 class DbSession:
-    def __init__(self, engine: Engine) -> None:
+    _engine: Engine
+    _commit: bool
+
+    def __init__(self, engine: Engine, commit: bool) -> None:
         self._engine = engine
+        self._commit = commit
 
     def __enter__(self) -> "DbSession":
         """
@@ -47,10 +52,12 @@ class DbSession:
         """
         Close the session when exiting the context manager
         """
+        if exc_type is None and exc_val is None and self._commit:
+            self.session.commit()
         self.session.close()
 
     def get_repository(
-        self, repository_class: Type["repository_base.TRepositoryBase"]
+        self, repository_class: type["repository_base.TRepositoryBase"]
     ) -> "repository_base.TRepositoryBase":
         """
         Returns an instantiated repository for the given model class

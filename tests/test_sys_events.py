@@ -1,11 +1,12 @@
 """Asserts the PRS-HEALTH / PRS-SYS events (issue 1041) are emitted correctly."""
 
 import logging
-from typing import Callable, List
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from app.services.org_service import OrgService
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from jwcrypto import jwk
@@ -17,11 +18,10 @@ from app.db.db import Database
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 from app.services.oprf.evaluators import HsmOprfEvaluator
-from app.services.org_service import OrgService
+from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
-RecordLogs = Callable[[str], List[logging.LogRecord]]
+RecordLogs = Callable[[str], list[logging.LogRecord]]
 
 
 def _blind_request() -> BlindRequest:
@@ -32,7 +32,7 @@ def _blind_request() -> BlindRequest:
     )
 
 
-def _events(records: List[logging.LogRecord], event_id: str) -> List[logging.LogRecord]:
+def _events(records: list[logging.LogRecord], event_id: str) -> list[logging.LogRecord]:
     return [r for r in records if getattr(r, "event_id", None) == event_id]
 
 
@@ -126,9 +126,8 @@ def test_db_retry_emits_connection_events(
         raise OperationalError("stmt", {}, Exception("connection lost"))
 
     try:
-        with database.get_db_session() as session:
-            with pytest.raises(DatabaseError):
-                session._retry(failing_operation)
+        with database.get_db_session() as session, pytest.raises(DatabaseError):
+            session._retry(failing_operation)
     finally:
         config.database.retry_backoff = original_backoff
 

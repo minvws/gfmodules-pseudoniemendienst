@@ -1,17 +1,16 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+from uuid import UUID
 
 import pytest
 import requests
+from app.db.entities.hsm_key_versions import HsmKeyVersion
+from app.db.entities.organization import Organization
 
 from app.config import ConfigOprf
 from app.db.db import Database
-from app.db.entities.hsm_key_versions import HsmKeyVersion
-from app.db.entities.organization import Organization
-from app.db.repositories.org_repository import OrgRepository
 from app.db.session import DbSession
 from app.models.oin import Oin
 from app.rid import RidUsage
@@ -35,7 +34,9 @@ class HsmKeyVersionData:
 
 
 def _get_or_create_organization(session: DbSession, oin: Oin) -> Organization:
-    org: Organization | None = session.get_repository(OrgRepository).get_by_oin(oin)
+    org: Organization | None = session.get_repository(
+        OrganizationRepository
+    ).get_by_oin(oin)
     if org is None:
         org = Organization(
             oin=oin,

@@ -1,10 +1,11 @@
 import base64
 import json
 from dataclasses import dataclass
-from typing import Dict, Tuple
 
 import pyoprf
 import pytest
+from app.services.key_resolver import KeyResolver
+from app.services.org_service import OrgService
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -12,13 +13,11 @@ from starlette.testclient import TestClient
 
 from app.models.oin import Oin
 from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver
-from app.services.org_service import OrgService
 
 
 @dataclass(frozen=True)
 class OprfTestRouterContext:
-    personal_identifier: Dict[str, str]
+    personal_identifier: dict[str, str]
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
@@ -28,7 +27,7 @@ TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_VALUE = TEST_OIN.value
 
 
-def generate_rsa_keypair() -> Tuple[str, str]:
+def generate_rsa_keypair() -> tuple[str, str]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
 
@@ -90,7 +89,7 @@ def oprf_test_router_context(
 def test_test_oprf_client_and_receiver_roundtrip(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     client_response = client.post(
         "/test/oprf/client",
@@ -138,12 +137,12 @@ def test_test_oprf_client_and_receiver_roundtrip(
 def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     info = (
         f"{oprf_test_router_context.recipient_organization}|"
         f"{oprf_test_router_context.recipient_scope}|v1"
-    ).encode("utf-8")
+    ).encode()
     hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
     personal_id = json.dumps(
         oprf_test_router_context.personal_identifier,
