@@ -18,8 +18,8 @@ from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
-from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.org_service import OrgService
 
 RecordLogs = Callable[[str], List[logging.LogRecord]]

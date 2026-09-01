@@ -11,9 +11,9 @@ from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.key_resolver import KeyResolver
 from app.services.mtls_service import MtlsService
 from app.services.oprf.evaluators import (
+    OprfEvaluator,
     HsmOprfEvaluator,
     LocalOprfEvaluator,
-    OprfEvaluator,
 )
 from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
