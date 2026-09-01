@@ -77,7 +77,10 @@ GF_HEADERS = [
 ]
 
 
-def gf_header_params() -> list[Any]:
+def gf_header_params(document_gf_headers: bool) -> list[Any]:
+    if not document_gf_headers:
+        return []
+
     return [
         Security(APIKeyHeader(name=header, scheme_name=header, auto_error=False))
         for header in GF_HEADERS
@@ -346,7 +349,7 @@ def setup_fastapi() -> FastAPI:
             openapi_tags=openapi_tags,
             root_path=config.uvicorn.root_path,
             lifespan=_lifespan,
-            dependencies=gf_header_params(),
+            dependencies=gf_header_params(config.uvicorn.document_gf_headers),
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
