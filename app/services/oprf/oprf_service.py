@@ -6,8 +6,8 @@ import pyoprf
 from jwcrypto import jwk
 
 from app.models.requests import BlindRequest
-from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
 from app.services.oprf.jwe_token import BlindJwe
+from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
 
 logger = logging.getLogger(__name__)
 

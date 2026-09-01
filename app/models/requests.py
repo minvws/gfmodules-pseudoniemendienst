@@ -7,8 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.models.oin import RecipientOrganizationOin
 from app.personal_id import PersonalId
-from app.rid import RidUsage
 from app.services.pseudonym_service import PseudonymType
+from app.rid import RidUsage
 
 logger = logging.getLogger(__name__)
 
