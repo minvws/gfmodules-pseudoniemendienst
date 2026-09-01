@@ -1,12 +1,47 @@
 import logging
 from collections.abc import Callable, Generator
+from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app import container
 from app.config import get_config, set_config
+from app.services.saml.client import SamlServiceError
 
 ENDPOINT = "/saml-exchange/reversible-pseudonym"
+
+
+class _EchoSamlServiceClient:
+    """Stands in for the PRS-SAML service, which currently echoes its input."""
+
+    def decrypt(self, payload: Any) -> Any:
+        return payload
+
+
+class _FailingSamlServiceClient:
+    def __init__(self, error_type: str) -> None:
+        self.error_type = error_type
+
+    def decrypt(self, payload: Any) -> Any:
+        raise SamlServiceError(self.error_type, "boom")
+
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    """Test client with the PRS-SAML client replaced by an in-process echo."""
+    app.dependency_overrides[container.get_saml_service_client] = (
+        _EchoSamlServiceClient
+    )
+    return TestClient(app)
+
+
+@pytest.fixture
+def unmocked_client(app: FastAPI) -> TestClient:
+    """Test client using the real SamlServiceClient, whose configured URL is
+    intentionally unreachable in the test config."""
+    return TestClient(app)
 
 
 @pytest.fixture
@@ -93,6 +128,36 @@ def test_saml_exchange_logs_event(
     record = events[0]
     assert record.levelno == logging.INFO
     assert "00000099000000001000" in str(record.__dict__["handelende_oin"])
+
+
+def test_saml_exchange_service_error_returns_502_and_logs(
+    app: FastAPI,
+    valid_headers: dict[str, str],
+    record_logs: Callable[[str], list[logging.LogRecord]],
+) -> None:
+    app.dependency_overrides[container.get_saml_service_client] = (
+        lambda: _FailingSamlServiceClient("saml_service_error")
+    )
+    records = record_logs("app.routers.saml_exchange")
+
+    response = TestClient(app).post(
+        ENDPOINT, json={"foo": "bar"}, headers=valid_headers
+    )
+    assert response.status_code == 502
+    assert response.json() == {"error": "SAML exchange failed"}
+
+    events = [r for r in records if getattr(r, "event_id", None) == "230401"]
+    assert len(events) == 1
+    assert events[0].__dict__["error_type"] == "saml_service_error"
+
+
+def test_saml_exchange_unreachable_service_returns_502(
+    unmocked_client: TestClient, valid_headers: dict[str, str]
+) -> None:
+    response = unmocked_client.post(
+        ENDPOINT, json={"foo": "bar"}, headers=valid_headers
+    )
+    assert response.status_code == 502
 
 
 def test_saml_exchange_not_mounted_when_disabled(
