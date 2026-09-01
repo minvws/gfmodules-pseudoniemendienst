@@ -9,10 +9,10 @@ from types import TracebackType
 from typing import Any, AsyncIterator
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
 
-from app.auth import get_auth_ctx
+from app.auth import get_auth_ctx, require_scopes
 from app.config import get_config
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import (
@@ -23,6 +23,7 @@ from app.logging.events import (
     log_event,
 )
 from app.logging.middleware import RequestContextMiddleware, restore_request_context
+from app.models.auth.data import AuthorizationScope
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
@@ -343,8 +344,6 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])
 
     # OAuth protected administration routes
-    # TODO: Add protection based on scopes for these routes so not all organization
-    # clients are allowed to use these
     administration_routers = [
         key_router,
         hsm_key_version_router,
@@ -353,7 +352,12 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(
             router,
             prefix="/administration",
-            dependencies=[Depends(get_auth_ctx)],
+            dependencies=[
+                Depends(get_auth_ctx),
+                Security(
+                    require_scopes, scopes=[AuthorizationScope.ADMINISTRATION.value]
+                ),
+            ],
         )
 
     return fastapi

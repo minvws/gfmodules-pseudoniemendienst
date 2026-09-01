@@ -2,21 +2,31 @@ import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.openapi.models import OAuthFlowClientCredentials, OAuthFlows
+from fastapi.security import OAuth2, SecurityScopes
 from starlette.requests import Request
 
 from app import container
 from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
+from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
 from app.models.auth.headers import AuthHeaders
 from app.services.auth.header import AuthHeaderService
 from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
 
-bearer_auth = HTTPBearer(
+bearer_auth = OAuth2(
     scheme_name="BearerAuth",
     description="OAuth access token. Swagger will send it as: Authorization: Bearer <token>",
+    flows=OAuthFlows(
+        clientCredentials=OAuthFlowClientCredentials(
+            tokenUrl="token",
+            scopes={
+                scope.value: SCOPE_DESCRIPTIONS[scope] for scope in AuthorizationScope
+            },
+        )
+    ),
     # Actual authentication happens through the proxy-verified headers below;
     # this scheme only exists so swagger shows the authorize button.
     auto_error=False,
@@ -26,7 +36,7 @@ bearer_auth = HTTPBearer(
 def get_auth_ctx(
     request: Request,
     # We don't do anything with it, but it's just a marker that allows swagger to add the authorize button
-    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
+    _credentials: Annotated[str | None, Security(bearer_auth)],
     auth_headers_service: AuthHeaderService = Depends(
         container.get_auth_headers_service
     ),
@@ -46,8 +56,37 @@ def get_auth_ctx(
     ctx = AuthContext(
         claims=claims,
         audience=validated_auth_headers.audience,
+        scope=[AuthorizationScope(s) for s in validated_auth_headers.scope.split()],
     )
     request.state.auth = ctx
+    return ctx
+
+
+def get_auth_context(request: Request) -> AuthContext:
+    ctx: AuthContext | None = getattr(request.state, "auth", None)
+    if ctx is None:
+        logger.error("no authentication context on request for %s", request.url.path)
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+    return ctx
+
+
+def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
+    if required not in ctx.scope:
+        granted = " ".join(s.value for s in ctx.scope)
+        logger.warning(
+            "scope %s missing for request, granted scopes: %s", required.value, granted
+        )
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+    return ctx
+
+
+def require_scopes(
+    security_scopes: SecurityScopes,
+    _credentials: Annotated[str | None, Security(bearer_auth)],
+    ctx: AuthContext = Depends(get_auth_context),
+) -> AuthContext:
+    for scope in security_scopes.scopes:
+        assert_scope(ctx, AuthorizationScope(scope))
     return ctx
 
 
