@@ -80,7 +80,6 @@ def post_key(
         organization_public_key_service.create(
             auth_ctx.claims.organization_id,
             req.domain,
-            req.key_id,
             req.jws,
         )
     except AlreadyExistsError:
@@ -117,12 +116,11 @@ def list_keys_for_org(
         Depends(container.get_organization_public_key_service),
     ],
 ) -> JSONResponse:
-    entries = (
-        organization_public_key_service.get_by_org(auth_ctx.claims.organization_id)
-        or []
+    entries = organization_public_key_service.get_by_org(
+        auth_ctx.claims.organization_id
     )
 
-    return JSONResponse(status_code=200, content=[k.to_dict() for k in entries])
+    return JSONResponse(status_code=200, content=entries)
 
 
 @router.put(
@@ -144,7 +142,6 @@ def put_key(
             id,
             auth_ctx.claims.organization_id,
             req.domain,
-            req.key_id,
             req.jws,
         )
     except KeyNotFoundError:
@@ -158,7 +155,7 @@ def put_key(
         logger.warning(
             "key already exists for org_id=%s scope=%r",
             auth_ctx.claims.organization_id,
-            req.scope,
+            req.domain,
         )
         raise HTTPException(
             status_code=409, detail="key for this org/scope already exists"
@@ -167,7 +164,7 @@ def put_key(
         logger.exception("failed to update key %s", id)
         raise HTTPException(status_code=500, detail="failed to update key")
 
-    return JSONResponse(status_code=200, content=updated.to_dict())
+    return JSONResponse(status_code=200, content=updated)
 
 
 @router.delete(

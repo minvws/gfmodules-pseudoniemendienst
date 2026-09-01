@@ -1,3 +1,7 @@
+from typing import Any
+from fastapi import HTTPException
+from app.db.models.organization_public_key import OrganizationPublicKeyEntity
+from app.db.repositories.organization_repository import OrganizationRepository
 import json
 import logging
 import uuid
@@ -7,7 +11,6 @@ from jwcrypto.jwk import JWK
 from jwcrypto.jws import JWS, InvalidJWSObject, InvalidJWSSignature
 
 from app.db.db import Database
-from app.db.entities.organization_key import OrganizationPublicKey
 from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
@@ -46,6 +49,8 @@ class OrganizationPublicKeyService:
         private_components = ["d", "p", "q", "dp", "dq", "qi"]
         if any(p in jws.jose_header["jwk"] for p in private_components):
             raise Exception("TODO CUSTOM ERROR, JWK contains private key")
+        if "kid" not in jws.jose_header["jwk"]:
+            raise Exception("TODO CUSTOM ERROR, Missing 'kid' in jwk")
 
         jwk = JWK(**jws.jose_header.get("jwk", jws.jose_header.get("JWK")))
         try:
@@ -72,102 +77,103 @@ class OrganizationPublicKeyService:
         self,
         org_id: Oin,
         domain: str,
-        kid: str | None,
         raw_jws: str,
-    ) -> OrganizationPublicKey:
+    ) -> dict[str, Any]:
         jwk = self._validate_and_extract(raw_jws, org_id)
-        kid: str = kid or jwk.key_id or jwk.thumbprint()
-
-        with self.db.get_db_session() as session:
-            try:
-                repository = session.get_repository(OrganizationPublicKeyRepository)
-                organization_public_key = OrganizationPublicKey(
-                    organization_id=org_id,
-                    domain=domain,
-                    jwk=jwk.export(private_key=False, as_dict=False),
-                    kid=kid,
+        with self.db.get_db_session(commit=True) as session:
+            org_repo = session.get_repository(OrganizationRepository)
+            org = org_repo.get_one_by_external_id(org_id)
+            if org is None:
+                raise HTTPException(
+                    status_code=405, detail="Organization does not exist"
                 )
-                repository.create(organization_public_key)
-            except Exception as e:
-                logger.exception(
-                    "failed to create key entry for org %s and scope %r",
-                    org_id,
-                    domain,
+            key_with_same_domain = [
+                pk for pk in org.public_keys if domain in pk.domains
+            ]
+            if key_with_same_domain:
+                raise Exception("Domain is already registered to different key")
+            public_key = OrganizationPublicKeyEntity(
+                domains=[domain],
+                jwk=jwk.export(as_dict=True),
+            )
+            org.public_keys.append(
+                OrganizationPublicKeyEntity(
+                    domains=[domain],
+                    jwk=jwk.export(as_dict=True),
                 )
-                # TODO:GB: Valid raise
-                raise e
-            session.commit()
-            return organization_public_key
+            )
+            session.flush()
+            return public_key.to_dict()
 
     def update(
         self,
         id: uuid.UUID,
         org_id: Oin,
         domain: str,
-        kid: str | None,
         raw_jws: str,
-    ) -> OrganizationPublicKey:
+    ) -> dict[str, Any]:
         jwk = self._validate_and_extract(raw_jws, org_id)
-        kid: str = kid or jwk.key_id or jwk.thumbprint()
-
-        with self.db.get_db_session() as session:
-            try:
-                repository = session.get_repository(OrganizationPublicKeyRepository)
-                organization_public_key = repository.get(id)
-                if not organization_public_key:
-                    raise KeyNotFoundError()
-                organization_public_key.domain = domain
-                organization_public_key.jwk = jwk.export(
-                    private_key=False, as_dict=False
+        with self.db.get_db_session(commit=True) as session:
+            org_repo = session.get_repository(OrganizationRepository)
+            org = org_repo.get_one_by_external_id(org_id)
+            if org is None:
+                raise HTTPException(
+                    status_code=405, detail="Organization does not exist"
                 )
-                organization_public_key.kid = kid
-            except Exception as e:
-                logger.exception(
-                    "failed to create key entry for org %s and scope %r",
-                    org_id,
-                    domain,
-                )
-                # TODO:GB: Valid raise
-                raise e
-            session.commit()
-            return organization_public_key
+            public_key_for_id = [pk for pk in org.public_keys if pk.id == id]
+            if len(public_key_for_id) != 1:
+                raise HTTPException(status_code=404, detail="public key not found")
+            key_with_same_domain = [
+                pk for pk in org.public_keys if domain in pk.domains and pk.id != id
+            ]
+            if key_with_same_domain:
+                raise Exception("Domain is already registered to different key")
+            public_key = public_key_for_id[0]
+            public_key.domains = [domain]
+            public_key.jwk = jwk.export(as_dict=True)
+            return public_key.to_dict()
 
-    def get_by_id(self, key_id: uuid.UUID) -> OrganizationPublicKey | None:
+    def get_by_id(self, key_id: uuid.UUID) -> OrganizationPublicKeyEntity | None:
         with self.db.get_db_session() as session:
             entry = session.get_repository(OrganizationPublicKeyRepository).get_by_id(
                 key_id
             )
         return entry
 
-    def get_by_org(self, org_id: Oin) -> list[OrganizationPublicKey]:
+    def get_by_org(self, org_id: Oin) -> list[dict[str, Any]]:
         with self.db.get_db_session() as session:
-            return session.get_repository(OrganizationPublicKeyRepository).get_by_org(
-                org_id
-            )
+            org_repo = session.get_repository(OrganizationRepository)
+            org = org_repo.get_one_by_external_id(org_id)
+            if not org:
+                raise HTTPException(
+                    status_code=404, detail="Organization does not exist"
+                )
+            return [pk.to_dict() for pk in org.public_keys]
 
     def get_by_org_and_domain(
         self, org_id: Oin, domain: str
-    ) -> OrganizationPublicKey | None:
+    ) -> OrganizationPublicKeyEntity:
         with self.db.get_db_session() as session:
-            return session.get_repository(
-                OrganizationPublicKeyRepository
-            ).get_by_org_and_domain(org_id, domain)
+            org_repo = session.get_repository(OrganizationRepository)
+            org = org_repo.get_one_by_external_id(org_id)
+            if not org:
+                raise HTTPException(
+                    status_code=404, detail="Organization does not exist"
+                )
+            public_key = [pk for pk in org.public_keys if domain in pk.domains]
+            if not public_key:
+                public_key = [pk for pk in org.public_keys if "*" in pk.domains]
+            if not public_key:
+                raise Exception("TODO NICE EXCEPTION, Recipient not found")
+            return public_key[0]
 
     def delete(self, key_id: uuid.UUID, organization_id: Oin) -> bool:
-        with self.db.get_db_session() as session:
-            repository = session.get_repository(OrganizationPublicKeyRepository)
-            deleted = repository.delete(key_id, organization_id)
-            if not deleted:
-                entry = repository.get_by_id(key_id)
-                if entry is not None and entry.organization_id != organization_id:
-                    logger.warning(
-                        "caller org %s attempted to delete key %s owned by org %s",
-                        organization_id,
-                        key_id,
-                        entry.organization_id,
-                    )
-
-                return False
-
-            session.commit()
-            return True
+        with self.db.get_db_session(commit=True) as session:
+            org_repo = session.get_repository(OrganizationRepository)
+            org = org_repo.get_one_by_external_id(organization_id)
+            if not org:
+                raise HTTPException(
+                    status_code=404, detail="Organization does not exist"
+                )
+            org.public_keys = [pk for pk in org.public_keys if pk.id != key_id]
+        return True

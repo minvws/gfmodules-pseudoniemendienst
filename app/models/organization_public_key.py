@@ -6,4 +6,3 @@ class OrganizationPublicKeyRequest(BaseModel):
 
     domain: str = Field(...)
     jws: str = Field(..., min_length=32)
-    key_id: str | None = None

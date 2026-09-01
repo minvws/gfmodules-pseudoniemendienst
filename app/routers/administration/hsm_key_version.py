@@ -96,4 +96,4 @@ def put_key_version(
         logger.exception("failed to update key version %s", id)
         raise HTTPException(status_code=500, detail="failed to update key version")
 
-    return JSONResponse(status_code=200, content=jsonable_encoder(entry.to_dict()))
+    return JSONResponse(status_code=200, content=jsonable_encoder(entry))

@@ -97,9 +97,8 @@ CREATE TABLE prs.hsm_key_versions (
 CREATE TABLE prs.organization_public_keys (
     id UUID PRIMARY KEY,
     organization_id UUID NOT NULL REFERENCES admin.organizations(id),
-    domain VARCHAR(255) NOT NULL,
-    jwk TEXT,
-    kid TEXT,
+    domains JSONB NOT NULL DEFAULT '[]',
+    jwk JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (organization_id, domain)
 );

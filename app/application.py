@@ -363,7 +363,9 @@ def setup_fastapi() -> FastAPI:
     return fastapi
 
 
-def set_authorization_headers_openapi(fastapi: FastAPI, document_gf_headers: bool):
+def set_authorization_headers_openapi(
+    fastapi: FastAPI, document_gf_headers: bool
+) -> None:
     def custom_openapi() -> dict[str, Any] | None:
         if fastapi.openapi_schema:
             return fastapi.openapi_schema
@@ -421,12 +423,12 @@ def set_authorization_headers_openapi(fastapi: FastAPI, document_gf_headers: boo
         # Optional: Apply security globally in the schema (UI only)
         # so the "lock" icon appears on all endpoints,
         # but WITHOUT enforcing it in the code.
-        security = {}
-        for name in security_schemes.keys():
+        security: dict[str, list[Any]] = {}
+        for name in security_schemes:
             security[name] = []
         openapi_schema["security"] = [security]
 
         fastapi.openapi_schema = openapi_schema
         return fastapi.openapi_schema
 
-    fastapi.openapi = custom_openapi
+    fastapi.openapi = custom_openapi  # type: ignore[method-assign, assignment]

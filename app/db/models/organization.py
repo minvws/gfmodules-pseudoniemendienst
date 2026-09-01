@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.db.models.organization_public_key import OrganizationPublicKeyEntity
 
 from typing import TYPE_CHECKING, Any
 
@@ -57,6 +58,11 @@ class OrganizationEntity(Base, WithUUID, WithTimestamps):
     hsm_key_versions: Mapped[list[HsmKeyVersionEntity]] = relationship(
         back_populates="organization",
         order_by="HsmKeyVersionEntity.version",
+    )
+
+    public_keys: Mapped[list[OrganizationPublicKeyEntity]] = relationship(
+        "OrganizationPublicKeyEntity",
+        back_populates="organization",
     )
 
     def to_dict(self) -> dict[str, Any]:

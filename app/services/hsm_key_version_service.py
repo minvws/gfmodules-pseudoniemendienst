@@ -1,3 +1,4 @@
+from typing import Any
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -5,7 +6,6 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 
 from app.db.db import Database
-from app.db.models import organization
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
 from app.db.repositories.organization_repository import OrganizationRepository
@@ -97,37 +97,30 @@ class HsmKeyVersionService:
             )
             return versions
 
-    def get_active_or_create_version_numbers_by_organization_id(
+    def get_active_or_create_version_numbers_by_organization_oin(
         self,
-        organization_id: uuid.UUID,
+        organization_external_id: Oin,
     ) -> list[int]:
         """
         Returns active version numbers for the organization at the current moment.
 
-        If no active version exists yet, creates one and returns its version
-        number.
+        TODO RL: Correct that we don't need to create version anymore now Beheer api does this?
         """
-        at = datetime.now(timezone.utc)
+
+        def _is_active(version: HsmKeyVersionEntity, now: datetime) -> bool:
+            if version.removed_at is not None:
+                return False
+            return version.until_dt is None or version.until_dt > now
+
+        now = datetime.now(timezone.utc)
         with self.__db.get_db_session() as session:
-            repo = session.get_repository(HsmKeyVersionRepository)
-            try:
-                versions = repo.get_active_or_create_version_numbers_by_organization_id(
-                    organization_id=organization_id,
-                    at=at,
+            org_repo = session.get_repository(OrganizationRepository)
+            org = org_repo.get_one_by_external_id(organization_external_id)
+            if org is None:
+                raise HTTPException(
+                    status_code=405, detail="Organization does not exist"
                 )
-                session.commit()
-                if not versions:
-                    raise RuntimeError(
-                        f"failed to obtain active key version numbers for organization_id {organization_id}"
-                    )
-                return versions
-            except Exception:
-                session.rollback()
-                logger.exception(
-                    "failed active-or-create key version numbers for organization_id %s",
-                    organization_id,
-                )
-                raise
+            return [v.version for v in org.hsm_key_versions if _is_active(v, now)]
 
     def get_expired_versions(
         self, at: datetime | None = None
@@ -141,27 +134,6 @@ class HsmKeyVersionService:
             repo = session.get_repository(HsmKeyVersionRepository)
             versions = repo.get_expired_versions(at)
             return versions
-
-    def create_version(
-        self,
-        organization_id: uuid.UUID,
-        from_dt: datetime | None = None,
-        until_dt: datetime | None = None,
-    ) -> HsmKeyVersionEntity:
-        """
-        Creates a new key version for the organization identified by the given
-        OIN. The version number is automatically derived from the highest
-        existing version for that organization. When no start moment is given,
-        the version becomes active immediately.
-
-        Raises a ValueError when no organization exists for the given OIN.
-        TODO GB: Update doc
-        """
-        return self.create_version_by_organization_external_id(
-            organization_id,
-            from_dt=from_dt,
-            until_dt=until_dt,
-        )
 
     def create_version_by_organization_external_id(
         self,
@@ -196,7 +168,7 @@ class HsmKeyVersionService:
         version_id: uuid.UUID,
         organization_external_id: Oin,
         until_dt: datetime | None = None,
-    ) -> HsmKeyVersionEntity:
+    ) -> dict[str, Any]:
         """
         Updates the end date of an existing key version for the specified
         organization id. Raises when the version does not exist or belongs to
@@ -208,44 +180,13 @@ class HsmKeyVersionService:
             )
             if not org:
                 raise HTTPException(status_code=404, detail="Organization not found")
-            versions = [hkv for hkv in org.hsm_key_versions where hkv.id == version_id]
+            versions = [hkv for hkv in org.hsm_key_versions if hkv.id == version_id]
             if len(versions) != 1:
                 raise HTTPException(status_code=404, detail="KeyVersion not found")
             version = versions[0]
             # TODO GB: Validation errors?
-            version.until_dt == until_dt
-
-            repo = session.get_repository(HsmKeyVersionRepository)
-            try:
-                updated = repo.update(version_id, organization_id, until_dt)
-                if updated is None:
-                    current = repo.get_by_id(version_id)
-                    if (
-                        current is not None
-                        and current.organization_id != organization_id
-                    ):
-                        logger.warning(
-                            "caller org %s attempted to update key version %s owned by org %s",
-                            organization_id,
-                            version_id,
-                            current.organization_id,
-                        )
-                    raise HsmKeyVersionNotFoundError(version_id, organization_id)
-
-                target_version = updated
-                session.commit()
-                return target_version
-            except HsmKeyVersionNotFoundError:
-                session.rollback()
-                raise
-            except Exception:
-                session.rollback()
-                logger.exception(
-                    "failed to update hsm key version %s for organization_id %s",
-                    version_id,
-                    organization_id,
-                )
-                raise
+            version.until_dt = until_dt
+            return version.to_dict()
 
     def mark_removed(self, version_id: uuid.UUID) -> HsmKeyVersionEntity | None:
         """

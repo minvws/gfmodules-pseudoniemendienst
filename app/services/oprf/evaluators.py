@@ -54,7 +54,7 @@ class HsmOprfEvaluator:
         recipient_org_oin: Oin,
         blinded_bytes: bytes,
     ) -> dict[int, bytes]:
-        active_versions = self._hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id(
+        active_versions = self._hsm_key_version_service.get_active_or_create_version_numbers_by_organization_oin(
             recipient_org_oin
         )
 
