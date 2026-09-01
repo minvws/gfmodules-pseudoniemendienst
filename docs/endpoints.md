@@ -165,3 +165,12 @@ Response:
 ```
 
 The decrypted JWE `subject` carries the evaluation for the latest key version in the form `pseudonym:eval:<base64>`. When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extra_versions` claim (`{"<version>": "<base64 eval>"}`).
+
+## SAML Exchange Services
+
+These routes are only mounted when `enable_saml_exchange_routes` is set
+
+#### `POST /saml-exchange/reversible-pseudonym`
+**Mock** of the [DigiD SAML exchange API](https://github.com/minvws/generiekefuncties-architectuur/blob/main/docs/prs/concepts/to/PRS-DOC-DRFT.md#digid-saml-exchange-api-prs-int-saml), available so the VAD/MGO can start integrating before the real implementation lands. It accepts any JSON body and echoes it back unchanged; no SAML decryption or validation is performed and no pseudonym is derived.
+
+Requires the `prs:saml-reversible-pseudonym` OAuth scope; the token and its scopes are validated upstream by the OIN-verifier proxy.

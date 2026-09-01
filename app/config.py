@@ -25,6 +25,7 @@ class ConfigApp(BaseModel):
     mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
+    enable_saml_exchange_routes: bool = Field(default=False)
 
 
 class ConfigLogging(BaseModel):

@@ -29,6 +29,7 @@ from app.routers.health import router as health_router
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.administration.key import router as key_router
 from app.routers.oprf import router as oprf_router
+from app.routers.saml_exchange import router as saml_exchange_router
 from app.routers.test_oprf import router as test_oprf_router
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,21 @@ EXCHANGE_TAGS_METADATA = [
             "organization/scope, and redeem a previously issued RID for a pseudonym "
             "(or the BSN, when permitted by both the RID usage and the "
             "organization's `max_key_usage`)."
+        ),
+    },
+]
+
+# Section (tag) metadata for the SAML exchange routes. Only included in the
+# OpenAPI schema when `enable_saml_exchange_routes` is set, matching when these
+# routes are mounted.
+SAML_EXCHANGE_TAGS_METADATA = [
+    {
+        "name": "SAML Exchange Services",
+        "description": (
+            "Exchange a DigiD SAML response for a pseudonym. Currently a mock "
+            "that echoes the request body so the VAD/MGO can integrate; only "
+            "mounted when `enable_saml_exchange_routes` is set (test "
+            "environments only)."
         ),
     },
 ]
@@ -298,6 +314,8 @@ def setup_fastapi() -> FastAPI:
     openapi_tags = list(TAGS_METADATA)
     if config.app.enable_exchange_services_routes:
         openapi_tags += EXCHANGE_TAGS_METADATA
+    if config.app.enable_saml_exchange_routes:
+        openapi_tags += SAML_EXCHANGE_TAGS_METADATA
     if config.app.enable_test_routes:
         openapi_tags += TEST_TAGS_METADATA
 
@@ -336,6 +354,8 @@ def setup_fastapi() -> FastAPI:
     ]
     if config.app.enable_exchange_services_routes:
         routers.append(exchange_router)
+    if config.app.enable_saml_exchange_routes:
+        routers.append(saml_exchange_router)
     if config.app.enable_test_routes:
         routers.append(test_oprf_router)
 
