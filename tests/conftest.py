@@ -150,4 +150,5 @@ def valid_headers(
         "x-gf-act-sub": valid_client_organization_id.value,
         "x-gf-act-cn": valid_client_common_name,
         "x-gf-audience": "prs.service",
+        "x-gf-scope": "prs:saml-reversible-pseudonym",
     }

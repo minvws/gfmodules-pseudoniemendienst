@@ -20,3 +20,7 @@ class AuthContext:
     claims: AuthenticationClaims
     # audience intended for
     audience: str
+    # OAuth scopes from the token (via the proxy's x-gf-scope header). Kept as
+    # raw strings: unknown scopes are ignored rather than rejected, so tokens
+    # carrying scopes for other services keep working.
+    scope: tuple[str, ...] = ()

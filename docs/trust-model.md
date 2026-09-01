@@ -50,6 +50,7 @@ OIN-verifier has set and sanitised:
 |-------------------------------|-------------------------------------------|---------|
 | `x-gf-oin`                    | Verified OIN of the calling organisation  | `app/models/auth/headers.py`, `app/auth.py` |
 | `x-gf-audience`               | Intended audience; checked against a configured allowlist | `app/services/auth/header.py` |
+| `x-gf-scope`                  | Space-separated OAuth scopes from the validated token; enforced per route via `require_scope` | `app/models/auth/headers.py`, `app/auth.py` |
 | `X-Forwarded-Tls-Client-Cert` | The caller's client certificate (used to derive the source OIN for some endpoints) | `app/services/mtls_service.py` |
 
 `x-gf-audience` is validated against `authorization_headers.expected_audiences`

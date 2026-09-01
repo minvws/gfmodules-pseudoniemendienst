@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
@@ -8,6 +9,7 @@ from starlette.requests import Request
 from app import container
 from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
+from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
 from app.services.auth.header import AuthHeaderService
 from app.services.org_service import OrgService
@@ -46,9 +48,29 @@ def get_auth_ctx(
     ctx = AuthContext(
         claims=claims,
         audience=validated_auth_headers.audience,
+        scope=tuple((validated_auth_headers.scope or "").split()),
     )
     request.state.auth = ctx
     return ctx
+
+
+def require_scope(scope: AuthorizationScope) -> Callable[..., AuthContext]:
+    """Route dependency requiring an OAuth scope from the proxy-verified
+    x-gf-scope header, mirroring the pattern in the nationale-verwijsindex."""
+
+    def dependency(
+        auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
+    ) -> AuthContext:
+        if scope.value not in auth_ctx.scope:
+            logger.warning(
+                "client %s lacks required scope %s",
+                auth_ctx.claims.client_organization_id,
+                scope.value,
+            )
+            raise HTTPException(status_code=403, detail="Missing required scope")
+        return auth_ctx
+
+    return dependency
 
 
 def authenticated_organization(

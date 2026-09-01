@@ -13,6 +13,10 @@ class AuthHeaders(BaseModel):
     client_organization_id: Annotated[Oin, Field(alias="x-gf-act-sub")]
     client_organization_common_name: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
+    # Space-separated OAuth scopes from the token, forwarded by the proxy.
+    # Optional: tokens without a scope claim arrive as an empty or absent
+    # header; scope requirements are enforced per route via require_scope.
+    scope: Annotated[str | None, Field(alias="x-gf-scope", default=None)]
 
     @classmethod
     def from_request(cls, req: Request) -> Self:

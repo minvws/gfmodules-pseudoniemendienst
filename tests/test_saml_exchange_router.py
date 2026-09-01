@@ -55,6 +55,30 @@ def test_saml_exchange_requires_auth_headers(client: TestClient) -> None:
     assert response.status_code == 403
 
 
+def test_saml_exchange_rejects_missing_scope_header(
+    client: TestClient, valid_headers: dict[str, str]
+) -> None:
+    del valid_headers["x-gf-scope"]
+    response = client.post(ENDPOINT, json={"foo": "bar"}, headers=valid_headers)
+    assert response.status_code == 403
+
+
+def test_saml_exchange_rejects_wrong_scope(
+    client: TestClient, valid_headers: dict[str, str]
+) -> None:
+    valid_headers["x-gf-scope"] = "nvi:read prs:some-other-scope"
+    response = client.post(ENDPOINT, json={"foo": "bar"}, headers=valid_headers)
+    assert response.status_code == 403
+
+
+def test_saml_exchange_accepts_scope_among_others(
+    client: TestClient, valid_headers: dict[str, str]
+) -> None:
+    valid_headers["x-gf-scope"] = "nvi:read prs:saml-reversible-pseudonym other"
+    response = client.post(ENDPOINT, json={"foo": "bar"}, headers=valid_headers)
+    assert response.status_code == 200
+
+
 def test_saml_exchange_logs_event(
     client: TestClient,
     valid_headers: dict[str, str],
@@ -68,7 +92,7 @@ def test_saml_exchange_logs_event(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert "00000099000000001000" in str(getattr(record, "handelende_oin"))
+    assert "00000099000000001000" in str(record.__dict__["handelende_oin"])
 
 
 def test_saml_exchange_not_mounted_when_disabled(

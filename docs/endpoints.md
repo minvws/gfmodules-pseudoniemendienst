@@ -173,4 +173,4 @@ These routes are only mounted when `enable_saml_exchange_routes` is set
 #### `POST /saml-exchange/reversible-pseudonym`
 **Mock** of the [DigiD SAML exchange API](https://github.com/minvws/generiekefuncties-architectuur/blob/main/docs/prs/concepts/to/PRS-DOC-DRFT.md#digid-saml-exchange-api-prs-int-saml), available so the VAD/MGO can start integrating before the real implementation lands. It accepts any JSON body and echoes it back unchanged; no SAML decryption or validation is performed and no pseudonym is derived.
 
-Requires the `prs:saml-reversible-pseudonym` OAuth scope; the token and its scopes are validated upstream by the OIN-verifier proxy.
+Requires the `prs:saml-reversible-pseudonym` OAuth scope: the OIN-verifier proxy validates the token and forwards its scopes in the `x-gf-scope` header, and the endpoint rejects requests without this scope (403).
