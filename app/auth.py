@@ -2,31 +2,22 @@ import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.openapi.models import OAuthFlowClientCredentials, OAuthFlows
-from fastapi.security import OAuth2, SecurityScopes
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
 
 from app import container
 from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
-from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
+from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
 from app.services.auth.header import AuthHeaderService
 from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
 
-bearer_auth = OAuth2(
+bearer_auth = HTTPBearer(
     scheme_name="BearerAuth",
     description="OAuth access token. Swagger will send it as: Authorization: Bearer <token>",
-    flows=OAuthFlows(
-        clientCredentials=OAuthFlowClientCredentials(
-            tokenUrl="token",
-            scopes={
-                scope.value: SCOPE_DESCRIPTIONS[scope] for scope in AuthorizationScope
-            },
-        )
-    ),
     # Actual authentication happens through the proxy-verified headers below;
     # this scheme only exists so swagger shows the authorize button.
     auto_error=False,
@@ -36,7 +27,7 @@ bearer_auth = OAuth2(
 def get_auth_ctx(
     request: Request,
     # We don't do anything with it, but it's just a marker that allows swagger to add the authorize button
-    _credentials: Annotated[str | None, Security(bearer_auth)],
+    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
     auth_headers_service: AuthHeaderService = Depends(
         container.get_auth_headers_service
     ),
@@ -82,7 +73,7 @@ def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
 
 def require_scopes(
     security_scopes: SecurityScopes,
-    _credentials: Annotated[str | None, Security(bearer_auth)],
+    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
     ctx: AuthContext = Depends(get_auth_context),
 ) -> AuthContext:
     for scope in security_scopes.scopes:

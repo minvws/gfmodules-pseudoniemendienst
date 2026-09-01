@@ -1,9 +1,9 @@
 from collections.abc import Callable
-from typing import Any
 
 import pytest
 from starlette.testclient import TestClient
 
+from app.db.db import Database
 from app.models.auth.data import AuthorizationScope
 
 Headers = dict[str, str]
@@ -20,6 +20,12 @@ EXCHANGE_PSEUDONYM_BODY = {
     "recipientOrganization": "oin:00000099000000001000",
     "recipientScope": "nvi",
 }
+
+
+@pytest.fixture(autouse=True)
+def _tables(database: Database) -> None:
+    """A request that passes the scope check goes on to query the database, so the
+    tables have to exist for this file to run on its own."""
 
 
 def test_missing_scope_header_is_rejected(

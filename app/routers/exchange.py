@@ -3,6 +3,7 @@ import logging
 from typing import Annotated, Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -53,7 +54,7 @@ PSEUDONYM_SCOPES = [
 
 def _require_scope_for_exchange_pseudonym(
     req: ExchangeRequest,
-    _credentials: Annotated[str | None, Security(bearer_auth)],
+    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
     ctx: AuthContext = Depends(get_auth_context),
 ) -> AuthContext:
     required = (

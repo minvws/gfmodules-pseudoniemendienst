@@ -11,6 +11,7 @@ from typing import Any, AsyncIterator
 import uvicorn
 from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 
 from app.auth import get_auth_ctx, require_scopes
 from app.config import get_config
@@ -23,7 +24,7 @@ from app.logging.events import (
     log_event,
 )
 from app.logging.middleware import RequestContextMiddleware, restore_request_context
-from app.models.auth.data import AuthorizationScope
+from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
@@ -49,6 +50,39 @@ The endpoints are grouped into the sections below. Most sections are protected b
 mutual TLS (mTLS); the calling organization and, where relevant, its public key
 are derived from the client certificate.
 """
+
+SCOPES_EXTENSION = "x-authorization-scopes"
+
+
+def install_scope_catalogue(fastapi: FastAPI) -> None:
+    build_schema = fastapi.openapi
+
+    def openapi() -> dict[str, Any]:
+        schema = build_schema()
+        scope_extension = {
+            scope.value: SCOPE_DESCRIPTIONS[scope] for scope in AuthorizationScope
+        }
+        schema[SCOPES_EXTENSION] = scope_extension
+        return schema
+
+    fastapi.openapi = openapi  # type: ignore[method-assign]
+
+
+GF_HEADERS = [
+    "x-gf-sub",
+    "x-gf-act-sub",
+    "x-gf-act-cn",
+    "x-gf-audience",
+    "x-gf-scope",
+]
+
+
+def gf_header_params() -> list[Any]:
+    return [
+        Security(APIKeyHeader(name=header, scheme_name=header, auto_error=False))
+        for header in GF_HEADERS
+    ]
+
 
 # Section (tag) metadata shown in the Swagger UI / OpenAPI schema. The order here
 # determines the order in which the sections are rendered.
@@ -312,10 +346,12 @@ def setup_fastapi() -> FastAPI:
             openapi_tags=openapi_tags,
             root_path=config.uvicorn.root_path,
             lifespan=_lifespan,
+            dependencies=gf_header_params(),
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     )
+    install_scope_catalogue(fastapi)
 
     fastapi.add_middleware(
         RequestContextMiddleware,
