@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Any, Dict, Self
 
 from fastapi import Request
@@ -5,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
+
+logger = logging.getLogger(__name__)
 
 
 class AuthHeaders(BaseModel):
@@ -14,22 +17,25 @@ class AuthHeaders(BaseModel):
     client_organization_id: Annotated[Oin, Field(alias="x-gf-act-sub")]
     client_organization_common_name: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
-    scope: Annotated[str, Field(alias="x-gf-scope")]
+    scope: Annotated[list[AuthorizationScope], Field(alias="x-gf-scope", default_factory=list)]
 
-    @field_validator("scope", mode="after")
+    @field_validator("scope", mode="before")
     @classmethod
-    def validate_scope(cls, data: str) -> str:
-        entries = data.split()
-        if not entries:
-            raise ValueError("x-gf-scope must hold at least one scope")
+    def parse_scope(cls, data: Any) -> list[AuthorizationScope]:
+        """Keep the scopes this service knows about and ignore the rest."""
+        entries = data.split() if isinstance(data, str) else []
 
+        granted = []
         for entry in entries:
             try:
-                _ = AuthorizationScope(entry)
-            except ValueError as e:
-                raise ValueError(f"Invalid scope {entry}: {e}")
+                granted.append(AuthorizationScope(entry))
+            except ValueError:
+                logger.debug("ignoring scope %s, not a scope of this service", entry)
 
-        return data
+        if not granted:
+            raise ValueError("x-gf-scope must hold at least one known scope")
+
+        return granted
 
     @classmethod
     def from_request(cls, req: Request) -> Self:
