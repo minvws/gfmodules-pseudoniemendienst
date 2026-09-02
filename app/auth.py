@@ -2,12 +2,13 @@ import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
 
 from app import container
 from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
+from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
 from app.services.auth.header import AuthHeaderService
 from app.services.org_service import OrgService
@@ -46,8 +47,37 @@ def get_auth_ctx(
     ctx = AuthContext(
         claims=claims,
         audience=validated_auth_headers.audience,
+        scope=[AuthorizationScope(s) for s in validated_auth_headers.scope.split()],
     )
     request.state.auth = ctx
+    return ctx
+
+
+def get_auth_context(request: Request) -> AuthContext:
+    ctx: AuthContext | None = getattr(request.state, "auth", None)
+    if ctx is None:
+        logger.error("no authentication context on request for %s", request.url.path)
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+    return ctx
+
+
+def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
+    if required not in ctx.scope:
+        granted = " ".join(s.value for s in ctx.scope)
+        logger.warning(
+            "scope %s missing for request, granted scopes: %s", required.value, granted
+        )
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+    return ctx
+
+
+def require_scopes(
+    security_scopes: SecurityScopes,
+    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
+    ctx: AuthContext = Depends(get_auth_context),
+) -> AuthContext:
+    for scope in security_scopes.scopes:
+        assert_scope(ctx, AuthorizationScope(scope))
     return ctx
 
 

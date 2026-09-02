@@ -1,14 +1,16 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import Annotated, Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app import container
-from app.auth import get_auth_ctx
+from app.auth import assert_scope, bearer_auth, get_auth_context, get_auth_ctx
 from app.models.auth.context import AuthContext
+from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 from app.models.requests import ExchangeRequest, RidExchangeRequest, RidReceiveRequest
 from app.personal_id import PersonalId
@@ -42,6 +44,25 @@ class PubKeyNotFound(HTTPException):
             status_code=404,
             detail=f"No public key found for organization '{oin.value}' and scope '{scope}'",
         )
+
+
+PSEUDONYM_SCOPES = [
+    AuthorizationScope.PSEUDONYM.value,
+    AuthorizationScope.REVERSIBLE_PSEUDONYM.value,
+]
+
+
+def _require_scope_for_exchange_pseudonym(
+    req: ExchangeRequest,
+    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
+    ctx: AuthContext = Depends(get_auth_context),
+) -> AuthContext:
+    required = (
+        AuthorizationScope.REVERSIBLE_PSEUDONYM
+        if req.pseudonymType == PseudonymType.Reversible
+        else AuthorizationScope.PSEUDONYM
+    )
+    return assert_scope(ctx, required)
 
 
 @router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
@@ -249,6 +270,9 @@ def exchange_rid(
 def exchange_pseudonym(
     req: ExchangeRequest,
     request: Request,
+    auth_ctx: AuthContext = Security(
+        _require_scope_for_exchange_pseudonym, scopes=PSEUDONYM_SCOPES
+    ),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
     org_service: OrgService = Depends(container.get_org_service),

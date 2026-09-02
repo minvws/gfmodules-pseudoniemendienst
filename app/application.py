@@ -9,10 +9,11 @@ from types import TracebackType
 from typing import Any, AsyncIterator
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 
-from app.auth import get_auth_ctx
+from app.auth import get_auth_ctx, require_scopes
 from app.config import get_config
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import (
@@ -23,6 +24,7 @@ from app.logging.events import (
     log_event,
 )
 from app.logging.middleware import RequestContextMiddleware, restore_request_context
+from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
@@ -48,6 +50,43 @@ The endpoints are grouped into the sections below. Most sections are protected b
 mutual TLS (mTLS); the calling organization and, where relevant, its public key
 are derived from the client certificate.
 """
+
+# OpenAPI extension to describe the possible authorization scopes. See https://swagger.io/docs/specification/v3_0/openapi-extensions/
+SCOPES_EXTENSION = "x-authorization-scopes"
+
+
+def install_scope_catalogue(fastapi: FastAPI) -> None:
+    build_schema = fastapi.openapi
+
+    def openapi() -> dict[str, Any]:
+        schema = build_schema()
+        scope_extension = {
+            scope.value: SCOPE_DESCRIPTIONS[scope] for scope in AuthorizationScope
+        }
+        schema[SCOPES_EXTENSION] = scope_extension
+        return schema
+
+    fastapi.openapi = openapi  # type: ignore[method-assign]
+
+
+GF_HEADERS = [
+    "x-gf-sub",
+    "x-gf-act-sub",
+    "x-gf-act-cn",
+    "x-gf-audience",
+    "x-gf-scope",
+]
+
+
+def gf_header_params(document_gf_headers: bool) -> list[Any]:
+    if not document_gf_headers:
+        return []
+
+    return [
+        Security(APIKeyHeader(name=header, scheme_name=header, auto_error=False))
+        for header in GF_HEADERS
+    ]
+
 
 # Section (tag) metadata shown in the Swagger UI / OpenAPI schema. The order here
 # determines the order in which the sections are rendered.
@@ -311,10 +350,12 @@ def setup_fastapi() -> FastAPI:
             openapi_tags=openapi_tags,
             root_path=config.uvicorn.root_path,
             lifespan=_lifespan,
+            dependencies=gf_header_params(config.uvicorn.document_gf_headers),
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     )
+    install_scope_catalogue(fastapi)
 
     fastapi.add_middleware(
         RequestContextMiddleware,
@@ -343,8 +384,6 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])
 
     # OAuth protected administration routes
-    # TODO: Add protection based on scopes for these routes so not all organization
-    # clients are allowed to use these
     administration_routers = [
         key_router,
         hsm_key_version_router,
@@ -353,7 +392,12 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(
             router,
             prefix="/administration",
-            dependencies=[Depends(get_auth_ctx)],
+            dependencies=[
+                Depends(get_auth_ctx),
+                Security(
+                    require_scopes, scopes=[AuthorizationScope.ADMINISTRATION.value]
+                ),
+            ],
         )
 
     return fastapi

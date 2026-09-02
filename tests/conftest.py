@@ -18,6 +18,7 @@ from pydantic import SecretStr
 from app.config import get_config, set_config
 from app.db.db import Database
 from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.models.auth.data import AuthorizationScope
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
 
@@ -139,6 +140,9 @@ def valid_client_common_name() -> str:
     return "client_common_name"
 
 
+ALL_SCOPES = " ".join(scope.value for scope in AuthorizationScope)
+
+
 @pytest.fixture
 def valid_headers(
     valid_organization_id: Oin,
@@ -150,4 +154,18 @@ def valid_headers(
         "x-gf-act-sub": valid_client_organization_id.value,
         "x-gf-act-cn": valid_client_common_name,
         "x-gf-audience": "prs.service",
+        "x-gf-scope": ALL_SCOPES,
     }
+
+
+@pytest.fixture
+def headers_with_scopes(
+    valid_headers: Dict[str, str],
+) -> Callable[..., Dict[str, str]]:
+    def _build(*scopes: AuthorizationScope) -> Dict[str, str]:
+        return {
+            **valid_headers,
+            "x-gf-scope": " ".join(scope.value for scope in scopes),
+        }
+
+    return _build
