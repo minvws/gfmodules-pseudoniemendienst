@@ -51,6 +51,7 @@ mutual TLS (mTLS); the calling organization and, where relevant, its public key
 are derived from the client certificate.
 """
 
+# OpenAPI extension to describe the possible authorization scopes. See https://swagger.io/docs/specification/v3_0/openapi-extensions/
 SCOPES_EXTENSION = "x-authorization-scopes"
 
 
