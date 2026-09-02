@@ -54,19 +54,37 @@ def test_empty_scope_header_is_rejected(
     [
         "prs:read",
         "prs:create prs:read",
-        "prs:oprf prs:read",
         "nvi:read",
         "prs:administration_typo",
     ],
 )
-def test_unknown_scope_is_rejected(
+def test_scope_header_without_a_known_scope_is_rejected(
     client: TestClient, valid_headers: Headers, value: str
 ) -> None:
-    """An unrecognised scope fails header validation, so it is refused on every route,
-    not only on the ones whose own requirement it fails to meet."""
+    """A token that grants this service nothing is refused up front, on every route,
+    rather than left to fail the requirement of each individual one."""
     headers = {**valid_headers, "x-gf-scope": value}
 
     assert client.post("/oprf/eval", json=OPRF_BODY, headers=headers).status_code == 403
+    assert client.get("/administration/keys", headers=headers).status_code == 403
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "prs:oprf prs:read",
+        "nvi:read prs:oprf",
+        "nvi:read prs:oprf lmr:write",
+    ],
+)
+def test_unknown_scopes_are_ignored_alongside_a_known_one(
+    client: TestClient, valid_headers: Headers, value: str
+) -> None:
+    """An access token may carry scopes belonging to other services. Those must not
+    fail the request, and must not grant anything here either."""
+    headers = {**valid_headers, "x-gf-scope": value}
+
+    assert client.post("/oprf/eval", json=OPRF_BODY, headers=headers).status_code != 403
     assert client.get("/administration/keys", headers=headers).status_code == 403
 
 
