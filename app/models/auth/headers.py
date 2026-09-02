@@ -17,7 +17,7 @@ class AuthHeaders(BaseModel):
     client_organization_id: Annotated[Oin, Field(alias="x-gf-act-sub")]
     client_organization_common_name: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
-    scope: Annotated[list[AuthorizationScope], Field(alias="x-gf-scope")]
+    scope: Annotated[list[AuthorizationScope], Field(alias="x-gf-scope", default_factory=list)]
 
     @field_validator("scope", mode="before")
     @classmethod

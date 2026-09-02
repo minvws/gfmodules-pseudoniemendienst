@@ -47,7 +47,7 @@ def get_auth_ctx(
     ctx = AuthContext(
         claims=claims,
         audience=validated_auth_headers.audience,
-        scope=list(validated_auth_headers.scope),
+        scope=validated_auth_headers.scope,
     )
     request.state.auth = ctx
     return ctx
