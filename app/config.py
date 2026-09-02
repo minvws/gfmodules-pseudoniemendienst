@@ -3,6 +3,7 @@ import os
 from enum import Enum
 from typing import Any, List
 
+from gfmodules.logging import ConfigLogging
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 _PATH = "app.conf"
@@ -25,14 +26,6 @@ class ConfigApp(BaseModel):
     mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
-
-
-class ConfigLogging(BaseModel):
-    syslog_path: str | None = Field(default=None)
-    application_id: str | None = Field(default=None)
-    include_traces: bool = Field(default=True)
-    debug_logs_in_console: bool = Field(default=False)
-    correlation_id_expected: bool = Field(default=False)
 
 
 class ConfigDatabase(BaseModel):

@@ -1,42 +1,34 @@
 import json
 import logging
-import signal
-import sys
+import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from logging.config import dictConfig
 from pathlib import Path
-from types import TracebackType
-from typing import Any, AsyncIterator
+from typing import Any
 
+import gfmodules.logging as gflog
 import uvicorn
 from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
+from gfmodules.logging.middleware import (
+    RequestContextMiddleware,
+    restore_request_context,
+)
 
 from app.auth import get_auth_ctx, require_scopes
-from app.config import get_config
-from app.logging.config_builder import LogConfigBuilder
-from app.logging.events import (
-    SYS_APP_CRASHED,
-    SYS_APP_STARTED,
-    SYS_APP_STOPPED,
-    SYS_UNHANDLED_EXCEPTION,
-    log_event,
-)
-from app.logging.middleware import RequestContextMiddleware, restore_request_context
+from app.config import _ENVIRONMENT_CONFIG_PATH_NAME, _PATH, get_config
+from app.logging.events import Log
 from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
+from app.routers.administration.hsm_key_version import router as hsm_key_version_router
+from app.routers.administration.key import router as key_router
 from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
-from app.routers.administration.hsm_key_version import router as hsm_key_version_router
-from app.routers.administration.key import router as key_router
 from app.routers.oprf import router as oprf_router
 from app.routers.test_oprf import router as test_oprf_router
 
 logger = logging.getLogger(__name__)
-
-# Component name carried on the PRS-HEALTH / PRS-SYS audit events.
-COMPONENT = "pseudoniemendienst"
 
 API_DESCRIPTION = """
 The Pseudoniemendienst (PRS) lets parties exchange data about a person without
@@ -186,8 +178,8 @@ def run() -> None:
 
 def application_init() -> None:
     setup_logging()
-    _install_excepthook()
-    _install_signal_handlers()
+    gflog.install_excepthook(logger)
+    gflog.install_signal_handlers()
 
 
 def create_fastapi_app() -> FastAPI:
@@ -195,22 +187,16 @@ def create_fastapi_app() -> FastAPI:
     try:
         fastapi = setup_fastapi()
     except Exception as exc:
-        log_event(
+        gflog.emit(
             logger,
-            SYS_APP_CRASHED,
-            "Application crashed during startup",
+            Log.SYS_UNHANDLED_EXCEPTION,
+            "Unhandled exception during application startup",
+            fields={"exception_type": type(exc).__name__},
             exc_info=exc,
-            component=COMPONENT,
-            shutdown_reason="crash",
-            last_exception_type=type(exc).__name__,
         )
         raise
-    _emit_app_started()
 
     return fastapi
-
-
-_shutdown_reason: str = "graceful"
 
 
 def _read_version() -> str:
@@ -223,112 +209,40 @@ def _read_version() -> str:
         return "unknown"
 
 
-def _emit_app_started() -> None:
-    config = get_config()
-    log_event(
-        logger,
-        SYS_APP_STARTED,
-        "Application started",
-        component=COMPONENT,
-        version=_read_version(),
-        environment=config.app.environment,
-        pseudoniem_api_enabled=config.app.enable_exchange_services_routes,
-    )
-
-
-def _install_excepthook() -> None:
-    """Route uncaught exceptions through our own logging so the crash is
-    recorded as a PRS-SYS-002 event before the process dies."""
-
-    def _hook(
-        exc_type: type[BaseException],
-        exc_value: BaseException,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        if issubclass(exc_type, KeyboardInterrupt):
-            sys.__excepthook__(exc_type, exc_value, exc_tb)
-            return
-        global _shutdown_reason
-        _shutdown_reason = "crash"
-        log_event(
-            logger,
-            SYS_APP_CRASHED,
-            "Application crashed: uncaught exception",
-            exc_info=(exc_type, exc_value, exc_tb),
-            component=COMPONENT,
-            shutdown_reason="crash",
-            last_exception_type=exc_type.__name__,
-        )
-
-    sys.excepthook = _hook
-
-
-def _install_signal_handlers() -> None:
-    """Record the shutdown reason then delegate to the previously-installed
-    handler (typically uvicorn's), so we don't disrupt graceful shutdown."""
-
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        try:
-            previous = signal.getsignal(sig)
-        except (ValueError, OSError):
-            continue
-
-        def _make_handler(signum: int, prev: Any) -> Any:
-            def _handler(s: int, frame: Any) -> None:
-                global _shutdown_reason
-                _shutdown_reason = f"signal:{signal.Signals(signum).name}"
-                if callable(prev):
-                    prev(s, frame)
-
-            return _handler
-
-        try:
-            signal.signal(sig, _make_handler(sig, previous))
-        except (ValueError, OSError):
-            pass
-
-
 @asynccontextmanager
 async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
-    global _shutdown_reason
-    try:
+    config = get_config()
+    async with gflog.lifespan_logging(
+        logger,
+        version=_read_version(),
+        config_path=os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME, _PATH),
+        started_fields={
+            "environment": config.app.environment,
+            "pseudoniem_api_enabled": config.app.enable_exchange_services_routes,
+        },
+    ):
         yield
-    finally:
-        if _shutdown_reason != "crash":
-            log_event(
-                logger,
-                SYS_APP_STOPPED,
-                "Application stopped",
-                component=COMPONENT,
-                shutdown_reason=_shutdown_reason,
-            )
 
 
 @restore_request_context
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    log_event(
+    gflog.emit(
         logger,
-        SYS_UNHANDLED_EXCEPTION,
+        Log.SYS_UNHANDLED_EXCEPTION,
         "Unhandled exception",
+        fields={
+            "exception_type": type(exc).__name__,
+            "endpoint": request.url.path,
+            "method": request.method,
+        },
         exc_info=exc,
-        exception_type=type(exc).__name__,
-        endpoint=request.url.path,
-        method=request.method,
     )
     return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 def setup_logging() -> None:
     config = get_config()
-    loglevel = config.app.loglevel.upper()
-    if loglevel not in logging.getLevelNamesMapping():
-        raise ValueError(f"Invalid loglevel {loglevel}")
-
-    log_config = LogConfigBuilder(
-        loglevel=loglevel,
-        logging_config=config.logging,
-    ).build()
-    dictConfig(log_config)
+    gflog.configure(config=config.logging, loglevel=config.app.loglevel, catalogue=Log)
 
 
 def setup_fastapi() -> FastAPI:

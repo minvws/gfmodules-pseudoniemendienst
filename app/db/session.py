@@ -3,6 +3,7 @@ import random
 from time import sleep
 from typing import Any, Callable, Type, TypeVar
 
+import gfmodules.logging as gflog
 from sqlalchemy import Engine, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import get_config
 from app.db.entities.base import Base
 from app.db.repositories import repository_base
-from app.logging.events import SYS_DB_CONNECTION_FAILED, log_event
+from app.logging.events import Log
 
 """
 This module contains the DbSession class, which is a context manager that provides a session to interact with
@@ -156,26 +157,30 @@ class DbSession:
             attempt += 1
             if len(backoff) == 0:
                 logger.error("operation failed after all retries")
-                log_event(
+                gflog.emit(
                     logger,
-                    SYS_DB_CONNECTION_FAILED,
+                    Log.SYS_DB_CONNECTION_FAILED,
                     "Database connection lost: giving up after all retries",
-                    datastore="prs-database",
-                    error_type=type(error).__name__,
-                    retry_attempt=attempt,
+                    fields={
+                        "datastore": "prs-database",
+                        "error_type": type(error).__name__,
+                        "retry_attempt": attempt,
+                    },
                 )
                 raise DatabaseError(
                     "Operation failed after all retries", None, BaseException()
                 )
 
-            log_event(
+            gflog.emit(
                 logger,
-                SYS_DB_CONNECTION_FAILED,
+                Log.SYS_DB_CONNECTION_FAILED,
                 "Database connection lost, retrying",
-                datastore="prs-database",
-                error_type=type(error).__name__,
-                retry_attempt=attempt,
-                backoff_seconds=backoff[0],
+                fields={
+                    "datastore": "prs-database",
+                    "error_type": type(error).__name__,
+                    "retry_attempt": attempt,
+                    "backoff_seconds": backoff[0],
+                },
             )
             sleep(backoff[0] + random.uniform(0, 0.1))
             backoff = backoff[1:]

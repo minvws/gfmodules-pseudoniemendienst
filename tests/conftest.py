@@ -7,17 +7,22 @@ os.environ["FASTAPI_CONFIG_PATH"] = "./app.test.conf"  # noqa
 
 import base64
 import secrets
-from typing import Callable, Dict, Generator, List
+from collections.abc import Callable, Generator
+from typing import Dict, List
 
+import gfmodules.logging as gflog
 import inject
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from gfmodules.logging import ConfigLogging
+from gfmodules.logging.testing import reset_for_tests
 from pydantic import SecretStr
 
 from app.config import get_config, set_config
 from app.db.db import Database
 from app.db.repositories.org_key_repository import OrganizationKeyRepository
+from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
 from app.services.key_resolver import KeyResolver
 from app.services.org_service import OrgService
@@ -38,6 +43,19 @@ if not os.path.exists(oprf_path):
 if not conf.pseudonym.master_key.get_secret_value():
     conf.pseudonym.master_key = SecretStr(genkey(32))
 set_config(conf)
+
+
+@pytest.fixture(autouse=True)
+def logging_catalogue() -> Generator[None, None, None]:
+    gflog.configure(
+        config=ConfigLogging(debug_logs_in_console=True, access_logs=False),
+        loglevel="DEBUG",
+        catalogue=Log,
+    )
+    try:
+        yield
+    finally:
+        reset_for_tests()
 
 
 class RecordingHandler(logging.Handler):
