@@ -7,6 +7,8 @@ mtls_override_cert=
 enable_test_routes=True
 # Enable the exchange service routes (/exchange/*, /receive)
 enable_exchange_services_routes=True
+# Enable the mock SAML exchange routes (/saml-exchange/*); test environments only
+enable_saml_exchange_routes=False
 
 [logging]
 # Single syslog channel (host:port, UDP); leave empty to log to stdout only.
@@ -64,6 +66,17 @@ server_key_file=secrets/oprf-server.key
 [pseudonym]
 # Master key for hkdf
 master_key=
+
+[saml_service]
+# Base URL of the internal PRS-SAML service; required when enable_saml_exchange_routes is set
+url=http://localhost:8504
+timeout=5
+# mTLS towards the PRS-SAML service: client certificate/key presented to the
+# service, and the internal CA its server certificate must chain to.
+# Leave unset for plain HTTP in local development.
+# cert_file=secrets/prs-saml/client.crt
+# key_file=secrets/prs-saml/client.key
+# ca_cert_file=secrets/prs-saml/ca.crt
 
 [authorization_headers]
 # space separated list of expected audiences, one should be present in the authorization authorization header

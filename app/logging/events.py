@@ -56,6 +56,37 @@ OPRF_REFUSED_NO_ACTIVE_PUBKEY = PRSEvent(  # PRS-OPRF-004
     },
 )
 
+# DigiD SAML exchange events (PRS-SAML), see
+# https://github.com/minvws/gfmodules-coordination-private/issues/1037
+# PRS-SAML-003 (230402, decryption failed) and PRS-SAML-004 (230403, invalid
+# assertion) are not defined here yet: the current endpoint is a mock that does
+# not decrypt or validate assertions (coordination issue #1088).
+SAML_EXCHANGE_OK = PRSEvent(  # PRS-SAML-001
+    "230400",
+    logging.INFO,
+    (_APP, _SIEM),
+    {
+        _APP: (
+            "handelende_oin",
+            "namens_oin",
+            "doel_oin",
+            "domein",
+            "saml_decrypt_key_versie",
+            "sleutel_versie",
+        ),
+        _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+    },
+)
+SAML_EXCHANGE_FAILED = PRSEvent(  # PRS-SAML-002
+    "230401",
+    logging.ERROR,
+    (_APP, _SIEM),
+    {
+        _APP: ("handelende_oin", "namens_oin", "doel_oin", "error_type", "endpoint"),
+        _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+    },
+)
+
 # Health and system events (PRS-HEALTH / PRS-SYS), see
 # https://github.com/minvws/gfmodules-coordination-private/issues/1041
 # PRS-SYS-005 (270405, crypto engine unreachable) is not defined here: this

@@ -19,6 +19,7 @@ from app.services.oprf.oprf_service import OprfService
 from app.services.org_service import OrgService
 from app.services.pseudonym_service import PseudonymService
 from app.services.rid_service import RidService
+from app.services.saml.client import SamlServiceClient
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,21 @@ def container_config(binder: inject.Binder) -> None:
     rid_service = RidService(master_key, b"RID:v1")
     binder.bind(RidService, rid_service)
 
+    if config.app.enable_saml_exchange_routes:
+        if not config.saml_service.url:
+            raise ValueError(
+                "saml_service.url is not configured. It is required when "
+                "enable_saml_exchange_routes is set."
+            )
+        saml_service_client = SamlServiceClient(
+            url=config.saml_service.url,
+            timeout=config.saml_service.timeout,
+            cert_file=config.saml_service.cert_file,
+            key_file=config.saml_service.key_file,
+            ca_cert_file=config.saml_service.ca_cert_file,
+        )
+        binder.bind(SamlServiceClient, saml_service_client)
+
 
 def get_mtls_service() -> MtlsService:
     return inject.instance(MtlsService)
@@ -157,6 +173,10 @@ def get_hsm_key_cleanup_service() -> HsmKeyCleanupService:
 
 def get_auth_headers_service() -> AuthHeaderService:
     return inject.instance(AuthHeaderService)
+
+
+def get_saml_service_client() -> SamlServiceClient:
+    return inject.instance(SamlServiceClient)
 
 
 if not inject.is_configured():

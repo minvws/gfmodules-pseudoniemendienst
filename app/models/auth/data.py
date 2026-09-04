@@ -6,6 +6,7 @@ class AuthorizationScope(str, Enum):
     OPRF = "prs:oprf"
     PSEUDONYM = "prs:pseudonym"
     REVERSIBLE_PSEUDONYM = "prs:reversible-pseudonym"
+    SAML_REVERSIBLE_PSEUDONYM = "prs:saml-reversible-pseudonym"
 
 
 SCOPE_DESCRIPTIONS: dict[AuthorizationScope, str] = {
@@ -20,5 +21,8 @@ SCOPE_DESCRIPTIONS: dict[AuthorizationScope, str] = {
     ),
     AuthorizationScope.REVERSIBLE_PSEUDONYM: (
         "Exchange a personal ID for a reversible pseudonym or a BSN."
+    ),
+    AuthorizationScope.SAML_REVERSIBLE_PSEUDONYM: (
+        "Exchange a DigiD SAML response for a reversible pseudonym."
     ),
 }
