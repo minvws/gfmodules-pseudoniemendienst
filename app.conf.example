@@ -38,6 +38,9 @@ pool_recycle=1800
 swagger_enabled = True
 docs_url = /docs
 redoc_url = /redocs
+# Show inputs for the x-gf-* headers in swagger. Only for calling the API directly:
+# behind the OAuth gateway these are injected upstream, so leave this off there.
+document_gf_headers = True
 host = 0.0.0.0
 port = 6502
 reload = True

@@ -1,11 +1,11 @@
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Security
 from jwcrypto import jwk
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import get_auth_ctx
+from app.auth import require_scopes
 from app.logging.events import (
     OPRF_EVAL_FAILED,
     OPRF_EVAL_OK,
@@ -13,6 +13,7 @@ from app.logging.events import (
     log_event,
 )
 from app.models.auth.context import AuthContext
+from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
 from app.services.key_resolver import KeyResolver
 from app.services.oprf.oprf_service import OprfService
@@ -31,7 +32,9 @@ _ENDPOINT = "/oprf/eval"
 )
 def post_eval(
     req: BlindRequest,
-    auth: AuthContext = Depends(get_auth_ctx),
+    auth: AuthContext = Security(
+        require_scopes, scopes=[AuthorizationScope.OPRF.value]
+    ),
     key_resolver: KeyResolver = Depends(container.get_key_resolver),
     org_service: OrgService = Depends(container.get_org_service),
     oprf_service: OprfService = Depends(container.get_oprf_service),

@@ -14,6 +14,7 @@ from sqlalchemy.exc import DatabaseError, OperationalError
 from app import container
 from app.config import ConfigOprf, get_config
 from app.db.db import Database
+from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.rid import RidUsage
@@ -98,6 +99,7 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
                 "x-gf-act-sub": "00000099000000001000",
                 "x-gf-act-cn": "00000099000000001000",
                 "x-gf-audience": "prs.service",
+                "x-gf-scope": AuthorizationScope.OPRF.value,
             },
         )
     finally:

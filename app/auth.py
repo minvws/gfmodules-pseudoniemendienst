@@ -1,9 +1,8 @@
 import logging
-from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
 
 from app import container
@@ -48,29 +47,38 @@ def get_auth_ctx(
     ctx = AuthContext(
         claims=claims,
         audience=validated_auth_headers.audience,
-        scope=tuple((validated_auth_headers.scope or "").split()),
+        scope=validated_auth_headers.scope,
     )
     request.state.auth = ctx
     return ctx
 
 
-def require_scope(scope: AuthorizationScope) -> Callable[..., AuthContext]:
-    """Route dependency requiring an OAuth scope from the proxy-verified
-    x-gf-scope header, mirroring the pattern in the nationale-verwijsindex."""
+def get_auth_context(request: Request) -> AuthContext:
+    ctx: AuthContext | None = getattr(request.state, "auth", None)
+    if ctx is None:
+        logger.error("no authentication context on request for %s", request.url.path)
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+    return ctx
 
-    def dependency(
-        auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
-    ) -> AuthContext:
-        if scope.value not in auth_ctx.scope:
-            logger.warning(
-                "client %s lacks required scope %s",
-                auth_ctx.claims.client_organization_id,
-                scope.value,
-            )
-            raise HTTPException(status_code=403, detail="Missing required scope")
-        return auth_ctx
 
-    return dependency
+def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
+    if required not in ctx.scope:
+        granted = " ".join(s.value for s in ctx.scope)
+        logger.warning(
+            "scope %s missing for request, granted scopes: %s", required.value, granted
+        )
+        raise HTTPException(status_code=403, detail="Unauthorized request")
+    return ctx
+
+
+def require_scopes(
+    security_scopes: SecurityScopes,
+    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
+    ctx: AuthContext = Depends(get_auth_context),
+) -> AuthContext:
+    for scope in security_scopes.scopes:
+        assert_scope(ctx, AuthorizationScope(scope))
+    return ctx
 
 
 def authenticated_organization(

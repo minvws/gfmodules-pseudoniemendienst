@@ -79,6 +79,7 @@ class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
     docs_url: str = Field(default="/docs")
     redoc_url: str = Field(default="/redoc")
+    document_gf_headers: bool = Field(default=False)
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8502, gt=0, lt=65535)
     reload: bool = Field(default=True)

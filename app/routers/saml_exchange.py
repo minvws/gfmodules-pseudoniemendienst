@@ -1,12 +1,12 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Security
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import require_scope
+from app.auth import require_scopes
 from app.logging.events import SAML_EXCHANGE_FAILED, SAML_EXCHANGE_OK, log_event
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
@@ -34,8 +34,9 @@ validated upstream by the OIN-verifier proxy, which forwards its scopes in the
 )
 def post_reversible_pseudonym(
     payload: Any = Body(...),
-    auth: AuthContext = Depends(
-        require_scope(AuthorizationScope.SAML_REVERSIBLE_PSEUDONYM)
+    auth: AuthContext = Security(
+        require_scopes,
+        scopes=[AuthorizationScope.SAML_REVERSIBLE_PSEUDONYM.value],
     ),
     saml_client: SamlServiceClient = Depends(container.get_saml_service_client),
 ) -> JSONResponse:
