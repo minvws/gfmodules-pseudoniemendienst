@@ -21,7 +21,7 @@ access_logs=False
 # Include stack traces in the JSON logs
 include_traces=True
 # Log everything as plain text to the console (for local development)
-debug_logs_in_console=True
+console_streams=debug
 # Log an error when a request arrives without an X-GF-Correlation-ID header
 correlation_id_expected=False
 
