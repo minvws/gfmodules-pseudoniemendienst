@@ -3,7 +3,7 @@ import os
 from enum import Enum
 from typing import Any, List
 
-from gfmodules.logging import ConfigLogging
+from gfmodules.logging import ConfigLogging as GFConfigLogging
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 _PATH = "app.conf"
@@ -38,6 +38,13 @@ class ConfigDatabase(BaseModel):
     max_overflow: int = Field(default=10, ge=0, lt=100)
     pool_pre_ping: bool = Field(default=False)
     pool_recycle: int = Field(default=3600, ge=0)
+
+    @field_validator("retry_backoff", mode="before")
+    @classmethod
+    def _split_retry_backoff(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [float(item.strip()) for item in value.split(",") if item.strip()]
+        return value
 
     @field_validator("create_tables", mode="before")
     def validate_create_tables(cls, v: Any) -> bool:
@@ -127,6 +134,15 @@ class ConfigAuthorizationHeaders(BaseModel):
         raise ValueError("Invalid input on `expected_audience`, please check config")
 
 
+class ConfigLogging(GFConfigLogging):
+    @field_validator("console_streams", mode="before")
+    @classmethod
+    def _split_console_streams(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+
 class Config(BaseModel):
     app: ConfigApp
     logging: ConfigLogging = Field(default_factory=ConfigLogging)
@@ -178,23 +194,6 @@ def get_config(path: str | None = None) -> Config:
     # To be inline with other python code, we use INI-type files for configuration. Since this isn't
     # a standard format for pydantic, we need to do some manual parsing first.
     ini_data = read_ini_file(path)
-
-    # Convert database.retry_backoff to a list of floats
-    if "retry_backoff" in ini_data["database"] and isinstance(
-        ini_data["database"]["retry_backoff"], str
-    ):
-        # convert the string to a list of floats
-        ini_data["database"]["retry_backoff"] = [
-            float(i) for i in ini_data["database"]["retry_backoff"].split(",")
-        ]
-
-    # Convert logging.console_streams to a list of strings
-    if "logging" in ini_data and isinstance(
-        ini_data["logging"].get("console_streams"), str
-    ):
-        ini_data["logging"]["console_streams"] = [
-            i.strip() for i in ini_data["logging"]["console_streams"].split(",")
-        ]
 
     _CONFIG = Config.model_validate(ini_data)
 
