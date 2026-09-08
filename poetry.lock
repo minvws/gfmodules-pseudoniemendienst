@@ -816,7 +816,7 @@ files = [
 
 [[package]]
 name = "gfmodules-python-logging-library"
-version = "0.3.0"
+version = "0.3.1"
 description = "Provides logging utilities for GFModules Python projects."
 optional = false
 python-versions = ">=3.11,<4.0"
@@ -834,8 +834,8 @@ fastapi = ["starlette (>=1.3,<2.0)"]
 [package.source]
 type = "git"
 url = "https://github.com/minvws/gfmodules-python-logging-library"
-reference = "v0.3.0"
-resolved_reference = "da7c1b1057d42b7e5199f522b190c8a9e61b1941"
+reference = "v0.3.1"
+resolved_reference = "a5d337d6167c95441804c61a16032a5ef2f69556"
 
 [[package]]
 name = "greenlet"
@@ -3076,4 +3076,4 @@ dev = ["pytest", "setuptools"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "c928ad3021897aac370816d9b4c4667b43b8304174a4345224cbc493b9f2f280"
+content-hash = "b4cba0bb4b4a32bd78af4b11d461bbd38186210d7f0c9e8d8597dd0ef79b86f7"
