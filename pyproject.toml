@@ -31,7 +31,7 @@ jwcrypto = "^1.5.7"
 sqlalchemy = "^2.0.46"
 psycopg = "^3.3.2"
 pyjwt = "^2.11.0"
-gfmodules-python-logging-library = { git = "https://github.com/minvws/gfmodules-python-logging-library", tag = "v0.3.0", extras = [
+gfmodules-python-logging-library = { git = "https://github.com/minvws/gfmodules-python-logging-library", tag = "v0.3.1", extras = [
     "fastapi",
 ] }
 
