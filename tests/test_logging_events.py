@@ -7,10 +7,14 @@ from jwcrypto import jwk
 
 from app.config import ConfigOprf
 from app.logging.events import (
+    AUTHORIZATION_DENIED,
     HEALTH_UNHEALTHY,
     OPRF_EVAL_FAILED,
     OPRF_EVAL_OK,
     OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+    PERSONAL_ID_VALIDATION_FAILED,
+    PSEUDONYM_CREATE_FAILED,
+    PSEUDONYM_REVERSIBLE_CREATED,
     SYS_APP_CRASHED,
     SYS_APP_STARTED,
     SYS_APP_STOPPED,
@@ -49,6 +53,10 @@ def test_log_event_attaches_event_id_and_streams(
         (OPRF_EVAL_OK, "210400", logging.INFO),
         (OPRF_EVAL_FAILED, "210402", logging.ERROR),
         (OPRF_REFUSED_NO_ACTIVE_PUBKEY, "210403", logging.WARNING),
+        (AUTHORIZATION_DENIED, "200402", logging.WARNING),
+        (PSEUDONYM_REVERSIBLE_CREATED, "220400", logging.INFO),
+        (PSEUDONYM_CREATE_FAILED, "220403", logging.ERROR),
+        (PERSONAL_ID_VALIDATION_FAILED, "220404", logging.WARNING),
         (HEALTH_UNHEALTHY, "270400", logging.ERROR),
         (SYS_APP_STOPPED, "270402", logging.INFO),
         (SYS_APP_CRASHED, "270402", logging.CRITICAL),

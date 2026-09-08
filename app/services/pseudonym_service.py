@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import logging
-from enum import Enum
 
 from Crypto.Cipher import AES
 from cryptography.hazmat.primitives import hashes
@@ -21,11 +20,6 @@ def hkdf_derive(master_key: bytes, info: bytes, length: int = 32) -> bytes:
         info=info,
     )
     return hkdf.derive(master_key)
-
-
-class PseudonymType(str, Enum):
-    Irreversible = "irreversible"
-    Reversible = "reversible"
 
 
 class PseudonymService:
