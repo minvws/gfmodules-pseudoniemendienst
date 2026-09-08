@@ -1,7 +1,5 @@
 [app]
 loglevel=debug
-# Deployment environment reported on the startup audit event (e.g. local, test, acc, prod)
-environment=local
 mtls_override_cert=
 # Enable the /test routes
 enable_test_routes=True

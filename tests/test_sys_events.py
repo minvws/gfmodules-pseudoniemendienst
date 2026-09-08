@@ -54,7 +54,6 @@ def test_startup_emits_sys_app_started(
     message = event["message"]
     assert message["component"] == "pseudoniemendienst"
     assert message["version"]
-    assert message["environment"]
     assert message["pseudoniem_api_enabled"] is True
 
 

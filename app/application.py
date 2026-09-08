@@ -247,7 +247,6 @@ def _emit_app_started() -> None:
         "Application started",
         component=COMPONENT,
         version=_read_version(),
-        environment=config.app.environment,
         pseudoniem_api_enabled=config.app.enable_exchange_services_routes,
     )
 
