@@ -157,7 +157,7 @@ def test_db_retry_emits_connection_events(
 def test_hsm_unreachable_emits_sys_event(
     record_logs: RecordLogs,
 ) -> None:
-    records = record_logs("app.services.oprf.evaluators")
+    records = record_logs("app.services.hsm.client")
     hsm_key_version_service = MagicMock()
     hsm_key_version_service.get_active_version_numbers_by_organization_oin.return_value = [
         1
@@ -174,7 +174,7 @@ def test_hsm_unreachable_emits_sys_event(
 
     with (
         patch(
-            "app.services.oprf.evaluators.requests.post",
+            "app.services.hsm.client.requests.post",
             side_effect=requests.exceptions.ConnectionError("connection refused"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

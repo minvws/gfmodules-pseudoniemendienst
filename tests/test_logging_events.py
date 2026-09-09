@@ -145,7 +145,7 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
 
     with (
         patch(
-            "app.services.oprf.evaluators.requests.post",
+            "app.services.hsm.client.requests.post",
             side_effect=RuntimeError("HSM unreachable"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

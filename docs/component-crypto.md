@@ -30,24 +30,42 @@ but as an emphemeral token to transfer the personal_id to a another recipient.
 
 ## Reversible Pseudonym
 
-The reversible pseudonym is an encrypted representation of the combination of:
+The reversible pseudonym follows the Double-HMAC-IV construction of the technical design (PRS-AK-F0XF). It is an
+encryption of the subject
 
-    <personal_id> | <rcpt_org> | <rcpt_scope>
+    <personal_id> | oin:<rcpt_org> | <rcpt_scope>
 
-it is encrypted through AES-SIV, with the key derived as following:
+under keys that belong to the recipient organization and a key version. Per (organization, version) two keys exist,
+an AES-256 key and an HMAC key. In production they live in the HSM under the labels
 
-    hkdf(master_key, info=b"prs:rp:aes-siv:" + <rcpt_org>, length=32) => <static_org_aes_key>
+    oin-<oin>-rp-v<version>-aes
+    oin-<oin>-rp-v<version>-hmac
 
-This allows the RP to be deterministic per organization, while still being irreversible without the master key.
+and are created on first use. Without an HSM (development only) they are derived from the master key:
 
-A RP is encrypted with AES-SIV (AEAD) with the following proeperties:
+    hkdf(master_key, info=b"prs:rp:aes:<oin>:v<version>", length=32)   => <aes_key>
+    hkdf(master_key, info=b"prs:rp:hmac:<oin>:v<version>", length=32)  => <hmac_key>
 
-    plaintext     <personal_id> | <rcpt_org> | <rcpt_scope>
-    key           <org_static_aes_key>  
-    aad           b"PRS:Pseudonym:v1"
-    layout        tag || ciphertext
-    
-An RP is deterministic and only reversible by the PRS service using the organization key derived from the master key.
+The design describes one shared "versie_secret"; a PKCS#11 generic secret cannot double as an AES key, so the two
+roles are separate objects (which also resolves open question PRS-VR-P15Y on key reuse).
+
+The pseudonym is computed as:
+
+    iv          hmac_sha256(<hmac_key>, hmac_sha256(<hmac_key>, subject))[:16]
+    ciphertext  aes_256_cbc(<aes_key>, iv, pkcs7(subject))
+    layout      format (1 byte, 0x01) || version (2 bytes, big endian) || ciphertext || iv
+
+The double HMAC makes the IV deterministic without letting anyone who later obtains the HMAC key link an IV back to
+a personal ID. HMAC-SHA256 yields 32 bytes; the AES block size fixes the IV at the first 16.
+
+The key version is the organization's active HSM key version at the time of creation (the latest one when several
+are active during rotation) and is carried in the pseudonym so the PRS can select the right key when reversing.
+
+Reversal decrypts the ciphertext with the (organization, version) AES key, recomputes the IV from the decrypted
+subject and compares it, in constant time, with the embedded IV. A mismatch, a subject naming another organization, or
+a version that has been destroyed is rejected. Reversal is only possible by the PRS itself.
+
+An RP is deterministic per (personal_id, organization, scope, version).
 
 
 ## Irreversible Pseudonym

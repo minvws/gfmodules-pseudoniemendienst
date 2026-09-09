@@ -143,7 +143,7 @@ EXCHANGE_TAGS_METADATA = [
             "pseudonym (or the BSN, when permitted by both the RID usage and the "
             "organization's `max_key_usage`). Exchanges that involve a personal ID "
             "require both the calling and the recipient organization to be "
-            "authorized for it by a PRS administrator."
+            "authorized for that personal ID type by a PRS administrator."
         ),
     },
 ]

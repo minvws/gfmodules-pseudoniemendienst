@@ -7,6 +7,7 @@ from app.config import get_config
 from app.db.db import Database
 from app.services.auth.header import AuthHeaderService
 from app.services.authorization_service import AuthorizationService
+from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import (
@@ -17,6 +18,12 @@ from app.services.oprf.evaluators import (
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.pseudonym_service import PseudonymService
+from app.services.reversible.keys import (
+    HsmReversibleKeyOperations,
+    LocalReversibleKeyOperations,
+    ReversibleKeyOperations,
+)
+from app.services.reversible.service import ReversiblePseudonymService
 from app.services.rid_service import RidService
 from app.services.saml.client import SamlServiceClient
 
@@ -78,10 +85,15 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(AuthHeaderService, auth_header_service)
 
+    master_key = _load_master_key(config.pseudonym.master_key.get_secret_value())
+
     oprf_evaluator: OprfEvaluator
+    reversible_keys: ReversibleKeyOperations
     if config.oprf.hsm_url:
         oprf_evaluator = HsmOprfEvaluator(config.oprf, hsm_key_version_service)
+        reversible_keys = HsmReversibleKeyOperations(HsmClient(config.oprf))
     else:
+        reversible_keys = LocalReversibleKeyOperations(master_key)
         try:
             with open(config.oprf.server_key_file, "r") as f:
                 key = f.read().strip()
@@ -98,9 +110,12 @@ def container_config(binder: inject.Binder) -> None:
     oprf_service = OprfService(oprf_evaluator)
     binder.bind(OprfService, oprf_service)
 
-    # This should be done through an HSM
-    master_key = _load_master_key(config.pseudonym.master_key.get_secret_value())
+    reversible_pseudonym_service = ReversiblePseudonymService(
+        reversible_keys, hsm_key_version_service
+    )
+    binder.bind(ReversiblePseudonymService, reversible_pseudonym_service)
 
+    # This should be done through an HSM
     pseudonym_service = PseudonymService(master_key)
     binder.bind(PseudonymService, pseudonym_service)
 
@@ -137,6 +152,10 @@ def get_organization_public_key_service() -> OrganizationPublicKeyService:
 
 def get_authorization_service() -> AuthorizationService:
     return inject.instance(AuthorizationService)
+
+
+def get_reversible_pseudonym_service() -> ReversiblePseudonymService:
+    return inject.instance(ReversiblePseudonymService)
 
 
 def get_oprf_service() -> OprfService:

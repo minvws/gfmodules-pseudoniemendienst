@@ -87,7 +87,7 @@ The `subject` always holds the evaluation for the latest key version. The `extra
 
 # Steps to create reversible pseudonyms
 
-The calling organization (the `x-gf-sub` identity) needs `may_provide_personal_id` set, and the recipient organization needs a `max_rid_usage` of at least `rp`; see the scenarios below.
+The calling organization (the `x-gf-sub` identity) must be allowed to request the `reversible_pseudonym` personal ID type, and the recipient organization must be allowed to receive it; see the scenarios below.
 
 ### Create a JWE
 
@@ -152,14 +152,14 @@ Response:
 
 # Scenarios:
 
- org   | oin                      | max_key_usage | may_provide_personal_id
--------|--------------------------|---------------|------------------------
- Org 1 | oin:00000099000000001000 | irp           | false
- Org 2 | oin:00000098000000001000 | rp            | true
- Org 3 | oin:00000097000000001000 | bsn           | true
+ org   | oin                      | may request           | may receive
+-------|--------------------------|-----------------------|-----------------------------
+ Org 1 | oin:00000099000000001000 | oprf                  | oprf
+ Org 2 | oin:00000098000000001000 | reversible_pseudonym  | reversible_pseudonym
+ Org 3 | oin:00000097000000001000 | reversible_pseudonym  | oprf, reversible_pseudonym
 
 * Org 1 may not hand a personal ID to the PRS and can only receive irreversible pseudonyms (through the OPRF). Those cannot be decoded back to the personal ID by anyone.
-* Org 2 can hand a personal ID to the PRS and receive reversible pseudonyms, but cannot decode them back to the personal ID itself.
-* Org 3 can hand a personal ID to the PRS, receive reversible pseudonyms and decode them back to the personal ID.
+* Org 2 can hand a personal ID to the PRS and receive reversible pseudonyms.
+* Org 3 can hand a personal ID to the PRS and receive both OPRF evaluations and reversible pseudonyms.
 
-An exchange of a personal ID for a reversible pseudonym therefore succeeds from Org 2 or Org 3 towards Org 2 or Org 3, and is refused (403) when Org 1 is the sender or the recipient.
+An exchange of a personal ID for a reversible pseudonym therefore succeeds from Org 2 or Org 3 towards Org 2 or Org 3, and is refused when Org 1 is the sender (401) or the recipient (404).

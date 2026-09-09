@@ -97,7 +97,7 @@ Update the end date for one key version.
 ## Exchange Services
 
 #### `POST /exchange/reversible-pseudonym`
-Exchange a personal ID for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:reversible-pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>`. The pseudonym is deterministic for the same personal ID, organization and scope, and can only be reversed to the personal ID by the PRS.
+Exchange a personal ID for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:reversible-pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>` and its `keyVersion` claim the recipient's HSM key version the pseudonym was made with. The pseudonym is deterministic for the same personal ID, organization, scope and key version, is computed with keys held in the HSM (see [component-crypto.md](component-crypto.md)), and can only be reversed to the personal ID by the PRS. When the HSM cannot be reached the endpoint returns `503`.
 
 ```json
 {
@@ -111,10 +111,10 @@ Exchange a personal ID for a reversible pseudonym bound to a recipient organizat
 
 Before the personal ID is processed, two administrator-managed authorizations are checked (the "dubbele bevoegdheidscontrole" from the technical design, PRS-AK-DBAC):
 
-- the calling organization (the verified `x-gf-sub` identity) must have `may_provide_personal_id` set;
-- the recipient organization must have a `max_rid_usage` of at least `rp`, since the pseudonym can be reversed to the personal ID by the PRS.
+- the calling organization (the verified `x-gf-sub` identity) must be allowed to *request* the `reversible_pseudonym` personal ID type;
+- the recipient organization must be allowed to *receive* the `reversible_pseudonym` personal ID type, since the pseudonym can be reversed to the personal ID by the PRS.
 
-Neither flag can be set by the organizations themselves. Responses: `403` when the scope is missing or either authorization fails (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `400` when `personalId` is malformed, `404` when the recipient organization is unknown or has no public key for the scope.
+Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing, `401` when the caller is unknown or not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, or has no public key for the scope, `400` when `personalId` is malformed.
 
 Irreversible pseudonyms are not exchanged through this section: use `POST /oprf/eval`.
 
