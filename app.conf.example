@@ -34,6 +34,10 @@ pool_recycle=1800
 
 [uvicorn]
 swagger_enabled = True
+# If set to true, swagger will show fields to provide x-gf headers
+# Should be disabled on production, this is not an security risk because
+# x-gf headers are stripped by the gateway
+document_gf_headers = True
 docs_url = /docs
 redoc_url = /redocs
 host = 0.0.0.0
@@ -64,5 +68,5 @@ master_key=
 
 [authorization_headers]
 # space separated list of expected audiences, one should be present in the authorization authorization header
-# usually the value is the domain of the running application 
+# usually the value is the domain of the running application
 expected_audiences = https://localhost:6502

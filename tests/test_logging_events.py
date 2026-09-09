@@ -1,8 +1,6 @@
 import base64
 import logging
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
 
 import pytest
 from jwcrypto import jwk
@@ -127,16 +125,13 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     pub_key: jwk.JWK,
 ) -> None:
     hsm_key_version_service = MagicMock()
-    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_id.return_value = [
+    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_oin.return_value = [
         1
     ]
-    org_service = MagicMock()
-    org_service.get_by_oin.return_value = SimpleNamespace(id=uuid4())
     service = OprfService(
         evaluator=HsmOprfEvaluator(
             hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
             hsm_key_version_service=hsm_key_version_service,
-            org_service=org_service,
         )
     )
 

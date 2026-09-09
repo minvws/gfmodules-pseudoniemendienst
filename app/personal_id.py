@@ -18,7 +18,7 @@ class PersonalId:
         self.__id_type = id_type.lower()
         self.__id_number = id_number.strip()
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         """
         Compares two PersonalId instances for equality
         """

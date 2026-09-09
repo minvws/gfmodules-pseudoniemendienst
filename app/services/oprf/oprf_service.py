@@ -6,8 +6,8 @@ import pyoprf
 from jwcrypto import jwk
 
 from app.models.requests import BlindRequest
-from app.services.oprf.jwe_token import BlindJwe
 from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
+from app.services.oprf.jwe_token import BlindJwe
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ class OprfService:
 
         try:
             evals = self.__evaluator.evaluate(req.recipientOrganization, bi)
+            print("DONE EVAL")
         except OprfEvaluationError:
             raise
         except Exception as e:

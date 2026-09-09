@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Dict, Self
+from typing import Annotated, Any, Self
 
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +17,7 @@ class AuthHeaders(BaseModel):
     @classmethod
     def from_request(cls, req: Request) -> Self:
         headers = req.headers
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         for name, field in cls.model_fields.items():
             header_name = field.alias or name
             value = headers.get(header_name)

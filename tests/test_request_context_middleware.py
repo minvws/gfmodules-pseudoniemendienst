@@ -1,7 +1,8 @@
 import io
 import json
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
