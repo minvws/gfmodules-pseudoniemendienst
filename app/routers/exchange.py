@@ -2,32 +2,61 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from typing import Annotated, Any, Dict
+
+from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+
+from app import container
+from app.models.auth.context import AuthContext
+from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class OrganizationNotFound(HTTPException):
-    def __init__(self, oin: Oin) -> None:
-        super().__init__(
-            status_code=404, detail=f"Organization with OIN '{oin.value}' not found"
-        )
-
-
-class InvalidRID(HTTPException):
-    def __init__(self, message: str = "Invalid RID.") -> None:
-        super().__init__(status_code=400, detail=message)
-
-
-class PubKeyNotFound(HTTPException):
-    def __init__(self, oin: Oin, scope: str) -> None:
-        super().__init__(
-            status_code=404,
-            detail=f"No public key found for organization '{oin.value}' and scope '{scope}'",
-        )
-
-
+# class OrganizationNotFound(HTTPException):
+#    def __init__(self, oin: Oin) -> None:
+#        super().__init__(
+#            status_code=404, detail=f"Organization with OIN '{oin.value}' not found"
+#        )
+#
+#
+# class InvalidRID(HTTPException):
+#    def __init__(self, message: str = "Invalid RID.") -> None:
+#        super().__init__(status_code=400, detail=message)
+#
+#
+# class PubKeyNotFound(HTTPException):
+#    def __init__(self, oin: Oin, scope: str) -> None:
+#        super().__init__(
+#            status_code=404,
+#            detail=f"No public key found for organization '{oin.value}' and scope '{scope}'",
+#        )
+#
+#
+# PSEUDONYM_SCOPES = [
+#    AuthorizationScope.PSEUDONYM.value,
+#    AuthorizationScope.REVERSIBLE_PSEUDONYM.value,
+# ]
+#
+#
+# def _require_scope_for_exchange_pseudonym(
+#    req: ExchangeRequest,
+#    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
+#    ctx: AuthContext = Depends(get_auth_context),
+# ) -> AuthContext:
+#    required = (
+#        AuthorizationScope.REVERSIBLE_PSEUDONYM
+#        if req.pseudonymType == PseudonymType.Reversible
+#        else AuthorizationScope.PSEUDONYM
+#    )
+#    return assert_scope(ctx, required)
+#
+#
 # @router.post("/receive", summary="Receive and decrypt RID", tags=["Exchange Services"])
 # def receive(
 #    req: RidReceiveRequest,
@@ -226,16 +255,19 @@ class PubKeyNotFound(HTTPException):
 #        status_code=201, content=jwe, headers={"Content-Type": "application/jwe"}
 #    )
 
-
 # @router.post(
 #    "/exchange/pseudonym", summary="Exchange pseudonym", tags=["Exchange Services"]
 # )
 # def exchange_pseudonym(
 #    req: ExchangeRequest,
 #    request: Request,
+#    auth_ctx: AuthContext = Security(
+#        _require_scope_for_exchange_pseudonym, scopes=PSEUDONYM_SCOPES
+#    ),
 #    key_resolver: KeyResolver = Depends(container.get_key_resolver),
 #    pseudonym_service: PseudonymService = Depends(container.get_pseudonym_service),
-#    auth_ctx: AuthContext = Depends(get_auth_ctx),
+#    org_service: OrgService = Depends(container.get_org_service),
+#    mtls_service: MtlsService = Depends(container.get_mtls_service),
 # ) -> Response:
 #    recipient_oin = req.recipientOrganization
 #
@@ -244,7 +276,7 @@ class PubKeyNotFound(HTTPException):
 #        logger.warning("recipient organization not found for OIN: %s", recipient_oin)
 #        raise OrganizationNotFound(recipient_oin)
 #
-#    organization_id = auth_ctx.claims.organization_id
+#    source_org = mtls_service.get_org_from_request(request)
 #
 #    if req.pseudonymType == PseudonymType.Irreversible:
 #        res = pseudonym_service.generate_irreversible_pseudonym(

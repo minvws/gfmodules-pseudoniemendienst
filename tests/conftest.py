@@ -31,6 +31,7 @@ from starlette.testclient import TestClient
 
 from app.config import get_config, set_config
 from app.db.db import Database
+from app.models.auth.data import AuthorizationScope
 
 
 def genkey(len: int) -> str:
@@ -154,6 +155,9 @@ def valid_client_common_name() -> str:
     return "client_common_name"
 
 
+ALL_SCOPES = " ".join(scope.value for scope in AuthorizationScope)
+
+
 @pytest.fixture
 def valid_headers(
     valid_organization_id: Oin,
@@ -165,6 +169,7 @@ def valid_headers(
         "x-gf-act-sub": valid_client_organization_id.value,
         "x-gf-act-cn": valid_client_common_name,
         "x-gf-audience": "prs.service",
+        "x-gf-scope": ALL_SCOPES,
     }
 
 
@@ -265,3 +270,16 @@ def setup_org_and_key(
         raw_jws=create_signed_jws(private_key_pem, organization.external_id),
     )
     return private_key_pem
+
+
+@pytest.fixture
+def headers_with_scopes(
+    valid_headers: dict[str, str],
+) -> Callable[..., dict[str, str]]:
+    def _build(*scopes: AuthorizationScope) -> dict[str, str]:
+        return {
+            **valid_headers,
+            "x-gf-scope": " ".join(scope.value for scope in scopes),
+        }
+
+    return _build

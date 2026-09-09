@@ -8,7 +8,20 @@ from starlette.responses import JSONResponse
 from app import container
 from app.auth import get_auth_ctx
 from app.enums.personal_id_type import PersonalIdType
+from fastapi import APIRouter, Depends, Security
+from jwcrypto import jwk
+from starlette.responses import JSONResponse
+
+from app import container
+from app.auth import require_scopes
+from app.logging.events import (
+    OPRF_EVAL_FAILED,
+    OPRF_EVAL_OK,
+    OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+    log_event,
+)
 from app.models.auth.context import AuthContext
+from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
 from app.services.authorization_service import AuthorizationService
 from app.services.oprf.oprf_service import OprfService
@@ -27,7 +40,6 @@ _ENDPOINT = "/oprf/eval"
 )
 def post_eval(
     req: BlindRequest,
-    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
     organization_public_key_service: Annotated[
         OrganizationPublicKeyService,
@@ -36,10 +48,12 @@ def post_eval(
     authorization_service: Annotated[
         AuthorizationService, Depends(container.get_authorization_service)
     ],
+    auth_ctx: AuthContext = Security(
+        require_scopes, scopes=[AuthorizationScope.OPRF.value]
+    ),
 ) -> JSONResponse:
     recipient_oin = req.recipientOrganization
     personal_id_type = PersonalIdType.OPRF
-    print(auth_ctx.claims)
     authorization_service.validate_allowed_to_request(
         auth_ctx.claims.organization_id, personal_id_type
     )

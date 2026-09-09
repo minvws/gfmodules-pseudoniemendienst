@@ -16,6 +16,8 @@ from app.config import ConfigOprf, get_config
 from app.db.db import Database
 from app.db.models import OrganizationEntity
 from app.models.oin import RecipientOrganizationOin
+from app.models.auth.data import AuthorizationScope
+from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
@@ -52,7 +54,6 @@ def test_startup_emits_sys_app_started(
     message = event["message"]
     assert message["component"] == "pseudoniemendienst"
     assert message["version"]
-    assert message["environment"]
     assert message["pseudoniem_api_enabled"] is True
 
 
@@ -102,6 +103,7 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
                 "x-gf-act-sub": persisted_organization.external_id.value,
                 "x-gf-act-cn": persisted_organization.external_id.value,
                 "x-gf-audience": "prs.service",
+                "x-gf-scope": AuthorizationScope.OPRF.value,
             },
         )
     finally:

@@ -12,9 +12,11 @@ from typing import Any
 import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.openapi.utils import get_openapi
+from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 
-from app.auth import get_auth_ctx
+from app.auth import get_auth_ctx, require_scopes
 from app.config import get_config
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import (
@@ -25,11 +27,16 @@ from app.logging.events import (
     log_event,
 )
 from app.logging.middleware import RequestContextMiddleware, restore_request_context
+from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
+from app.routers.default import router as default_router
+from app.routers.exchange import router as exchange_router
+from app.routers.health import router as health_router
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.administration.key import router as key_router
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.oprf import router as oprf_router
+from app.routers.saml_exchange import router as saml_exchange_router
 from app.routers.test_oprf import router as test_oprf_router
 
 logger = logging.getLogger(__name__)
@@ -49,6 +56,43 @@ The endpoints are grouped into the sections below. Most sections are protected b
 mutual TLS (mTLS); the calling organization and, where relevant, its public key
 are derived from the client certificate.
 """
+
+# OpenAPI extension to describe the possible authorization scopes. See https://swagger.io/docs/specification/v3_0/openapi-extensions/
+SCOPES_EXTENSION = "x-authorization-scopes"
+
+
+def install_scope_catalogue(fastapi: FastAPI) -> None:
+    build_schema = fastapi.openapi
+
+    def openapi() -> dict[str, Any]:
+        schema = build_schema()
+        scope_extension = {
+            scope.value: SCOPE_DESCRIPTIONS[scope] for scope in AuthorizationScope
+        }
+        schema[SCOPES_EXTENSION] = scope_extension
+        return schema
+
+    fastapi.openapi = openapi  # type: ignore[method-assign]
+
+
+GF_HEADERS = [
+    "x-gf-sub",
+    "x-gf-act-sub",
+    "x-gf-act-cn",
+    "x-gf-audience",
+    "x-gf-scope",
+]
+
+
+def gf_header_params(document_gf_headers: bool) -> list[Any]:
+    if not document_gf_headers:
+        return []
+
+    return [
+        Security(APIKeyHeader(name=header, scheme_name=header, auto_error=False))
+        for header in GF_HEADERS
+    ]
+
 
 # Section (tag) metadata shown in the Swagger UI / OpenAPI schema. The order here
 # determines the order in which the sections are rendered.
@@ -97,6 +141,21 @@ EXCHANGE_TAGS_METADATA = [
             "organization/scope, and redeem a previously issued RID for a pseudonym "
             "(or the BSN, when permitted by both the RID usage and the "
             "organization's `max_key_usage`)."
+        ),
+    },
+]
+
+# Section (tag) metadata for the SAML exchange routes. Only included in the
+# OpenAPI schema when `enable_saml_exchange_routes` is set, matching when these
+# routes are mounted.
+SAML_EXCHANGE_TAGS_METADATA = [
+    {
+        "name": "SAML Exchange Services",
+        "description": (
+            "Exchange a DigiD SAML response for a pseudonym. Currently a mock "
+            "that echoes the request body so the VAD/MGO can integrate; only "
+            "mounted when `enable_saml_exchange_routes` is set (test "
+            "environments only)."
         ),
     },
 ]
@@ -193,7 +252,6 @@ def _emit_app_started() -> None:
         "Application started",
         component=COMPONENT,
         version=_read_version(),
-        environment=config.app.environment,
         pseudoniem_api_enabled=config.app.enable_exchange_services_routes,
     )
 
@@ -300,6 +358,8 @@ def setup_fastapi() -> FastAPI:
     openapi_tags = list(TAGS_METADATA)
     if config.app.enable_exchange_services_routes:
         openapi_tags += EXCHANGE_TAGS_METADATA
+    if config.app.enable_saml_exchange_routes:
+        openapi_tags += SAML_EXCHANGE_TAGS_METADATA
     if config.app.enable_test_routes:
         openapi_tags += TEST_TAGS_METADATA
 
@@ -313,10 +373,12 @@ def setup_fastapi() -> FastAPI:
             openapi_tags=openapi_tags,
             root_path=config.uvicorn.root_path,
             lifespan=_lifespan,
+            dependencies=gf_header_params(config.uvicorn.document_gf_headers),
         )
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     )
+    install_scope_catalogue(fastapi)
 
     fastapi.add_middleware(
         RequestContextMiddleware,
@@ -336,8 +398,10 @@ def setup_fastapi() -> FastAPI:
     routers = [
         oprf_router,
     ]
-    # if config.app.enable_exchange_services_routes:
-    #    routers.append(exchange_router)
+    if config.app.enable_exchange_services_routes:
+        routers.append(exchange_router)
+    if config.app.enable_saml_exchange_routes:
+        routers.append(saml_exchange_router)
     if config.app.enable_test_routes:
         routers.append(test_oprf_router)
 
@@ -345,8 +409,6 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])
 
     # OAuth protected administration routes
-    # TODO: Add protection based on scopes for these routes so not all organization
-    # clients are allowed to use these
     administration_routers = [
         key_router,
         hsm_key_version_router,
@@ -355,7 +417,12 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(
             router,
             prefix="/administration",
-            dependencies=[Depends(get_auth_ctx)],
+            dependencies=[
+                Depends(get_auth_ctx),
+                Security(
+                    require_scopes, scopes=[AuthorizationScope.ADMINISTRATION.value]
+                ),
+            ],
         )
     set_authorization_headers_openapi(fastapi, config.uvicorn.document_gf_headers)
     return fastapi
