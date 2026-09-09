@@ -27,50 +27,50 @@ class KeyNotFoundError(Exception):
     pass
 
 
-def _normalize_scope(items: list[str]) -> list[str]:
-    cleaned = [s.strip().lower() for s in items if s and s.strip()]
-    return sorted(set(cleaned))
-
-
 class OrganizationPublicKeyService:
     def __init__(self, db: Database):
         self.db = db
 
     def _validate_and_extract(self, raw_jws: str, org_id: Oin) -> JWK:
-        jws = JWS()
         try:
-            jws.deserialize(raw_jws)
+            jws = JWS.from_jose_token(raw_jws)
         except InvalidJWSObject:
-            raise Exception("TODO CUSTOM ERROR, Invalid jws")
+            raise HTTPException(status_code=422, detail="JWS invalid")
 
-        if "jwk" not in jws.jose_header and "JWK" not in jws.jose_header:
-            raise Exception("TODO CUSTOM ERROR, MISSING JWK in header")
+        if "jwk" not in jws.jose_header:
+            raise HTTPException(status_code=422, detail="Missing 'jwk' in header")
 
         private_components = ["d", "p", "q", "dp", "dq", "qi"]
         if any(p in jws.jose_header["jwk"] for p in private_components):
-            raise Exception("TODO CUSTOM ERROR, JWK contains private key")
+            raise HTTPException(
+                status_code=422, detail="'jwk' contains private components"
+            )
         if "kid" not in jws.jose_header["jwk"]:
-            raise Exception("TODO CUSTOM ERROR, Missing 'kid' in jwk")
+            raise HTTPException(status_code=422, detail="'jwk' is missing an 'kid'")
 
-        jwk = JWK(**jws.jose_header.get("jwk", jws.jose_header.get("JWK")))
+        jwk = JWK(**jws.jose_header["jwk"])
         try:
             jws.verify(jwk)
         except InvalidJWSSignature:
-            raise Exception("TODO CUSTOM ERROR, Verification failed")
+            raise HTTPException(status_code=422, detail="Verification of jws failed")
         try:
             payload = json.loads(jws.payload)
-        except Exception:
-            raise Exception("TODO CUSTOM ERROR, JSON decode error")
+        except Exception as e:
+            raise HTTPException(
+                status_code=422, detail="Unable to decode jws payload"
+            ) from e
         if "iat" not in payload:
-            raise Exception("TODO CUSTOM ERROR, iat not in payload")
+            raise HTTPException(status_code=422, detail="Missing 'iat' in payload")
         if "oin" not in payload:
-            raise Exception("TODO CUSTOM ERROR, Missing 'oin' in jws")
+            raise HTTPException(status_code=422, detail="Missing 'oin' in payload")
         if datetime.fromtimestamp(payload["iat"], tz=timezone.utc) + timedelta(
             hours=1
         ) < datetime.now(tz=timezone.utc):
-            raise Exception("TODO CUSTOM ERROR, jws to old")
+            raise HTTPException(status_code=422, detail="JWS expired")
         if payload["oin"] != org_id.value:
-            raise Exception("TODO CUSTOM ERROR, Unautorized for supplied `oin`")
+            raise HTTPException(
+                status_code=422, detail="Unautorized for supplied `oin`"
+            )
         return jwk
 
     def create(
@@ -174,7 +174,7 @@ class OrganizationPublicKeyService:
                 public_key = [pk for pk in org.public_keys if "*" in pk.domains]
             if not public_key:
                 raise HTTPException(
-                    status_code=404, detail="Organization domain does not exist"
+                    status_code=404, detail="Organization domain is not registered"
                 )
             return public_key[0]
 

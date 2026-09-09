@@ -29,7 +29,7 @@ if __name__ == "__main__":
                 receive_personal_id_types=list(personal_ids),
                 request_personal_id_types=list(personal_ids),
                 hsm_key_versions=[
-                    HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+                    HsmKeyVersionEntity(version=0, from_dt=datetime.now(timezone.utc))
                 ],
             )
             db_session.add(org)

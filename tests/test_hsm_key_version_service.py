@@ -163,7 +163,7 @@ def test_get_active_version_numbers(
     db_session.commit()
 
     service = HsmKeyVersionService(database)
-    versions = service.get_active_or_create_version_numbers_by_organization_oin(
+    versions = service.get_active_version_numbers_by_organization_oin(
         persisted_organization.external_id
     )
 
@@ -344,7 +344,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     )
 
     with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
-        result = service.eval_blind(req, pub, None)
+        result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 2, 7)
 
@@ -445,7 +445,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     )
 
     with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
-        result = service.eval_blind(req, pub, None)
+        result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 3, 5)
 
@@ -477,7 +477,7 @@ def test_eval_via_hsm_without_service_raises() -> None:
 
     with pytest.raises(
         AttributeError,
-        match="has no attribute 'get_active_or_create_version_numbers_by_organization_oin'",
+        match="has no attribute 'get_active_version_numbers_by_organization_oin'",
     ):
         evaluator.evaluate(TEST_OIN, b"blinded")
 
@@ -509,6 +509,5 @@ def test_local_mode_without_server_key_raises() -> None:
                 recipientScope="scope",
             ),
             pub_key=jwk.JWK.generate(kty="RSA", size=2048),
-            pub_key_id=None,
         )
     assert exc.value.error_type == "invalid_blinded_input"

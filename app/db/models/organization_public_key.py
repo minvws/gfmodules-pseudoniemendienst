@@ -1,7 +1,6 @@
 import uuid
 from typing import Any
 
-from pyoprf import List
 from sqlalchemy import UUID, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -29,8 +28,8 @@ class OrganizationPublicKeyEntity(Base):
         "OrganizationEntity", back_populates="public_keys"
     )
 
-    domains: Mapped[List[str]] = mapped_column(
-        JSONB, nullable=False, server_default="{}"
+    domains: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
     )
 
     jwk: Mapped[dict[str, str]] = mapped_column(

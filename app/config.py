@@ -20,11 +20,10 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
-    # Deployment environment carried on the PRS-SYS-001 startup event
-    environment: str = Field(default="unknown")
     mtls_override_cert: str | None = Field(default=None)
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
+    enable_saml_exchange_routes: bool = Field(default=False)
 
 
 class ConfigLogging(BaseModel):
@@ -106,6 +105,20 @@ class ConfigPseudonym(BaseModel):
     master_key: SecretStr = Field(default=SecretStr(""))
 
 
+class ConfigSamlService(BaseModel):
+    # Base URL of the internal PRS-SAML service (the SAML-ontvanger). Required
+    # when enable_saml_exchange_routes is set.
+    url: str | None = Field(default=None)
+    timeout: float = Field(default=5.0, gt=0)
+    # mTLS towards the PRS-SAML service, mirroring the [oprf] hsm_* fields:
+    # client certificate/key presented to the service, and the internal CA used
+    # to verify its server certificate. Leave unset for plain HTTP in local
+    # development.
+    cert_file: str | None = Field(default=None)
+    key_file: str | None = Field(default=None)
+    ca_cert_file: str | None = Field(default=None)
+
+
 class ConfigAuthorizationHeaders(BaseModel):
     expected_audiences: list[str]
 
@@ -129,6 +142,7 @@ class Config(BaseModel):
     oprf: ConfigOprf
     pseudonym: ConfigPseudonym
     authorization_headers: ConfigAuthorizationHeaders
+    saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
 
 
 def read_ini_file(path: str) -> Any:

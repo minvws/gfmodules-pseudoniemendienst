@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 
 
@@ -20,3 +21,5 @@ class AuthContext:
     claims: AuthenticationClaims
     # audience intended for
     audience: str
+    # authorization scopes granted by the token
+    scope: list[AuthorizationScope]

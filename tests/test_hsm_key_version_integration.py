@@ -87,15 +87,9 @@ def test_new_key_version_is_added_to_jwe(
     persisted_organization: OrganizationEntity,
     persisted_organization_2: OrganizationEntity,
     db_session: DbSession,
-    organization_public_key_service: OrganizationPublicKeyService,
 ) -> None:
-    # 1. Register an organization with a public key.
-    # org = org_service.create(
-    #    oin=TEST_OIN, name=f"Org {TEST_OIN}", max_key_usage=RidUsage.ReversiblePseudonym
-    # )
     private_key, public_key = generate_rsa_keypair()
     pub_jwk = JWK.from_pem(public_key.encode())
-    # key_resolver.create(org.id, [SCOPE], None, public_key_pem)
 
     persisted_organization_2.public_keys.append(
         OrganizationPublicKeyEntity(domains=["*"], jwk=pub_jwk.export(as_dict=True))
@@ -110,15 +104,11 @@ def test_new_key_version_is_added_to_jwe(
         )
     )
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
-    print("TESTS!!!")
-    print(valid_headers)
-    print(persisted_organization.external_id)
-
     try:
         with patch(
             "app.services.oprf.evaluators.requests.post", side_effect=_fake_hsm_post
         ):
-            # 3. We get a pseudonym back, carrying only version 1.
+            # We get a pseudonym back, carrying only version 1.
             eval_resp = _eval(
                 client, persisted_organization_2.external_id, valid_headers
             )
@@ -129,7 +119,7 @@ def test_new_key_version_is_added_to_jwe(
             assert body["subject"] == "pseudonym:eval:" + _eval_v("1")
             assert body["extra_versions"] == {}
 
-            # 4. Create version 2 of the HSM key.
+            # Create version 2 of the HSM key.
             resp = client.post(
                 "/administration/key-versions",
                 headers={
@@ -140,7 +130,7 @@ def test_new_key_version_is_added_to_jwe(
             assert resp.status_code == 201
             assert resp.json()["version"] == 2
 
-            # 5. The JWE now carries version 2 as the subject (latest) and
+            # The JWE now carries version 2 as the subject (latest) and
             #    version 1 as an extra version.
             eval_resp = _eval(
                 client, persisted_organization_2.external_id, valid_headers

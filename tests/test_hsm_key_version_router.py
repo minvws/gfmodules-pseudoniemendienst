@@ -5,6 +5,7 @@ from starlette.testclient import TestClient
 
 from app.db.db import Database
 from app.db.models import OrganizationEntity
+from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
@@ -19,6 +20,7 @@ TEST_ORGANIZATION_A_HEADERS = {
     "x-gf-act-sub": TEST_ORGANIZATION_B_OIN_VALUE,
     "x-gf-act-cn": TEST_CLIENT_CN,
     "x-gf-audience": "prs.service",
+    "x-gf-scope": AuthorizationScope.ADMINISTRATION.value,
 }
 
 TEST_ORGANIZATION_B_HEADERS = {
@@ -26,6 +28,7 @@ TEST_ORGANIZATION_B_HEADERS = {
     "x-gf-act-sub": TEST_ORGANIZATION_B_OIN_VALUE,
     "x-gf-act-cn": TEST_CLIENT_CN,
     "x-gf-audience": "prs.service",
+    "x-gf-scope": AuthorizationScope.ADMINISTRATION.value,
 }
 
 

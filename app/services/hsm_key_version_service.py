@@ -81,31 +81,12 @@ class HsmKeyVersionService:
             versions = repo.get_active_versions(at, organization_id=organization_id)
             return versions
 
-    def get_active_versions_by_organization_oin(
-        self,
-        oin: Oin,
-        at: datetime | None = None,
-    ) -> list[HsmKeyVersionEntity]:
-        """
-        Returns all active key versions for the organization with the provided OIN.
-        """
-        at = at or datetime.now(timezone.utc)
-        with self.__db.get_db_session() as session:
-            repo = session.get_repository(HsmKeyVersionRepository)
-            versions = repo.get_active_versions_by_organization_oin(
-                at, organization_oin=oin
-            )
-            return versions
-
-    def get_active_or_create_version_numbers_by_organization_oin(
+    def get_active_version_numbers_by_organization_oin(
         self,
         organization_external_id: Oin,
     ) -> list[int]:
         """
         Returns active version numbers for the organization at the current moment.
-
-        TODO RL: Correct that we don't need to create version anymore now Beheer api does this?
-        TODO: What happens when now is in the future?
         """
 
         def _is_active(version: HsmKeyVersionEntity, now: datetime) -> bool:
@@ -124,7 +105,6 @@ class HsmKeyVersionService:
                     status_code=405, detail="Organization does not exist"
                 )
             versions = [v.version for v in org.hsm_key_versions if _is_active(v, now)]
-            print(versions)
             return versions
 
     def get_expired_versions(

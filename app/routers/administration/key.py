@@ -21,46 +21,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# TODO GB: https://github.com/minvws/generiekefuncties-architectuur/blob/main/docs/prs/concepts/to/PRS-DOC-DRFT.md#organisatie-decryptie-public-key-prs-do-mfn9
-# @router.post(
-#    "/register/certificate",
-#    summary="Insert public key information for the authorized organization",
-#    tags=["Key Registration Services"],
-# )
-# def post_key(
-#    req: RegisterRequest,
-#    request: Request,
-#    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
-#    organization_public_key_service: Annotated[KeyResolver, Depends(container.get_key_resolver)],
-# ) -> JSONResponse:
-#    mtls_pub_key = mtls_service.get_mtls_pub_key(request)
-#
-#    # Create the key entry
-#    try:
-#        organization_public_key_service.create(
-#            auth_ctx.claims.organization_id, req.scope, req.key_id, mtls_pub_key
-#        )
-#    except AlreadyExistsError:
-#        logger.warning(
-#            "key already exists for org_id=%s scope=%r",
-#            auth_ctx.claims.organization_id,
-#            req.scope,
-#        )
-#        raise HTTPException(
-#            status_code=409, detail="key for this org/scope already exists"
-#        )
-#    except Exception:
-#        logger.exception(
-#            "failed to create key entry for org_id=%s scope=%r",
-#            auth_ctx.claims.organization_id,
-#            req.scope,
-#        )
-#        raise HTTPException(status_code=500, detail="failed to create key entry")
-#
-#    return JSONResponse(
-#        status_code=201, content={"message": "Key created successfully"}
-#    )
-
 
 @router.post(
     "/keys",

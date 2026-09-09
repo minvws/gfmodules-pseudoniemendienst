@@ -20,12 +20,10 @@ the database. It also provides methods to add and delete resources from the sess
 current transaction.
 
 Usage:
-
-    with DbSession(engine) as session:
+    with DbSession(engine=engine, commit=True) as session:
         repo = session.get_repository(MyModelRepository)
         repo.find_all()
         session.add(MyModel())
-        session.commit()
 """
 
 

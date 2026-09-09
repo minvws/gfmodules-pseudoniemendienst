@@ -10,12 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class OrganizationPublicKeyRepository(RepositoryBase):
-    def get(self, id: uuid.UUID) -> OrganizationPublicKeyEntity | None:
-        query = select(OrganizationPublicKeyEntity).where(
-            OrganizationPublicKeyEntity.id == id
-        )
-        return self.db_session.execute(query).scalars().first()
-
     def get_by_id(self, key_id: uuid.UUID) -> OrganizationPublicKeyEntity | None:
         """
         Fetches the key entry by its unique ID.
@@ -33,20 +27,6 @@ class OrganizationPublicKeyRepository(RepositoryBase):
             OrganizationPublicKeyEntity.organization_id == org_id
         )
         return list(self.db_session.execute(query).scalars())
-
-    def get_by_org_and_domain(
-        self, org_id: uuid.UUID, domain: str
-    ) -> OrganizationPublicKeyEntity | None:
-        """
-        Fetches key entries for a given organization id and matching domain.
-        """
-        query = select(OrganizationPublicKeyEntity).where(
-            and_(
-                OrganizationPublicKeyEntity.organization_id == org_id,
-                OrganizationPublicKeyEntity.domains.contains(domain),
-            )
-        )
-        return self.db_session.execute(query).scalars().first()
 
     def create(
         self, organization_public_key: OrganizationPublicKeyEntity

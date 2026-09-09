@@ -99,6 +99,5 @@ CREATE TABLE prs.organization_public_keys (
     organization_id UUID NOT NULL REFERENCES admin.organizations(id),
     domains JSONB NOT NULL DEFAULT '[]',
     jwk JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (organization_id)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

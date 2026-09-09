@@ -53,24 +53,6 @@ class HsmKeyVersionRepository(RepositoryBase):
         )
         return list(self.db_session.execute(query).scalars().all())
 
-    def get_active_versions_by_organization_oin(
-        self,
-        at: datetime,
-        organization_oin: Oin,
-    ) -> list[HsmKeyVersionEntity]:
-        """
-        Returns all active key versions for the organization with the provided OIN.
-        """
-        query = (
-            select(HsmKeyVersionEntity)
-            .where(
-                HsmKeyVersionEntity.organization_id == organization_oin,
-                HsmKeyVersionRepository._active_filter(at),
-            )
-            .order_by(HsmKeyVersionEntity.version)
-        )
-        return list(self.db_session.execute(query).scalars().all())
-
     def get_by_organization_id(
         self, organization_id: uuid.UUID
     ) -> list[HsmKeyVersionEntity]:
@@ -99,69 +81,23 @@ class HsmKeyVersionRepository(RepositoryBase):
         )
         return list(self.db_session.execute(query).scalars().all())
 
-    def get_active_or_create_version_numbers_by_organization_id(
+    def get_active_version_numbers_by_organization_id(
         self,
         organization_id: uuid.UUID,
         at: datetime,
     ) -> list[int]:
         """
-        Returns active version numbers at `at` for the organization. When no
-        active version exists, atomically creates a new one and returns its
-        version number.
+        Returns active version numbers at `at` for the organization.
         """
-        active_versions = (
+        query = (
             select(HsmKeyVersionEntity.version)
             .where(
                 HsmKeyVersionEntity.organization_id == organization_id,
                 HsmKeyVersionRepository._active_filter(at),
             )
             .order_by(HsmKeyVersionEntity.version)
-            .cte("active_versions")
         )
-
-        next_version = (
-            select(func.max(HsmKeyVersionEntity.version) + 1)
-            .where(HsmKeyVersionEntity.organization_id == organization_id)
-            .scalar_subquery()
-        )
-
-        created_versions = (
-            insert(HsmKeyVersionEntity)
-            .from_select(
-                [
-                    HsmKeyVersionEntity.id,
-                    HsmKeyVersionEntity.organization_id,
-                    HsmKeyVersionEntity.version,
-                    HsmKeyVersionEntity.from_dt,
-                    HsmKeyVersionEntity.until_dt,
-                    HsmKeyVersionEntity.removed_at,
-                ],
-                select(
-                    literal(uuid.uuid4()),
-                    literal(organization_id),
-                    func.coalesce(next_version, 1),
-                    literal(at),
-                    literal(None),
-                    literal(False),
-                ).where(~select(active_versions.c.version).limit(1).exists()),
-            )
-            .returning(HsmKeyVersionEntity.version)
-            .cte("created_version")
-        )
-
-        rows = (
-            select(active_versions.c.version)
-            .union_all(select(created_versions.c.version))
-            .order_by(active_versions.c.version)
-        )
-
-        return list(
-            self.db_session.execute(
-                select(HsmKeyVersionEntity.version).from_statement(rows)
-            )
-            .scalars()
-            .all()
-        )
+        return list(self.db_session.execute(query).scalars().all())
 
     def create(
         self,

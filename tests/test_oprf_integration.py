@@ -159,7 +159,7 @@ def test_oprf_eval_invalid_scope_returns_not_found(
     )
 
     assert eval_response.status_code == 404
-    assert eval_response.json() == {"detail": "Organization domain does not exist"}
+    assert eval_response.json() == {"detail": "Organization domain is not registered"}
 
 
 def test_oprf_eval_invalid_recipient_organization_returns_expected_error(
@@ -348,9 +348,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
     valid_headers: dict[str, str],
 ) -> None:
     class FailingOprfService:
-        def eval_blind(
-            self, req: object, pub_key_jwk: object, pub_key_id: str | None
-        ) -> str:
+        def eval_blind(self, req: object, pub_key_jwk: object) -> str:
             raise ValueError("invalid blinded input")
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()

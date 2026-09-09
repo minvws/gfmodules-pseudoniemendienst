@@ -12,7 +12,6 @@ class BlindJwe:
         scope: str,
         subject: str,
         pub_key: jwk.JWK,
-        pub_key_id: str | None,
         extra_claims: dict[str, Any] | None = None,
     ) -> str:
         """
@@ -34,7 +33,7 @@ class BlindJwe:
         # TODO GB: require JWK to be rsa
 
         protected_headers = {
-            "kid": pub_key_id if pub_key_id else pub_key.thumbprint(),
+            "kid": pub_key.key_id,
             "alg": "RSA-OAEP",
             "enc": "A256GCM",
             "cty": "application/json",

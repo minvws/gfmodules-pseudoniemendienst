@@ -116,7 +116,7 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     )
 
     with pytest.raises(OprfEvaluationError) as exc:
-        service.eval_blind(_blind_request(), pub_key, None)
+        service.eval_blind(_blind_request(), pub_key)
 
     assert exc.value.error_type == "invalid_blinded_input"
 
@@ -125,7 +125,7 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     pub_key: jwk.JWK,
 ) -> None:
     hsm_key_version_service = MagicMock()
-    hsm_key_version_service.get_active_or_create_version_numbers_by_organization_oin.return_value = [
+    hsm_key_version_service.get_active_version_numbers_by_organization_oin.return_value = [
         1
     ]
     service = OprfService(
@@ -142,6 +142,6 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
         ),
         pytest.raises(OprfEvaluationError) as exc,
     ):
-        service.eval_blind(_blind_request(), pub_key, None)
+        service.eval_blind(_blind_request(), pub_key)
 
     assert exc.value.error_type == "crypto_evaluation_failure"

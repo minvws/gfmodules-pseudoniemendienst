@@ -35,12 +35,12 @@ class WithTimestamps:
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.now(tz=timezone.utc),
+        default=datetime.now,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.now(tz=timezone.utc),
+        default=datetime.now,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
@@ -61,15 +61,24 @@ client_certificates = Table(
     "client_certificates",
     Base.metadata,
     Column("client_id", UUID, ForeignKey("admin.clients.id"), primary_key=True),
-    Column("certificate_id", UUID, ForeignKey("admin.certificates.id"), primary_key=True),
+    Column(
+        "certificate_id", UUID, ForeignKey("admin.certificates.id"), primary_key=True
+    ),
     schema="admin",
 )
 
 organization_receive_personal_id_types = Table(
     "organization_receive_personal_id_types",
     Base.metadata,
-    Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
-    Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
+    Column(
+        "organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True
+    ),
+    Column(
+        "personal_id_type_id",
+        INTEGER,
+        ForeignKey("admin.personal_id_types.id"),
+        primary_key=True,
+    ),
     schema="admin",
 )
 
@@ -77,7 +86,14 @@ organization_request_personal_id_types = Table(
     "organization_request_personal_id_types",
     Base.metadata,
     admin_metadata_obj,
-    Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
-    Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
+    Column(
+        "organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True
+    ),
+    Column(
+        "personal_id_type_id",
+        INTEGER,
+        ForeignKey("admin.personal_id_types.id"),
+        primary_key=True,
+    ),
     schema="admin",
 )

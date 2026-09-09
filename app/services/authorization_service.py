@@ -20,7 +20,6 @@ class AuthorizationService:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_id)
-            print("Fetching org", organization_id, org)
             if not org:
                 raise HTTPException(401, "Organization not found")
             if not personal_id_type in [
