@@ -1,13 +1,14 @@
 import logging
 from typing import Any
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Body, Depends, Security
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import require_scopes
-from app.logging.events import SAML_EXCHANGE_FAILED, SAML_EXCHANGE_OK, log_event
+from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.services.saml.client import SamlServiceClient, SamlServiceError
@@ -45,20 +46,22 @@ def post_reversible_pseudonym(
     try:
         result = saml_client.decrypt(payload)
     except SamlServiceError as e:
-        log_event(
+        gflog.emit(
             logger,
-            SAML_EXCHANGE_FAILED,
+            Log.SAML_EXCHANGE_FAILED,
             "SAML exchange failed: PRS-SAML service error",
-            handelende_oin=handelende_oin,
-            error_type=e.error_type,
-            endpoint=_ENDPOINT,
+            fields={
+                "handelende_oin": handelende_oin,
+                "error_type": e.error_type,
+                "endpoint": _ENDPOINT,
+            },
         )
         return JSONResponse({"error": "SAML exchange failed"}, status_code=502)
 
-    log_event(
+    gflog.emit(
         logger,
-        SAML_EXCHANGE_OK,
+        Log.SAML_EXCHANGE_OK,
         "SAML exchange succeeded (mock: request echoed via PRS-SAML)",
-        handelende_oin=handelende_oin,
+        fields={"handelende_oin": handelende_oin},
     )
     return JSONResponse(jsonable_encoder(result))

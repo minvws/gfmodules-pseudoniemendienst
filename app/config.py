@@ -3,6 +3,8 @@ import os
 from enum import Enum
 from typing import Any, List
 
+from gfmodules.logging import ConfigLogging as GFConfigLogging
+from gfmodules.logging.ini import split_comma_separated
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
 _PATH = "app.conf"
@@ -26,14 +28,6 @@ class ConfigApp(BaseModel):
     enable_saml_exchange_routes: bool = Field(default=False)
 
 
-class ConfigLogging(BaseModel):
-    syslog_path: str | None = Field(default=None)
-    application_id: str | None = Field(default=None)
-    include_traces: bool = Field(default=True)
-    debug_logs_in_console: bool = Field(default=False)
-    correlation_id_expected: bool = Field(default=False)
-
-
 class ConfigDatabase(BaseModel):
     # SecretStr so the DSN password never appears in reprs or logs
     dsn: SecretStr
@@ -45,6 +39,10 @@ class ConfigDatabase(BaseModel):
     max_overflow: int = Field(default=10, ge=0, lt=100)
     pool_pre_ping: bool = Field(default=False)
     pool_recycle: int = Field(default=3600, ge=0)
+
+    _split_retry_backoff = field_validator("retry_backoff", mode="before")(
+        split_comma_separated(float)
+    )
 
     @field_validator("create_tables", mode="before")
     def validate_create_tables(cls, v: Any) -> bool:
@@ -134,6 +132,12 @@ class ConfigAuthorizationHeaders(BaseModel):
         raise ValueError("Invalid input on `expected_audience`, please check config")
 
 
+class ConfigLogging(GFConfigLogging):
+    _split_console_streams = field_validator("console_streams", mode="before")(
+        split_comma_separated()
+    )
+
+
 class Config(BaseModel):
     app: ConfigApp
     logging: ConfigLogging = Field(default_factory=ConfigLogging)
@@ -185,15 +189,6 @@ def get_config(path: str | None = None) -> Config:
     # To be inline with other python code, we use INI-type files for configuration. Since this isn't
     # a standard format for pydantic, we need to do some manual parsing first.
     ini_data = read_ini_file(path)
-
-    # Convert database.retry_backoff to a list of floats
-    if "retry_backoff" in ini_data["database"] and isinstance(
-        ini_data["database"]["retry_backoff"], str
-    ):
-        # convert the string to a list of floats
-        ini_data["database"]["retry_backoff"] = [
-            float(i) for i in ini_data["database"]["retry_backoff"].split(",")
-        ]
 
     _CONFIG = Config.model_validate(ini_data)
 
