@@ -19,7 +19,7 @@ from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
 
 def test_catalogue_defines_every_required_event() -> None:
-    assert_catalogue_complete(Log, access_logs=False)
+    assert_catalogue_complete(Log)
 
 
 def test_emit_attaches_event_id_and_streams() -> None:
