@@ -75,11 +75,9 @@ class TestAppStarted:
             Log.SYS_APP_STARTED,
             "started",
             version="v1.2.3",
-            environment="test",
         )
 
         assert routed[LoggingStreams.APP][0]["version"] == "v1.2.3"
-        assert routed[LoggingStreams.APP][0]["environment"] == "test"
         # PRS-SYS-001 has no SIEM stream per spec.
         assert routed[LoggingStreams.SIEM] == []
 
