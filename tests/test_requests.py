@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any
+
+import pytest
 from pydantic import ValidationError
 
 from app.models.oin import Oin, RecipientOrganizationOin
+from app.models.organization_public_key import OrganizationPublicKeyRequest
 from app.models.requests import (
     BlindRequest,
     ExchangeRequest,
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
-    RegisterRequest,
     RidExchangeRequest,
 )
 from app.services.pseudonym_service import PseudonymType
@@ -114,30 +117,26 @@ def test_exchange_request_invalid_recipient_organization_throws_validation_error
 
 
 def test_register_request_with_key_id() -> None:
-    request = RegisterRequest(scope=["nvi"], key_id="kid-2024")
+    request = OrganizationPublicKeyRequest(domains=["nvi"], jws="jw" * 16)
 
-    assert request.scope == ["nvi"]
-    assert request.key_id == "kid-2024"
-
-
-def test_register_request_key_id_may_be_none() -> None:
-    request = RegisterRequest(scope=["nvi"], key_id=None)
-
-    assert request.key_id is None
+    assert request.domains == ["nvi"]
+    assert request.jws == "jw" * 16
 
 
-def test_register_request_key_id_defaults_to_none() -> None:
-    request = RegisterRequest(scope=["nvi"])
-
-    assert request.key_id is None
-
-
-def test_hsm_key_version_request_from_dt_may_be_in_the_past() -> None:
-    past = datetime.now(timezone.utc) - timedelta(days=1)
-
-    request = HsmKeyVersionRequest(from_dt=past)
-
-    assert request.from_dt == past
+@pytest.mark.parametrize(
+    "values,error_count",
+    [
+        ({}, 2),
+        ({"domains": ["nvi"]}, 1),
+        ({"jws": "jw" * 16}, 1),
+    ],
+)
+def test_register_request_key_id_required_fields(
+    values: dict[str, Any], error_count: int
+) -> None:
+    with pytest.raises(ValidationError) as e:
+        OrganizationPublicKeyRequest(**values)
+    assert e.value.error_count() == error_count
 
 
 def test_hsm_key_version_request_from_dt_in_the_past_with_future_until_dt() -> None:

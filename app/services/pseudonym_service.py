@@ -83,7 +83,7 @@ class PseudonymService:
                 )
                 raise ValueError("Invalid encoded subject format")
         except ValueError as e:
-            logger.exception("failed to decode reversible pseudonym: %r", e)
+            logger.exception("failed to decode reversible pseudonym")
             raise ValueError("Failed to decode reversible pseudonym") from e
 
         return {
@@ -125,7 +125,7 @@ class PseudonymService:
             data = tag + ciphertext
             return base64.urlsafe_b64encode(data).decode("utf-8")
         except Exception as e:
-            logger.exception("failed to encrypt data: %r", e)
+            logger.exception("failed to encrypt data")
             raise ValueError("Failed to encrypt data") from e
 
     def _decrypt_data(self, ciphertext: str, recipient_organization: str) -> str:
@@ -149,9 +149,8 @@ class PseudonymService:
             return message.decode("utf-8")
         except Exception as e:
             logger.exception(
-                "failed to decrypt pseudonym (org=%r, ct_len=%d): %r",
+                "failed to decrypt pseudonym (org=%r, ct_len=%d)",
                 recipient_organization,
                 len(ciphertext),
-                e,
             )
             raise ValueError("Failed to decrypt pseudonym") from e

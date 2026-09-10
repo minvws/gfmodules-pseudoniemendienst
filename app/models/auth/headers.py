@@ -1,3 +1,4 @@
+from typing import Annotated, Any, Self
 import logging
 from typing import Annotated, Any, Dict, Self
 
@@ -17,7 +18,9 @@ class AuthHeaders(BaseModel):
     client_organization_id: Annotated[Oin, Field(alias="x-gf-act-sub")]
     client_organization_common_name: Annotated[str, Field(alias="x-gf-act-cn")]
     audience: Annotated[str, Field(alias="x-gf-audience")]
-    scope: Annotated[list[AuthorizationScope], Field(alias="x-gf-scope", default_factory=list)]
+    scope: Annotated[
+        list[AuthorizationScope], Field(alias="x-gf-scope", default_factory=list)
+    ]
 
     @field_validator("scope", mode="before")
     @classmethod
@@ -40,7 +43,7 @@ class AuthHeaders(BaseModel):
     @classmethod
     def from_request(cls, req: Request) -> Self:
         headers = req.headers
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         for name, field in cls.model_fields.items():
             header_name = field.alias or name
             value = headers.get(header_name)

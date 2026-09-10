@@ -6,8 +6,8 @@ import pyoprf
 from jwcrypto import jwk
 
 from app.models.requests import BlindRequest
-from app.services.oprf.jwe_token import BlindJwe
 from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
+from app.services.oprf.jwe_token import BlindJwe
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,9 @@ class OprfService:
         return base64.urlsafe_b64encode(pyoprf.keygen()).decode("ascii")
 
     def eval_blind(
-        self, req: BlindRequest, pub_key: jwk.JWK, pub_key_id: str | None
+        self,
+        req: BlindRequest,
+        pub_key: jwk.JWK,
     ) -> OprfEvalResult:
         """
         Evaluate a blind and returns a JWE encrypted on the pubkey, plus the
@@ -95,7 +97,6 @@ class OprfService:
             scope=req.recipientScope,
             subject=subject,
             pub_key=pub_key,
-            pub_key_id=pub_key_id,
             extra_claims={"extra_versions": extra_versions},
         )
 

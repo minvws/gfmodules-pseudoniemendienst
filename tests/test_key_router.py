@@ -1,485 +1,230 @@
 import uuid
-from typing import Dict
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI
+from conftest import create_organization, create_signed_jws, generate_rsa_keypair
+from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
-from app import container
+from app.db.models import OrganizationEntity
+from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
+from app.db.session import DbSession
 from app.models.oin import Oin
-from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver
-from app.services.org_service import OrgService
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 
-def _generate_rsa_public_key() -> str:
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_key = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    return public_key.decode("ascii")
-
-
-def _auth_headers(valid_headers: Dict[str, str], org_oin: Oin) -> Dict[str, str]:
+def _auth_headers(valid_headers: dict[str, str], org_oin: Oin) -> dict[str, str]:
     headers = dict(valid_headers)
     headers["x-gf-sub"] = org_oin.value
     return headers
 
 
 def test_register_certificate_creates_key_for_authenticated_org(
-    app: FastAPI,
     client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+    organization_public_key_service: OrganizationPublicKeyService,
 ) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
+    private_key, public_key = generate_rsa_keypair()
+    signed_jws = create_signed_jws(private_key, persisted_organization.external_id)
+    pub_jwk = JWK.from_pem(public_key.encode())
+
+    response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
-    public_key = _generate_rsa_public_key()
-
-    class _FakeMtlsService:
-        def get_mtls_pub_key(self, _request: object) -> str:
-            return public_key
-
-    app.dependency_overrides[container.get_mtls_service] = lambda: _FakeMtlsService()
-
-    try:
-        response = client.post(
-            "/administration/register/certificate",
-            json={"scope": ["nvi"], "key_id": "k1"},
-            headers=_auth_headers(valid_headers, auth_org.oin),
-        )
-    finally:
-        app.dependency_overrides.pop(container.get_mtls_service, None)
-
     assert response.status_code == 201
-    assert response.json() == {"message": "Key created successfully"}
+    json_reponse = response.json()
+    assert json_reponse["domains"] == ["nvi"]
+    assert json_reponse["jwk"] == pub_jwk.export(as_dict=True)
 
-    keys = key_resolver.get_by_org(auth_org.id)
+    keys = organization_public_key_service.get_by_org(
+        persisted_organization.external_id
+    )
     assert keys is not None and len(keys) == 1
     created = keys[0]
-    assert created.scope == ["nvi"]
-    assert created.key_id == "k1"
-    assert created.key_data == public_key
+    assert created["domains"] == ["nvi"]
+    assert created["jwk"] == pub_jwk.export(as_dict=True)
 
 
 def test_register_certificate_rejects_duplicate_scope_with_conflict(
-    app: FastAPI,
     client: TestClient,
-    org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
+    private_key, public_key = generate_rsa_keypair()
+    signed_jws = create_signed_jws(private_key, persisted_organization.external_id)
+    pub_jwk = JWK.from_pem(public_key.encode())
+
+    response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+    duplicate = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
-    public_key = _generate_rsa_public_key()
-
-    class _FakeMtlsService:
-        def get_mtls_pub_key(self, _request: object) -> str:
-            return public_key
-
-    app.dependency_overrides[container.get_mtls_service] = lambda: _FakeMtlsService()
-
-    try:
-        response = client.post(
-            "/administration/register/certificate",
-            json={"scope": ["nvi"], "key_id": "k1"},
-            headers=_auth_headers(valid_headers, auth_org.oin),
-        )
-        duplicate = client.post(
-            "/administration/register/certificate",
-            json={"scope": ["nvi"], "key_id": "k1"},
-            headers=_auth_headers(valid_headers, auth_org.oin),
-        )
-    finally:
-        app.dependency_overrides.pop(container.get_mtls_service, None)
-
     assert response.status_code == 201
-    assert response.json() == {"message": "Key created successfully"}
+    json_reponse = response.json()
+    assert json_reponse["domains"] == ["nvi"]
+    assert json_reponse["jwk"] == pub_jwk.export(as_dict=True)
     assert duplicate.status_code == 409
     assert duplicate.json() == {"detail": "key for this org/scope already exists"}
 
 
 def test_register_certificate_for_unknown_org_is_unauthorized(
-    app: FastAPI,
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
-    class _FakeMtlsService:
-        def get_mtls_pub_key(self, _request: object) -> str:
-            return _generate_rsa_public_key()
+    oin = Oin("00000099000000002000")
 
-    app.dependency_overrides[container.get_mtls_service] = lambda: _FakeMtlsService()
-    try:
-        response = client.post(
-            "/administration/register/certificate",
-            json={"scope": ["nvi"], "key_id": "k1"},
-            headers=_auth_headers(valid_headers, Oin("00000099000000002000")),
-        )
-    finally:
-        app.dependency_overrides.pop(container.get_mtls_service, None)
+    private_key, _ = generate_rsa_keypair()
+    signed_jws = create_signed_jws(private_key, oin)
+
+    response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, oin),
+    )
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "unauthorized"}
+    assert response.json() == {"detail": "Organization does not exist"}
 
 
 def test_list_keys_returns_entries_for_authenticated_org(
     client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-    key_a = key_resolver.create(auth_org.id, ["nvi"], None, _generate_rsa_public_key())
-    key_b = key_resolver.create(auth_org.id, ["brp"], "k2", _generate_rsa_public_key())
+    private_key_1, _ = generate_rsa_keypair()
+    signed_jws_1 = create_signed_jws(private_key_1, persisted_organization.external_id)
 
+    private_key_2, _ = generate_rsa_keypair()
+    signed_jws_2 = create_signed_jws(private_key_2, persisted_organization.external_id)
+    client.post(
+        "/administration/keys",
+        json={"domains": ["domain-1"], "jws": signed_jws_1},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+    client.post(
+        "/administration/keys",
+        json={"domains": ["domain-2"], "jws": signed_jws_2},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
     response = client.get(
-        "/administration/keys", headers=_auth_headers(valid_headers, auth_org.oin)
+        "/administration/keys",
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
     assert response.status_code == 200
     body = response.json()
     assert len(body) == 2
-    key_ids = {entry["id"] for entry in body}
-    assert key_ids == {str(key_a.id), str(key_b.id)}
+    key_ids = {entry["jwk"]["kid"] for entry in body}
+
+    assert key_ids == {
+        JWK.from_pem(private_key_1.encode()).export_public(as_dict=True)["kid"],
+        JWK.from_pem(private_key_2.encode()).export_public(as_dict=True)["kid"],
+    }
 
 
 def test_list_keys_for_unknown_org_is_unauthorized(
     client: TestClient,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     response = client.get(
         "/administration/keys",
         headers=_auth_headers(valid_headers, Oin("00000099000000002000")),
     )
 
-    assert response.status_code == 401
-    assert response.json() == {"detail": "unauthorized"}
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Organization does not exist"}
 
 
 def test_list_keys_for_org_without_keys_returns_empty(
     client: TestClient,
-    org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
 
     response = client.get(
-        "/administration/keys", headers=_auth_headers(valid_headers, auth_org.oin)
+        "/administration/keys",
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
     assert response.status_code == 200
     assert response.json() == []
 
 
-def test_update_key_clears_key_id_when_not_provided(
-    client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
-) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-    old_key_data = _generate_rsa_public_key()
-    created = key_resolver.create(auth_org.id, ["nvi"], "old", old_key_data)
-
-    new_key_data = _generate_rsa_public_key()
-
-    response = client.put(
-        f"/administration/keys/{created.id}",
-        json={
-            "scope": ["nvi", "brp"],
-            "key_data": new_key_data,
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["id"] == str(created.id)
-    assert body["scope"] == ["brp", "nvi"]
-    assert body["key_data"] == new_key_data
-    assert body["key_id"] is None
-
-    updated = key_resolver.get_by_id(created.id)
-    assert updated is not None
-    assert updated.key_data == new_key_data
-    assert updated.key_id is None
-
-
-def test_update_key_updates_key_id_for_authenticated_org(
-    client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
-) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-    old_key_data = _generate_rsa_public_key()
-    created = key_resolver.create(auth_org.id, ["nvi"], "old", old_key_data)
-
-    response = client.put(
-        f"/administration/keys/{created.id}",
-        json={
-            "scope": ["nvi"],
-            "key_data": old_key_data,
-            "key_id": "new",
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["id"] == str(created.id)
-    assert body["key_id"] == "new"
-
-    updated = key_resolver.get_by_id(created.id)
-    assert updated is not None
-    assert updated.key_id == "new"
-
-
-def test_update_key_clears_key_id_when_null(
-    client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
-) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-    old_key_data = _generate_rsa_public_key()
-    created = key_resolver.create(auth_org.id, ["nvi"], "old", old_key_data)
-
-    response = client.put(
-        f"/administration/keys/{created.id}",
-        json={
-            "scope": ["nvi"],
-            "key_data": old_key_data,
-            "key_id": None,
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["id"] == str(created.id)
-    assert body["key_id"] is None
-
-    updated = key_resolver.get_by_id(created.id)
-    assert updated is not None
-    assert updated.key_id is None
-
-
-def test_update_unknown_key_is_unauthorized(
-    client: TestClient,
-    org_service: OrgService,
-    valid_headers: Dict[str, str],
-) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-
-    response = client.put(
-        f"/administration/keys/{uuid.uuid4()}",
-        json={
-            "scope": ["nvi"],
-            "key_data": _generate_rsa_public_key(),
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
-
-
-def test_update_other_org_is_unauthorized(
-    client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
-) -> None:
-    owner_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-    auth_org = org_service.create(
-        Oin("00000099000000002000"),
-        "MyOrg B",
-        RidUsage.IrreversiblePseudonym,
-    )
-    created = key_resolver.create(
-        owner_org.id, ["nvi"], None, _generate_rsa_public_key()
-    )
-
-    response = client.put(
-        f"/administration/keys/{created.id}",
-        json={
-            "scope": ["nvi"],
-            "key_data": _generate_rsa_public_key(),
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
-
-    existing = key_resolver.get_by_id(created.id)
-    assert existing is not None
-    assert existing.organization_id == owner_org.id
-
-
 def test_delete_key_removes_key_for_authenticated_org(
     client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+    organization_public_key_service: OrganizationPublicKeyService,
 ) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
+    private_key, _ = generate_rsa_keypair()
+    signed_jws = create_signed_jws(private_key, persisted_organization.external_id)
+
+    create_response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
-    created = key_resolver.create(
-        auth_org.id, ["nvi"], None, _generate_rsa_public_key()
+    created = create_response.json()
+    delete_response = client.delete(
+        f"/administration/keys/{created['id']}",
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
-    response = client.delete(
-        f"/administration/keys/{created.id}",
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {"message": "key deleted"}
-    assert key_resolver.get_by_id(created.id) is None
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"message": "key deleted"}
+    assert organization_public_key_service.get_by_id(created["id"]) is None
 
 
 def test_delete_key_not_found_is_unauthorized(
     client: TestClient,
-    org_service: OrgService,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-
-    response = client.delete(
+    delete_response = client.delete(
         f"/administration/keys/{uuid.uuid4()}",
-        headers=_auth_headers(valid_headers, auth_org.oin),
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
+    assert delete_response.status_code == 403
+    assert delete_response.json() == {"detail": "forbidden"}
 
 
 def test_delete_other_org_is_unauthorized(
     client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+    db_session: DbSession,
+    personal_id_type_repository: PersonalIdTypeRepository,
+    organization_public_key_service: OrganizationPublicKeyService,
 ) -> None:
-    owner_org = org_service.create(
+    other_org = create_organization(
+        db_session,
+        personal_id_type_repository,
         Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
     )
-    auth_org = org_service.create(
-        Oin("00000099000000002000"),
-        "MyOrg B",
-        RidUsage.IrreversiblePseudonym,
+    private_key, _ = generate_rsa_keypair()
+    signed_jws = create_signed_jws(private_key, persisted_organization.external_id)
+
+    create_response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
-    created = key_resolver.create(
-        owner_org.id, ["nvi"], None, _generate_rsa_public_key()
-    )
+    created = create_response.json()
 
     response = client.delete(
-        f"/administration/keys/{created.id}",
-        headers=_auth_headers(valid_headers, auth_org.oin),
+        f"/administration/keys/{created['id']}",
+        headers=_auth_headers(valid_headers, other_org.external_id),
     )
 
     assert response.status_code == 403
     assert response.json() == {"detail": "forbidden"}
-    assert key_resolver.get_by_id(created.id) is not None
-
-
-def test_update_rejects_invalid_key_id_with_422(
-    client: TestClient,
-    org_service: OrgService,
-    valid_headers: Dict[str, str],
-) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-
-    response = client.put(
-        "/administration/keys/not-a-uuid",
-        json={
-            "scope": ["nvi"],
-            "key_data": _generate_rsa_public_key(),
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 422
-
-
-def test_update_rejects_extra_field_with_422(
-    client: TestClient,
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    valid_headers: Dict[str, str],
-) -> None:
-    auth_org = org_service.create(
-        Oin("00000099000000001000"),
-        "MyOrg A",
-        RidUsage.IrreversiblePseudonym,
-    )
-    created = key_resolver.create(
-        auth_org.id, ["nvi"], None, _generate_rsa_public_key()
-    )
-
-    response = client.put(
-        f"/administration/keys/{created.id}",
-        json={
-            "scope": ["nvi"],
-            "key_data": _generate_rsa_public_key(),
-            "organization": auth_org.oin.value,
-        },
-        headers=_auth_headers(valid_headers, auth_org.oin),
-    )
-
-    assert response.status_code == 422
-    detail = response.json().get("detail", [])
-    assert isinstance(detail, list)
-    assert any(item.get("type") == "extra_forbidden" for item in detail)
+    assert organization_public_key_service.get_by_id(created["id"]) is not None

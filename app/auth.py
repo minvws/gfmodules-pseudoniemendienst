@@ -1,17 +1,16 @@
-import logging
 from typing import Annotated
+import logging
 
+from fastapi import Depends, HTTPException
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
 
 from app import container
-from app.db.entities.organization import Organization
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
 from app.services.auth.header import AuthHeaderService
-from app.services.org_service import OrgService
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +25,6 @@ bearer_auth = HTTPBearer(
 
 def get_auth_ctx(
     request: Request,
-    # We don't do anything with it, but it's just a marker that allows swagger to add the authorize button
-    _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
     auth_headers_service: AuthHeaderService = Depends(
         container.get_auth_headers_service
     ),
@@ -53,14 +50,6 @@ def get_auth_ctx(
     return ctx
 
 
-def get_auth_context(request: Request) -> AuthContext:
-    ctx: AuthContext | None = getattr(request.state, "auth", None)
-    if ctx is None:
-        logger.error("no authentication context on request for %s", request.url.path)
-        raise HTTPException(status_code=403, detail="Unauthorized request")
-    return ctx
-
-
 def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
     if required not in ctx.scope:
         granted = " ".join(s.value for s in ctx.scope)
@@ -74,21 +63,8 @@ def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
 def require_scopes(
     security_scopes: SecurityScopes,
     _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
-    ctx: AuthContext = Depends(get_auth_context),
+    ctx: AuthContext = Depends(get_auth_ctx),
 ) -> AuthContext:
     for scope in security_scopes.scopes:
         assert_scope(ctx, AuthorizationScope(scope))
     return ctx
-
-
-def authenticated_organization(
-    auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
-    org_service: Annotated[OrgService, Depends(container.get_org_service)],
-) -> Organization:
-    organization = org_service.get_by_oin(auth_ctx.claims.organization_id)
-    if organization is None:
-        logger.warning(
-            "organization for oin=%s not found", auth_ctx.claims.organization_id
-        )
-        raise HTTPException(status_code=401, detail="unauthorized")
-    return organization

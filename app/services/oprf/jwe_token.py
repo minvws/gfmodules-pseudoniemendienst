@@ -12,12 +12,13 @@ class BlindJwe:
         scope: str,
         subject: str,
         pub_key: jwk.JWK,
-        pub_key_id: str | None,
-        extra_claims: dict[str, Any] = {},
+        extra_claims: dict[str, Any] | None = None,
     ) -> str:
         """
         Build a JWT token
         """
+        if extra_claims is None:
+            extra_claims = {}
         now = int(time.time())
         claims = {
             "subject": subject,
@@ -29,8 +30,10 @@ class BlindJwe:
             **extra_claims,
         }
 
+        # TODO GB: require JWK to be rsa
+
         protected_headers = {
-            "kid": pub_key_id if pub_key_id else pub_key.thumbprint(),
+            "kid": pub_key.key_id,
             "alg": "RSA-OAEP",
             "enc": "A256GCM",
             "cty": "application/json",

@@ -1,7 +1,7 @@
 import configparser
 import os
 from enum import Enum
-from typing import Any, List
+from typing import Any
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
@@ -75,9 +75,9 @@ class ConfigDatabase(BaseModel):
 
 class ConfigUvicorn(BaseModel):
     swagger_enabled: bool = Field(default=False)
+    document_gf_headers: bool = Field(default=False)
     docs_url: str = Field(default="/docs")
     redoc_url: str = Field(default="/redoc")
-    document_gf_headers: bool = Field(default=False)
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8502, gt=0, lt=65535)
     reload: bool = Field(default=True)
@@ -120,11 +120,11 @@ class ConfigSamlService(BaseModel):
 
 
 class ConfigAuthorizationHeaders(BaseModel):
-    expected_audiences: List[str]
+    expected_audiences: list[str]
 
     @field_validator("expected_audiences", mode="before")
     @classmethod
-    def validate_aud(cls, data: Any) -> List[str]:
+    def validate_aud(cls, data: Any) -> list[str]:
         if isinstance(data, str):
             return data.split()
 

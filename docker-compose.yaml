@@ -12,23 +12,11 @@ services:
       - ./secrets:/usr/local/secrets
     ports:
       - 6502:6502
+    networks:
+      - prs
     depends_on:
       postgres:
         condition: service_healthy
-
-  app-ssl:
-    profiles:
-      - ssl
-    image: httpd
-    restart: no
-    ports:
-      - 6503:443
-    volumes:
-      - ./secrets:/usr/local/secrets
-      - ./docker/httpd.conf:/usr/local/apache2/conf/httpd.conf
-      - ./docker/httpd-ssl.conf:/usr/local/apache2/conf/extra/httpd-ssl.conf
-    depends_on:
-      - app
 
   postgres:
     image: postgres:15
@@ -42,9 +30,15 @@ services:
       start_interval: 1s
     ports:
       - 5432:5432
+    networks:
+      - prs
     volumes:
       - ./docker/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql
       - postgres_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:
+
+networks:
+  prs:
+    name: prs

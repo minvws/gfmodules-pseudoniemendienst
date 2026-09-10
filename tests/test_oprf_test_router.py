@@ -1,24 +1,22 @@
 import base64
 import json
 from dataclasses import dataclass
-from typing import Dict, Tuple
 
 import pyoprf
 import pytest
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from conftest import setup_org_and_key
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from starlette.testclient import TestClient
 
+from app.db.models import OrganizationEntity
 from app.models.oin import Oin
-from app.rid import RidUsage
-from app.services.key_resolver import KeyResolver
-from app.services.org_service import OrgService
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 
 @dataclass(frozen=True)
 class OprfTestRouterContext:
-    personal_identifier: Dict[str, str]
+    personal_identifier: dict[str, str]
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
@@ -28,61 +26,26 @@ TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_VALUE = TEST_OIN.value
 
 
-def generate_rsa_keypair() -> Tuple[str, str]:
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_key = private_key.public_key()
-
-    private_key_pem = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode("ascii")
-    public_key_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("ascii")
-
-    return private_key_pem, public_key_pem
-
-
-def setup_org_and_key(
-    org_service: OrgService,
-    key_resolver: KeyResolver,
-    oin: Oin,
-    scope: str,
-) -> str:
-    org = org_service.create(
-        oin=oin,
-        name=f"Integration OPRF Test Router Org {oin}",
-        max_key_usage=RidUsage.ReversiblePseudonym,
-    )
-    private_key_pem, public_key_pem = generate_rsa_keypair()
-    key_resolver.create(org.id, [scope], None, public_key_pem)
-    return private_key_pem
-
-
 @pytest.fixture
 def oprf_test_router_context(
-    org_service: OrgService,
-    key_resolver: KeyResolver,
+    organization_public_key_service: OrganizationPublicKeyService,
+    persisted_organization: OrganizationEntity,
 ) -> OprfTestRouterContext:
-    recipient_organization = f"oin:{TEST_OIN}"
-    recipient_scope = "nvi"
+    recipient_domain = "nvi"
     personal_identifier = {
         "landCode": "NL",
         "type": "bsn",
         "value": "950000012",
     }
     private_key_pem = setup_org_and_key(
-        org_service=org_service,
-        key_resolver=key_resolver,
-        oin=TEST_OIN,
-        scope=recipient_scope,
+        organization_public_key_service=organization_public_key_service,
+        organization=persisted_organization,
+        domains=[recipient_domain],
     )
     return OprfTestRouterContext(
         personal_identifier=personal_identifier,
-        recipient_organization=recipient_organization,
-        recipient_scope=recipient_scope,
+        recipient_organization=f"oin:{persisted_organization.external_id.value}",
+        recipient_scope=recipient_domain,
         private_key_pem=private_key_pem,
     )
 
@@ -90,7 +53,7 @@ def oprf_test_router_context(
 def test_test_oprf_client_and_receiver_roundtrip(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     client_response = client.post(
         "/test/oprf/client",
@@ -138,12 +101,12 @@ def test_test_oprf_client_and_receiver_roundtrip(
 def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
-    valid_headers: Dict[str, str],
+    valid_headers: dict[str, str],
 ) -> None:
     info = (
         f"{oprf_test_router_context.recipient_organization}|"
         f"{oprf_test_router_context.recipient_scope}|v1"
-    ).encode("utf-8")
+    ).encode()
     hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
     personal_id = json.dumps(
         oprf_test_router_context.personal_identifier,

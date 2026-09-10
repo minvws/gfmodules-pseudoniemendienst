@@ -1,21 +1,16 @@
 import base64
 import logging
 from datetime import datetime, timezone
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.oin import RecipientOrganizationOin
 from app.personal_id import PersonalId
-from app.services.pseudonym_service import PseudonymType
 from app.rid import RidUsage
+from app.services.pseudonym_service import PseudonymType
 
 logger = logging.getLogger(__name__)
-
-
-class RegisterRequest(BaseModel):
-    scope: List[str]
-    key_id: Optional[str] = None
 
 
 class HsmKeyVersionRequest(BaseModel):
