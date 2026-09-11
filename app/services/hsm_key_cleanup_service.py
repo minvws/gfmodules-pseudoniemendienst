@@ -49,8 +49,14 @@ class HsmKeyCleanupService:
 
             try:
                 self._destroy_key(label)
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    logger.info("HSM key %r already absent, marking removed", label)
+                    # Fall through so we still do the mark_removed.
+                else:
+                    logger.exception("failed to destroy HSM key %r", label)
+                    continue
             except Exception:
-                # Leave the version untouched so the next run retries it.
                 logger.exception("failed to destroy HSM key %r", label)
                 continue
 
