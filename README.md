@@ -376,6 +376,17 @@ but is not allowed to reverse them back to BSN itself.
 The "IRP" level is intended for organizations that only need to create irreversible pseudonyms, and do not have access to
 BSN information at all.
 
+## Personal ID type authorizations
+
+An organization carries two administrator-managed lists of personal ID types (`oprf`, `reversible_pseudonym`,
+`irreversible_pseudonym`; there is no self-service for them), following the "dubbele bevoegdheidscontrole" of the
+technical design:
+
+- the types it may *request*: checked against the verified caller (`x-gf-sub`). Handing a personal ID to the PRS on
+  `POST /exchange/reversible-pseudonym` requires `reversible_pseudonym` here.
+- the types it may *receive*: checked against the recipient organization of an exchange. Receiving a reversible
+  pseudonym requires `reversible_pseudonym` here.
+
 ## Contribution
 
 As stated in the [Disclaimer](#disclaimer) this project and all associated code serve solely as documentation and

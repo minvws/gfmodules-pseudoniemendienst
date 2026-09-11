@@ -15,7 +15,7 @@ OPRF_BODY = {
     "recipientScope": "nvi",
 }
 
-EXCHANGE_PSEUDONYM_BODY = {
+REVERSIBLE_PSEUDONYM_BODY = {
     "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
     "recipientOrganization": "oin:00000099000000001000",
     "recipientScope": "nvi",
@@ -146,30 +146,23 @@ def test_test_routes_are_authenticated_but_not_scoped(
     )
 
 
-# @pytest.mark.parametrize(
-#    "pseudonym_type,required",
-#    [
-#        ("irreversible", AuthorizationScope.PSEUDONYM),
-#        ("reversible", AuthorizationScope.REVERSIBLE_PSEUDONYM),
-#    ],
-# )
-# def test_exchange_pseudonym_scope_follows_the_pseudonym_type(
-#    client: TestClient,
-#    headers_with_scopes: HeaderBuilder,
-#    pseudonym_type: str,
-#    required: AuthorizationScope,
-# ) -> None:
-#    body = {**EXCHANGE_PSEUDONYM_BODY, "pseudonymType": pseudonym_type}
-#    other = (
-#        AuthorizationScope.REVERSIBLE_PSEUDONYM
-#        if required is AuthorizationScope.PSEUDONYM
-#        else AuthorizationScope.PSEUDONYM
-#    )
-#
-#    without = headers_with_scopes(other, AuthorizationScope.ADMINISTRATION)
-#    denied = client.post("/exchange/pseudonym", json=body, headers=without)
-#    assert denied.status_code == 403
-#
-#    granted = headers_with_scopes(required)
-#    allowed = client.post("/exchange/pseudonym", json=body, headers=granted)
-#    assert allowed.status_code != 403
+def test_exchange_reversible_pseudonym_requires_the_reversible_pseudonym_scope(
+    client: TestClient, headers_with_scopes: HeaderBuilder
+) -> None:
+    without = headers_with_scopes(
+        AuthorizationScope.PSEUDONYM, AuthorizationScope.ADMINISTRATION
+    )
+    denied = client.post(
+        "/exchange/reversible-pseudonym",
+        json=REVERSIBLE_PSEUDONYM_BODY,
+        headers=without,
+    )
+    assert denied.status_code == 403
+
+    granted = headers_with_scopes(AuthorizationScope.REVERSIBLE_PSEUDONYM)
+    allowed = client.post(
+        "/exchange/reversible-pseudonym",
+        json=REVERSIBLE_PSEUDONYM_BODY,
+        headers=granted,
+    )
+    assert allowed.status_code != 403

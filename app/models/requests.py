@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.oin import RecipientOrganizationOin
 from app.personal_id import PersonalId
 from app.rid import RidUsage
-from app.services.pseudonym_service import PseudonymType
 
 logger = logging.getLogger(__name__)
 
@@ -187,23 +186,46 @@ class RidExchangeRequest(BaseModel):
         return data
 
 
-class ExchangeRequest(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+class ReversiblePseudonymExchangeRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "personalId": "NL:bsn:950000012",
+                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientScope": "nvi",
+                },
+                {
+                    "personalId": {
+                        "landCode": "NL",
+                        "type": "bsn",
+                        "value": "950000012",
+                    },
+                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientScope": "nvi",
+                },
+            ]
+        },
+    )
 
-    personalId: Any
+    # Kept as received: the endpoint parses it after the authorization checks,
+    # so a malformed value is reported as a 400 with an audit event instead of
+    # a validation error that echoes the input back.
+    personalId: str | dict[str, str] = Field(
+        ...,
+        description=(
+            "Personal ID as `<landCode>:<type>:<value>` or as an object with "
+            "`landCode`, `type` and `value`."
+        ),
+    )
     recipientOrganization: RecipientOrganizationOin
-    recipientScope: str = Field(..., min_length=1, max_length=100)
-    pseudonymType: PseudonymType
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
-        pid = data.get("personalId")
-        if isinstance(pid, str):
-            data["personalId"] = PersonalId.from_str(pid)
-        if isinstance(pid, dict):
-            data["personalId"] = PersonalId.from_dict(pid)
-        return data
+    recipientScope: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[^|]+$",
+        description="Scope of the recipient organization the pseudonym is bound to.",
+    )
 
 
 class InputRequest(BaseModel):

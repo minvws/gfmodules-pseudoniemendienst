@@ -1,21 +1,19 @@
 import logging
 
-import requests
-
 from app.config import ConfigOprf
-from app.logging.context import correlation_headers
+from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmKeyLabel
+from app.services.reversible.keys import reversible_key_labels
 
 logger = logging.getLogger(__name__)
 
 
 class HsmKeyCleanupService:
     """
-    Periodically removes expired HSM key versions from the HSM. For every key
-    version whose end date has passed (and which has not been removed yet), the
-    corresponding key is destroyed in the HSM and the version is marked as removed
-    in the database.
+    Destroys the HSM keys of expired key versions (the OPRF secret and the
+    reversible pseudonym AES/HMAC keys) and marks the version as removed.
+    Keys are created on first use, so missing ones are skipped.
     """
 
     def __init__(
@@ -25,6 +23,7 @@ class HsmKeyCleanupService:
     ) -> None:
         self.__hsm_config = hsm_config
         self.__version_service = version_service
+        self.__client = HsmClient(hsm_config)
 
     def cleanup_expired_keys(self) -> int:
         """
@@ -39,7 +38,10 @@ class HsmKeyCleanupService:
         cleaned = 0
         for version in expired:
             try:
-                label = HsmKeyLabel(version.organization.external_id, version.version)
+                oin = version.organization.external_id
+                labels = [str(HsmKeyLabel(oin, version.version))] + [
+                    str(label) for label in reversible_key_labels(oin, version.version)
+                ]
             except ValueError:
                 logger.exception(
                     "Value %r is not a correct OIN number",
@@ -48,33 +50,25 @@ class HsmKeyCleanupService:
                 continue
 
             try:
-                self._destroy_key(label)
+                for label in labels:
+                    if self._destroy_if_present(label):
+                        logger.info("removed expired HSM key %r", label)
             except Exception:
                 # Leave the version untouched so the next run retries it.
-                logger.exception("failed to destroy HSM key %r", label)
+                logger.exception(
+                    "failed to destroy HSM keys for version %s", version.id
+                )
                 continue
 
             self.__version_service.mark_removed(version.id)
             cleaned += 1
-            logger.info("removed expired HSM key %r", label)
 
         if cleaned:
             logger.info("cleaned up %d expired HSM key version(s)", cleaned)
         return cleaned
 
-    def _destroy_key(self, label: HsmKeyLabel) -> None:
-        cfg = self.__hsm_config
-        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}/destroy"
-        response = requests.post(
-            url,
-            json={"label": str(label)},
-            headers=correlation_headers(),
-            timeout=10,
-            verify=cfg.hsm_ca_cert_file or True,
-            cert=(
-                (cfg.hsm_cert_file, cfg.hsm_key_file)
-                if (cfg.hsm_cert_file and cfg.hsm_key_file)
-                else None
-            ),
-        )
-        response.raise_for_status()
+    def _destroy_if_present(self, label: str) -> bool:
+        if not self.__client.label_exists(label):
+            return False
+        self.__client.destroy(label)
+        return True

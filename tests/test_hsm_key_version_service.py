@@ -211,9 +211,11 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     )
 
     with (
-        patch.object(evaluator, "_label_exists", return_value=True) as label_exists,
         patch.object(
-            evaluator, "_evaluate_label", return_value=b"evaluated"
+            evaluator._client, "label_exists", return_value=True
+        ) as label_exists,
+        patch.object(
+            evaluator._client, "oprf_evaluate", return_value=b"evaluated"
         ) as evaluate_label,
     ):
         result = evaluator.evaluate(TEST_OIN_78000, b"blinded")
@@ -256,10 +258,12 @@ def test_eval_generates_keys_if_needed(
     )
 
     with (
-        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
-        patch.object(evaluator, "_generate_key") as generate_key,
         patch.object(
-            evaluator, "_evaluate_label", return_value=b"evaluated"
+            evaluator._client, "label_exists", return_value=False
+        ) as label_exists,
+        patch.object(evaluator._client, "generate_oprf_key") as generate_key,
+        patch.object(
+            evaluator._client, "oprf_evaluate", return_value=b"evaluated"
         ) as evaluate_label,
     ):
         result = evaluator.evaluate(TEST_OIN_79000, b"blinded")
@@ -343,7 +347,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
+    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 2, 7)
@@ -444,7 +448,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
+    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 3, 5)
@@ -489,11 +493,11 @@ def test_eval_generate_key_without_result_raises_value_error() -> None:
     )
 
     with (
-        patch.object(evaluator, "_hsm_post", return_value={}) as hsm_post,
-        pytest.raises(ValueError, match="could not generate the OPRF secret in HSM"),
+        patch.object(evaluator._client, "post", return_value={}) as hsm_post,
+        pytest.raises(ValueError, match="could not generate OPRF secret"),
     ):
-        evaluator._generate_key(
-            HsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1)
+        evaluator._client.generate_oprf_key(
+            str(HsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1))
         )
 
     assert hsm_post.call_count == 1

@@ -87,16 +87,17 @@ The `subject` always holds the evaluation for the latest key version. The `extra
 
 # Steps to create reversible pseudonyms
 
+The calling organization (the `x-gf-sub` identity) must be allowed to request the `reversible_pseudonym` personal ID type, and the recipient organization must be allowed to receive it; see the scenarios below.
+
 ### Create a JWE
 
 Request:
 ```
-POST /exchange/pseudonym
+POST /exchange/reversible-pseudonym
 {
   "personalId": "NL:bsn:950000012",
   "recipientOrganization": "oin:00000099000000001000",
-  "recipientScope": "bar",
-  "pseudonymType": "irreversible"
+  "recipientScope": "bar"
 }
 ```
 
@@ -134,7 +135,7 @@ Response:
       "cty": "application/json"
     },
     "decrypted": {
-      "subject": "pseudonym:irreversible:gOm6ILU3e0jjB9TJIUUHo0O0CCCgbhmpDmnvauyGP2w=",
+      "subject": "pseudonym:reversible:gOm6ILU3e0jjB9TJIUUHo0O0CCCgbhmpDmnvauyGP2w=",
       "aud": "90000036",
       "scope": "bar",
       "version": "1.1",
@@ -151,12 +152,14 @@ Response:
 
 # Scenarios:
 
- org   | oin                      | max_key_usage 
--------|--------------------------|---------------
- Org 1 | oin:00000099000000001000 | irp           
- Org 2 | oin:00000098000000001000 | rp            
- Org 3 | oin:00000097000000001000 | bsn           
+ org   | oin                      | may request           | may receive
+-------|--------------------------|-----------------------|-----------------------------
+ Org 1 | oin:00000099000000001000 | oprf                  | oprf
+ Org 2 | oin:00000098000000001000 | reversible_pseudonym  | reversible_pseudonym
+ Org 3 | oin:00000097000000001000 | reversible_pseudonym  | oprf, reversible_pseudonym
 
-* Org 1 can only create irreversible pseudonyms. It cannot be decoded back to the personal ID by anyone.
-* Org 2 can create reversible pseudonyms. It cannot decode itself back to the personal ID but can allow others (who have bsn max_key_usage) to do so.
-* Org 3 can create reversible pseudonyms and can decode them back to the personal ID. They can receive reversible pseudonyms from others as well and decode them.
+* Org 1 may not hand a personal ID to the PRS and can only receive irreversible pseudonyms (through the OPRF). Those cannot be decoded back to the personal ID by anyone.
+* Org 2 can hand a personal ID to the PRS and receive reversible pseudonyms.
+* Org 3 can hand a personal ID to the PRS and receive both OPRF evaluations and reversible pseudonyms.
+
+An exchange of a personal ID for a reversible pseudonym therefore succeeds from Org 2 or Org 3 towards Org 2 or Org 3, and is refused when Org 1 is the sender (401) or the recipient (404).

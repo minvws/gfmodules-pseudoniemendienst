@@ -31,7 +31,7 @@ class SamlServiceClient:
         self.timeout = timeout
         # Client certificate presented to the service (mTLS), and the internal
         # CA that its server certificate must chain to. Mirrors the PRS-to-HSM
-        # API setup in HsmOprfEvaluator._hsm_post.
+        # API setup in HsmClient.post.
         self.cert = (cert_file, key_file) if (cert_file and key_file) else None
         self.verify: str | bool = ca_cert_file or True
 

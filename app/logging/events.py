@@ -20,6 +20,60 @@ class PRSEvent:
     fields: Mapping[LoggingStreams, tuple[str, ...]] = field(default_factory=dict)
 
 
+# Authentication and authorization events (PRS-AUTH), see
+# https://github.com/minvws/gfmodules-coordination-private/issues/1034
+# Only PRS-AUTH-003 is emitted by this service: token validation and mTLS
+# binding are done upstream by the OIN-verifier, which logs the other events.
+AUTHORIZATION_DENIED = PRSEvent(  # PRS-AUTH-003
+    "200402",
+    logging.WARNING,
+    (_APP, _SIEM),
+    {
+        _APP: (
+            "handelende_oin",
+            "namens_oin",
+            "doel_oin",
+            "requested_operation",
+            "endpoint",
+            "method",
+        ),
+        _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "requested_operation"),
+    },
+)
+
+# Pseudonym creation events (PRS-PSE), see
+# https://github.com/minvws/gfmodules-coordination-private/issues/1036
+# PRS-PSE-002/003 (irreversible pseudonym created, dual-version) are not defined
+# here: irreversible pseudonyms are exchanged through the OPRF, which has its own
+# events above. Neither the personal ID nor the pseudonym is ever logged.
+PSEUDONYM_REVERSIBLE_CREATED = PRSEvent(  # PRS-PSE-001
+    "220400",
+    logging.INFO,
+    (_APP, _SIEM),
+    {
+        _APP: ("handelende_oin", "namens_oin", "doel_oin", "domein", "sleutel_versie"),
+        _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+    },
+)
+PSEUDONYM_CREATE_FAILED = PRSEvent(  # PRS-PSE-004
+    "220403",
+    logging.ERROR,
+    (_APP, _SIEM),
+    {
+        _APP: ("handelende_oin", "namens_oin", "doel_oin", "error_type", "endpoint"),
+        _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+    },
+)
+PERSONAL_ID_VALIDATION_FAILED = PRSEvent(  # PRS-PSE-005
+    "220404",
+    logging.WARNING,
+    (_APP, _SIEM),
+    {
+        _APP: ("handelende_oin", "namens_oin", "validation_error", "endpoint"),
+        _SIEM: ("handelende_oin", "validation_error"),
+    },
+)
+
 # OPRF exchange events (PRS-OPRF), see
 # https://github.com/minvws/gfmodules-coordination-private/issues/1035
 OPRF_EVAL_OK = PRSEvent(  # PRS-OPRF-001

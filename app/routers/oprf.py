@@ -34,7 +34,7 @@ _ENDPOINT = "/oprf/eval"
 
 
 @router.post(
-    "/oprf/eval",
+    _ENDPOINT,
     summary="Evaluate OPRF blind and returns an encrypted JWE for the organization",
     tags=["OPRF Services"],
 )
