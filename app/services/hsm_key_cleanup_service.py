@@ -3,7 +3,7 @@ import logging
 import requests
 
 from app.config import ConfigOprf
-from app.logging.context import correlation_headers
+from gfmodules.logging import correlation_headers
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmKeyLabel
 

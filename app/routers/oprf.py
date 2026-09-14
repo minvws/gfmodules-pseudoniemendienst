@@ -14,12 +14,6 @@ from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import require_scopes
-from app.logging.events import (
-    OPRF_EVAL_FAILED,
-    OPRF_EVAL_OK,
-    OPRF_REFUSED_NO_ACTIVE_PUBKEY,
-    log_event,
-)
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
