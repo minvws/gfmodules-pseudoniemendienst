@@ -2,11 +2,12 @@ import base64
 import logging
 from typing import Any
 
+import gfmodules.logging as gflog
 import requests
+from gfmodules.logging import correlation_headers
 
 from app.config import ConfigOprf
-from app.logging.context import correlation_headers
-from app.logging.events import SYS_HSM_UNREACHABLE, log_event
+from app.logging.events import Log
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +42,11 @@ class HsmClient:
                 ),
             )
         except HSM_UNREACHABLE_ERRORS as e:
-            log_event(
+            gflog.emit(
                 logger,
-                SYS_HSM_UNREACHABLE,
+                Log.SYS_HSM_UNREACHABLE,
                 "HSM/KMS unreachable",
-                error_reason=str(e),
+                fields={"error_reason": str(e)},
             )
             raise
         response.raise_for_status()

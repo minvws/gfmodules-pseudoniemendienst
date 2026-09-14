@@ -1,6 +1,7 @@
 import logging
 from typing import Annotated
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Depends, HTTPException, Security
 from jwcrypto.jwk import JWK
 from starlette.responses import Response
@@ -8,13 +9,7 @@ from starlette.responses import Response
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.logging.events import (
-    AUTHORIZATION_DENIED,
-    PERSONAL_ID_VALIDATION_FAILED,
-    PSEUDONYM_CREATE_FAILED,
-    PSEUDONYM_REVERSIBLE_CREATED,
-    log_event,
-)
+from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import ReversiblePseudonymExchangeRequest
@@ -111,16 +106,18 @@ def exchange_reversible_pseudonym(
     doel_oin = str(req.recipientOrganization)
 
     def deny(reason: str, error: HTTPException) -> HTTPException:
-        log_event(
+        gflog.emit(
             logger,
-            AUTHORIZATION_DENIED,
+            Log.AUTHORIZATION_DENIED,
             f"Authorization denied ({reason}): {error.detail}",
-            handelende_oin=handelende_oin,
-            namens_oin=namens_oin,
-            doel_oin=doel_oin,
-            requested_operation=_OPERATION,
-            endpoint=_ENDPOINT,
-            method="POST",
+            fields={
+                "handelende_oin": handelende_oin,
+                "namens_oin": namens_oin,
+                "doel_oin": doel_oin,
+                "requested_operation": _OPERATION,
+                "endpoint": _ENDPOINT,
+                "method": "POST",
+            },
         )
         return error
 
@@ -142,14 +139,16 @@ def exchange_reversible_pseudonym(
     try:
         personal_id = _parse_personal_id(req.personalId)
     except ValueError:
-        log_event(
+        gflog.emit(
             logger,
-            PERSONAL_ID_VALIDATION_FAILED,
+            Log.PERSONAL_ID_VALIDATION_FAILED,
             "Personal ID validation failed",
-            handelende_oin=handelende_oin,
-            namens_oin=namens_oin,
-            validation_error="format",
-            endpoint=_ENDPOINT,
+            fields={
+                "handelende_oin": handelende_oin,
+                "namens_oin": namens_oin,
+                "validation_error": "format",
+                "endpoint": _ENDPOINT,
+            },
         )
         raise HTTPException(status_code=400, detail="Invalid personal ID")
 
@@ -165,16 +164,18 @@ def exchange_reversible_pseudonym(
             recipient_scope=req.recipientScope,
         )
     except ReversiblePseudonymError as e:
-        log_event(
+        gflog.emit(
             logger,
-            PSEUDONYM_CREATE_FAILED,
+            Log.PSEUDONYM_CREATE_FAILED,
             "Reversible pseudonym creation failed",
             exc_info=e,
-            handelende_oin=handelende_oin,
-            namens_oin=namens_oin,
-            doel_oin=doel_oin,
-            error_type=e.error_type,
-            endpoint=_ENDPOINT,
+            fields={
+                "handelende_oin": handelende_oin,
+                "namens_oin": namens_oin,
+                "doel_oin": doel_oin,
+                "error_type": e.error_type,
+                "endpoint": _ENDPOINT,
+            },
         )
         status = 503 if e.error_type == "hsm_unreachable" else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
@@ -187,14 +188,16 @@ def exchange_reversible_pseudonym(
         extra_claims={"keyVersion": pseudonym.version},
     )
 
-    log_event(
+    gflog.emit(
         logger,
-        PSEUDONYM_REVERSIBLE_CREATED,
+        Log.PSEUDONYM_REVERSIBLE_CREATED,
         "Reversible pseudonym created",
-        handelende_oin=handelende_oin,
-        namens_oin=namens_oin,
-        doel_oin=doel_oin,
-        domein=req.recipientScope,
-        sleutel_versie=pseudonym.version,
+        fields={
+            "handelende_oin": handelende_oin,
+            "namens_oin": namens_oin,
+            "doel_oin": doel_oin,
+            "domein": req.recipientScope,
+            "sleutel_versie": pseudonym.version,
+        },
     )
     return Response(status_code=201, content=jwe, media_type="application/jwe")
