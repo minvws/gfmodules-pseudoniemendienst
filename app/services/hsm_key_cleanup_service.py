@@ -4,6 +4,12 @@ import requests
 
 from app.config import ConfigOprf
 from app.logging.context import correlation_headers
+from app.logging.events import (
+    HSM_OPERATION_FAILED,
+    KEY_VERSION_DESTROYED,
+    SLEUTELTYPE_OPRF_SECRET,
+    log_event,
+)
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmKeyLabel
 
@@ -49,14 +55,27 @@ class HsmKeyCleanupService:
 
             try:
                 self._destroy_key(label)
-            except Exception:
-                # Leave the version untouched so the next run retries it.
-                logger.exception("failed to destroy HSM key %r", label)
+            except Exception as e:  # noqa: BLE001 - any HSM failure must not stop the run
+                log_event(
+                    logger,
+                    HSM_OPERATION_FAILED,
+                    "failed to destroy expired HSM key",
+                    operation_type="destroy",
+                    error_reason=type(e).__name__,
+                    exc_info=e,
+                )
                 continue
 
             self.__version_service.mark_removed(version.id)
             cleaned += 1
-            logger.info("removed expired HSM key %r", label)
+            log_event(
+                logger,
+                KEY_VERSION_DESTROYED,
+                "expired HSM key version destroyed",
+                sleuteltype=SLEUTELTYPE_OPRF_SECRET,
+                organisatie_oin=label.oin.value,
+                vernietigde_versie=label.version,
+            )
 
         if cleaned:
             logger.info("cleaned up %d expired HSM key version(s)", cleaned)

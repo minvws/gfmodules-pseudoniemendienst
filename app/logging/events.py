@@ -87,6 +87,90 @@ SAML_EXCHANGE_FAILED = PRSEvent(  # PRS-SAML-002
     },
 )
 
+SLEUTELTYPE_OPRF_SECRET = "oprf_secret"
+
+KEY_GENERATED = PRSEvent(  # PRS-KEY-001
+    "250400",
+    logging.INFO,
+    (_APP, _SIEM),
+    {
+        _APP: (
+            "sleuteltype",
+            "organisatie_oin",
+            "domein",
+            "secret_id",
+            "sleutel_versie",
+        ),
+        _SIEM: ("sleuteltype", "organisatie_oin"),
+    },
+)
+KEY_ROTATION_STARTED = PRSEvent(  # PRS-KEY-002
+    "250401",
+    logging.WARNING,
+    (_APP, _SIEM),
+    {
+        _APP: (
+            "sleuteltype",
+            "organisatie_oin",
+            "domein",
+            "oude_versie",
+            "nieuwe_versie",
+        ),
+        _SIEM: ("sleuteltype", "organisatie_oin", "oude_versie", "nieuwe_versie"),
+    },
+)
+KEY_GRACE_STARTED = PRSEvent(  # PRS-KEY-003
+    "250402",
+    logging.INFO,
+    (_APP, _SIEM),
+    {
+        _APP: (
+            "sleuteltype",
+            "organisatie_oin",
+            "oude_versie",
+            "grace_start",
+            "grace_eind",
+        ),
+        _SIEM: ("sleuteltype", "organisatie_oin", "oude_versie"),
+    },
+)
+KEY_VERSION_DESTROYED = PRSEvent(  # PRS-KEY-004
+    "250403",
+    logging.WARNING,
+    (_APP, _SIEM),
+    {
+        _APP: ("sleuteltype", "organisatie_oin", "vernietigde_versie"),
+        _SIEM: ("sleuteltype", "organisatie_oin", "vernietigde_versie"),
+    },
+)
+DECRYPT_PUBKEY_REGISTERED = PRSEvent(  # PRS-KEY-005
+    "250404",
+    logging.INFO,
+    (_APP, _SIEM),
+    {
+        _APP: ("organisatie_oin", "key_algoritme", "key_lengte", "key_versie"),
+        _SIEM: ("organisatie_oin", "key_algoritme"),
+    },
+)
+DECRYPT_PUBKEY_REJECTED = PRSEvent(  # PRS-KEY-006
+    "250405",
+    logging.WARNING,
+    (_APP, _SIEM),
+    {
+        _APP: ("organisatie_oin", "key_algoritme", "rejection_reason"),
+        _SIEM: ("organisatie_oin", "key_algoritme", "rejection_reason"),
+    },
+)
+HSM_OPERATION_FAILED = PRSEvent(  # PRS-KEY-007
+    "250406",
+    logging.ERROR,
+    (_APP, _SIEM),
+    {
+        _APP: ("operation_type", "error_reason", "retry_attempt"),
+        _SIEM: ("operation_type", "error_reason"),
+    },
+)
+
 # Health and system events (PRS-HEALTH / PRS-SYS), see
 # https://github.com/minvws/gfmodules-coordination-private/issues/1041
 # PRS-SYS-005 (270405, crypto engine unreachable) is not defined here: this

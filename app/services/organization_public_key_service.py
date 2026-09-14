@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException
+from jwcrypto.common import base64url_decode
 from jwcrypto.jwk import JWK
 from jwcrypto.jws import JWS, InvalidJWSObject, InvalidJWSSignature
 
@@ -14,9 +15,69 @@ from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
 from app.db.repositories.organization_repository import OrganizationRepository
+from app.logging.events import (
+    DECRYPT_PUBKEY_REGISTERED,
+    DECRYPT_PUBKEY_REJECTED,
+    log_event,
+)
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
+
+_CURVE_BITS = {
+    "P-256": 256,
+    "P-384": 384,
+    "P-521": 521,
+    "secp256k1": 256,
+    "Ed25519": 256,
+    "Ed448": 448,
+    "X25519": 256,
+    "X448": 448,
+}
+
+
+def _key_algorithm(jwk: dict[str, Any]) -> str | None:
+    """Describes the public key type without exposing any key material."""
+    kty = jwk.get("kty")
+    crv = jwk.get("crv")
+    if kty in ("EC", "OKP") and crv:
+        return f"{kty}/{crv}"
+    return kty if isinstance(kty, str) else None
+
+
+def _key_length(jwk: dict[str, Any]) -> int | None:
+    if jwk.get("kty") == "RSA" and isinstance(jwk.get("n"), str):
+        try:
+            return int.from_bytes(base64url_decode(jwk["n"]), "big").bit_length()
+        except ValueError:
+            return None
+    return _CURVE_BITS.get(jwk.get("crv", ""))
+
+
+def _log_rejected(org_id: Oin, key_algoritme: str | None, reason: str) -> None:
+    # PRS-KEY-006
+    log_event(
+        logger,
+        DECRYPT_PUBKEY_REJECTED,
+        "decryption public key registration refused",
+        organisatie_oin=org_id.value,
+        key_algoritme=key_algoritme,
+        rejection_reason=reason,
+    )
+
+
+def _log_registered(org_id: Oin, jwk: dict[str, Any]) -> None:
+    # PRS-KEY-005. Decryption keys are not numbered; the organisation-supplied
+    # kid is the identifier that tells key generations apart.
+    log_event(
+        logger,
+        DECRYPT_PUBKEY_REGISTERED,
+        "decryption public key registered",
+        organisatie_oin=org_id.value,
+        key_algoritme=_key_algorithm(jwk),
+        key_lengte=_key_length(jwk),
+        key_versie=jwk.get("kid"),
+    )
 
 
 class AlreadyExistsError(Exception):
@@ -32,11 +93,23 @@ class OrganizationPublicKeyService:
         self.db = db
 
     def _validate_and_extract(self, raw_jws: str, org_id: Oin) -> JWK:
+        """
+        Validates the self-signed JWS and returns the public key it carries.
+        """
+        key_algoritme: str | None = None
         try:
             jws = JWS.from_jose_token(raw_jws)
+            if "jwk" in jws.jose_header and isinstance(jws.jose_header["jwk"], dict):
+                key_algoritme = _key_algorithm(jws.jose_header["jwk"])
+            return self._extract_verified_key(jws, org_id)
         except InvalidJWSObject:
+            _log_rejected(org_id, key_algoritme, "JWS invalid")
             raise HTTPException(status_code=422, detail="JWS invalid")
+        except HTTPException as e:
+            _log_rejected(org_id, key_algoritme, str(e.detail))
+            raise
 
+    def _extract_verified_key(self, jws: JWS, org_id: Oin) -> JWK:
         if "jwk" not in jws.jose_header:
             raise HTTPException(status_code=422, detail="Missing 'jwk' in header")
 
@@ -79,7 +152,7 @@ class OrganizationPublicKeyService:
         domains: list[str],
         raw_jws: str,
     ) -> dict[str, Any]:
-        jwk = self._validate_and_extract(raw_jws, org_id)
+        jwk_dict = self._validate_and_extract(raw_jws, org_id).export(as_dict=True)
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
@@ -97,15 +170,19 @@ class OrganizationPublicKeyService:
                 if list(domains_as_set.intersection(pk.domains))
             ]
             if key_with_same_domain:
+                _log_rejected(
+                    org_id, _key_algorithm(jwk_dict), "domain already registered"
+                )
                 raise AlreadyExistsError(
                     "Domain is already registered to different key"
                 )
             public_key = OrganizationPublicKeyEntity(
                 domains=domains,
-                jwk=jwk.export(as_dict=True),
+                jwk=jwk_dict,
             )
             org.public_keys.append(public_key)
             session.flush()
+            _log_registered(org_id, jwk_dict)
             return public_key.to_dict()
 
     def update(
@@ -115,7 +192,7 @@ class OrganizationPublicKeyService:
         domains: list[str],
         raw_jws: str,
     ) -> dict[str, Any]:
-        jwk = self._validate_and_extract(raw_jws, org_id)
+        jwk_dict = self._validate_and_extract(raw_jws, org_id).export(as_dict=True)
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
@@ -134,12 +211,16 @@ class OrganizationPublicKeyService:
                 if domains_as_set.intersection(pk.domains) and pk.id != id
             ]
             if key_with_same_domain:
+                _log_rejected(
+                    org_id, _key_algorithm(jwk_dict), "domain already registered"
+                )
                 raise AlreadyExistsError(
                     "Domain is already registered to different key"
                 )
             public_key = public_key_for_id[0]
             public_key.domains = domains
-            public_key.jwk = jwk.export(as_dict=True)
+            public_key.jwk = jwk_dict
+            _log_registered(org_id, jwk_dict)
             return public_key.to_dict()
 
     def get_by_id(self, key_id: uuid.UUID) -> OrganizationPublicKeyEntity | None:

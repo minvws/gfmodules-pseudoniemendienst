@@ -8,7 +8,13 @@ import requests
 
 from app.config import ConfigOprf
 from app.logging.context import correlation_headers
-from app.logging.events import SYS_HSM_UNREACHABLE, log_event
+from app.logging.events import (
+    HSM_OPERATION_FAILED,
+    KEY_GENERATED,
+    SLEUTELTYPE_OPRF_SECRET,
+    SYS_HSM_UNREACHABLE,
+    log_event,
+)
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
@@ -68,7 +74,7 @@ class HsmOprfEvaluator:
 
         return ret
 
-    def _hsm_post(self, path: str, payload: dict[str, str]) -> Any:
+    def _hsm_post(self, path: str, payload: dict[str, str], operation: str) -> Any:
         cfg = self._hsm_config
         url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}{path}"
         try:
@@ -92,16 +98,46 @@ class HsmOprfEvaluator:
                 error_reason=str(e),
             )
             raise
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            # PRS-KEY-007: the HSM was reachable but refused the operation.
+            log_event(
+                logger,
+                HSM_OPERATION_FAILED,
+                "HSM operation failed",
+                operation_type=operation,
+                error_reason=f"http_{response.status_code}",
+                exc_info=e,
+            )
+            raise
         return response.json()
 
     def _generate_key(self, label: HsmKeyLabel) -> None:
-        data = self._hsm_post("/generate/oprf", {"label": str(label)})
+        data = self._hsm_post("/generate/oprf", {"label": str(label)}, "keygen")
         if "result" not in data:
+            log_event(
+                logger,
+                HSM_OPERATION_FAILED,
+                "HSM operation failed",
+                operation_type="keygen",
+                error_reason="no_result_in_response",
+            )
             raise ValueError("could not generate the OPRF secret in HSM")
+        log_event(
+            logger,
+            KEY_GENERATED,
+            "OPRF secret generated in HSM",
+            sleuteltype=SLEUTELTYPE_OPRF_SECRET,
+            organisatie_oin=label.oin.value,
+            secret_id=str(label),
+            sleutel_versie=label.version,
+        )
 
     def _label_exists(self, label: HsmKeyLabel) -> bool:
-        data = self._hsm_post("", {"label": str(label), "objtype": "SECRET_KEY"})
+        data = self._hsm_post(
+            "", {"label": str(label), "objtype": "SECRET_KEY"}, "lookup"
+        )
         result = data["objects"] or []
         return len(result) > 0
 
@@ -112,5 +148,6 @@ class HsmOprfEvaluator:
                 "label": str(label),
                 "blinded_point": base64.b64encode(blinded_bytes).decode(),
             },
+            "oprf_evaluate",
         )
         return base64.b64decode(data["result"])

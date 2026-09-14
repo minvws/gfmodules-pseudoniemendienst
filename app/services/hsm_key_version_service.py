@@ -9,6 +9,12 @@ from app.db.db import Database
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
 from app.db.repositories.organization_repository import OrganizationRepository
+from app.logging.events import (
+    KEY_GRACE_STARTED,
+    KEY_ROTATION_STARTED,
+    SLEUTELTYPE_OPRF_SECRET,
+    log_event,
+)
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
@@ -139,13 +145,23 @@ class HsmKeyVersionService:
             )
             if not org:
                 raise HTTPException(status_code=401, detail="unauthorized")
+            current_version = org.hsm_key_versions[-1].version
             hsm_key_version = HsmKeyVersionEntity(
-                version=org.hsm_key_versions[-1].version + 1,
+                version=current_version + 1,
                 from_dt=from_dt,
                 until_dt=until_dt,
             )
             org.hsm_key_versions.append(hsm_key_version)
             session.flush()
+            log_event(
+                logger,
+                KEY_ROTATION_STARTED,
+                "HSM key version rotation started",
+                sleuteltype=SLEUTELTYPE_OPRF_SECRET,
+                organisatie_oin=organization_external_id.value,
+                oude_versie=current_version,
+                nieuwe_versie=hsm_key_version.version,
+            )
             return hsm_key_version
 
     def update_version_by_organization_id(
@@ -172,6 +188,17 @@ class HsmKeyVersionService:
             if version.removed_at is not None:
                 raise HTTPException(403, "forbidden")
             version.until_dt = until_dt
+            if until_dt is not None:
+                log_event(
+                    logger,
+                    KEY_GRACE_STARTED,
+                    "HSM key version grace period started",
+                    sleuteltype=SLEUTELTYPE_OPRF_SECRET,
+                    organisatie_oin=organization_external_id.value,
+                    oude_versie=version.version,
+                    grace_start=datetime.now(timezone.utc).isoformat(),
+                    grace_eind=until_dt.isoformat(),
+                )
             return version.to_dict()
 
     def mark_removed(self, version_id: uuid.UUID) -> HsmKeyVersionEntity | None:
