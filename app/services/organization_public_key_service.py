@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import gfmodules.logging as gflog
 from fastapi import HTTPException
 from jwcrypto.common import base64url_decode
 from jwcrypto.jwk import JWK
@@ -15,11 +16,7 @@ from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
 from app.db.repositories.organization_repository import OrganizationRepository
-from app.logging.events import (
-    DECRYPT_PUBKEY_REGISTERED,
-    DECRYPT_PUBKEY_REJECTED,
-    log_event,
-)
+from app.logging.events import Log
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
@@ -56,27 +53,33 @@ def _key_length(jwk: dict[str, Any]) -> int | None:
 
 def _log_rejected(org_id: Oin, key_algoritme: str | None, reason: str) -> None:
     # PRS-KEY-006
-    log_event(
+    gflog.emit(
         logger,
-        DECRYPT_PUBKEY_REJECTED,
+        Log.DECRYPT_PUBKEY_REJECTED,
         "decryption public key registration refused",
-        organisatie_oin=org_id.value,
-        key_algoritme=key_algoritme,
-        rejection_reason=reason,
+        fields={
+            "organisatie_oin": org_id.value,
+            "key_algoritme": key_algoritme,
+            "rejection_reason": reason,
+        },
+        stacklevel=2,
     )
 
 
 def _log_registered(org_id: Oin, jwk: dict[str, Any]) -> None:
     # PRS-KEY-005. Decryption keys are not numbered; the organisation-supplied
     # kid is the identifier that tells key generations apart.
-    log_event(
+    gflog.emit(
         logger,
-        DECRYPT_PUBKEY_REGISTERED,
+        Log.DECRYPT_PUBKEY_REGISTERED,
         "decryption public key registered",
-        organisatie_oin=org_id.value,
-        key_algoritme=_key_algorithm(jwk),
-        key_lengte=_key_length(jwk),
-        key_versie=jwk.get("kid"),
+        fields={
+            "organisatie_oin": org_id.value,
+            "key_algoritme": _key_algorithm(jwk),
+            "key_lengte": _key_length(jwk),
+            "key_versie": jwk.get("kid"),
+        },
+        stacklevel=2,
     )
 
 

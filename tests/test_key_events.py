@@ -8,22 +8,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 from conftest import create_signed_jws, generate_rsa_keypair
+from gfmodules.logging import LogEvent, LoggingStreams
 from starlette.testclient import TestClient
 
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
-from app.logging.events import (
-    DECRYPT_PUBKEY_REGISTERED,
-    DECRYPT_PUBKEY_REJECTED,
-    HSM_OPERATION_FAILED,
-    KEY_GENERATED,
-    KEY_GRACE_STARTED,
-    KEY_ROTATION_STARTED,
-    KEY_VERSION_DESTROYED,
-    PRSEvent,
-)
-from app.logging.filters import LoggingStreams
+from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -60,17 +51,17 @@ def _evaluator() -> HsmOprfEvaluator:
 @pytest.mark.parametrize(
     "event,expected_id,expected_level",
     [
-        (KEY_GENERATED, "250400", logging.INFO),
-        (KEY_ROTATION_STARTED, "250401", logging.WARNING),
-        (KEY_GRACE_STARTED, "250402", logging.INFO),
-        (KEY_VERSION_DESTROYED, "250403", logging.WARNING),
-        (DECRYPT_PUBKEY_REGISTERED, "250404", logging.INFO),
-        (DECRYPT_PUBKEY_REJECTED, "250405", logging.WARNING),
-        (HSM_OPERATION_FAILED, "250406", logging.ERROR),
+        (Log.KEY_GENERATED, "250400", logging.INFO),
+        (Log.KEY_ROTATION_STARTED, "250401", logging.WARNING),
+        (Log.KEY_GRACE_STARTED, "250402", logging.INFO),
+        (Log.KEY_VERSION_DESTROYED, "250403", logging.WARNING),
+        (Log.DECRYPT_PUBKEY_REGISTERED, "250404", logging.INFO),
+        (Log.DECRYPT_PUBKEY_REJECTED, "250405", logging.WARNING),
+        (Log.HSM_OPERATION_FAILED, "250406", logging.ERROR),
     ],
 )
 def test_key_events_match_logging_spec(
-    event: PRSEvent, expected_id: str, expected_level: int
+    event: LogEvent, expected_id: str, expected_level: int
 ) -> None:
     assert event.event_id == expected_id
     assert event.level == expected_level

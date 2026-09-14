@@ -3,18 +3,13 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+import gfmodules.logging as gflog
 import pyoprf
 import requests
+from gfmodules.logging import correlation_headers
 
 from app.config import ConfigOprf
-from app.logging.context import correlation_headers
-from app.logging.events import (
-    HSM_OPERATION_FAILED,
-    KEY_GENERATED,
-    SLEUTELTYPE_OPRF_SECRET,
-    SYS_HSM_UNREACHABLE,
-    log_event,
-)
+from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
@@ -91,23 +86,25 @@ class HsmOprfEvaluator:
                 ),
             )
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            log_event(
+            gflog.emit(
                 logger,
-                SYS_HSM_UNREACHABLE,
+                Log.SYS_HSM_UNREACHABLE,
                 "HSM/KMS unreachable",
-                error_reason=str(e),
+                fields={"error_reason": str(e)},
             )
             raise
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
             # PRS-KEY-007: the HSM was reachable but refused the operation.
-            log_event(
+            gflog.emit(
                 logger,
-                HSM_OPERATION_FAILED,
+                Log.HSM_OPERATION_FAILED,
                 "HSM operation failed",
-                operation_type=operation,
-                error_reason=f"http_{response.status_code}",
+                fields={
+                    "operation_type": operation,
+                    "error_reason": f"http_{response.status_code}",
+                },
                 exc_info=e,
             )
             raise
@@ -116,22 +113,27 @@ class HsmOprfEvaluator:
     def _generate_key(self, label: HsmKeyLabel) -> None:
         data = self._hsm_post("/generate/oprf", {"label": str(label)}, "keygen")
         if "result" not in data:
-            log_event(
+            gflog.emit(
                 logger,
-                HSM_OPERATION_FAILED,
+                Log.HSM_OPERATION_FAILED,
                 "HSM operation failed",
-                operation_type="keygen",
-                error_reason="no_result_in_response",
+                fields={
+                    "operation_type": "keygen",
+                    "error_reason": "no_result_in_response",
+                },
             )
             raise ValueError("could not generate the OPRF secret in HSM")
-        log_event(
+        # PRS-KEY-001: OPRF secrets are generated lazily on first use.
+        gflog.emit(
             logger,
-            KEY_GENERATED,
+            Log.KEY_GENERATED,
             "OPRF secret generated in HSM",
-            sleuteltype=SLEUTELTYPE_OPRF_SECRET,
-            organisatie_oin=label.oin.value,
-            secret_id=str(label),
-            sleutel_versie=label.version,
+            fields={
+                "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                "organisatie_oin": label.oin.value,
+                "secret_id": str(label),
+                "sleutel_versie": label.version,
+            },
         )
 
     def _label_exists(self, label: HsmKeyLabel) -> bool:
