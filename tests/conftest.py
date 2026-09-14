@@ -20,10 +20,13 @@ import secrets
 from collections.abc import Callable, Generator
 from datetime import datetime, timezone
 
+import gfmodules.logging as gflog
 import inject
 import pytest
 from cryptography.hazmat.primitives import serialization
 from fastapi import FastAPI
+from gfmodules.logging import ConfigLogging
+from gfmodules.logging.testing import reset_for_tests
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
 from pydantic import SecretStr
@@ -31,6 +34,7 @@ from starlette.testclient import TestClient
 
 from app.config import get_config, set_config
 from app.db.db import Database
+from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
 
 
@@ -49,6 +53,19 @@ if not os.path.exists(oprf_path):
 if not conf.pseudonym.master_key.get_secret_value():
     conf.pseudonym.master_key = SecretStr(genkey(32))
 set_config(conf)
+
+
+@pytest.fixture(autouse=True)
+def logging_catalogue() -> Generator[None, None, None]:
+    gflog.configure(
+        config=ConfigLogging(console_streams=["debug"], access_logs=True),
+        loglevel="DEBUG",
+        catalogue=Log,
+    )
+    try:
+        yield
+    finally:
+        reset_for_tests()
 
 
 class RecordingHandler(logging.Handler):
