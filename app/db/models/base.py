@@ -1,3 +1,4 @@
+from app.utils.datetime import now_utc
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -35,12 +36,12 @@ class WithTimestamps:
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.now,
+        default=now_utc,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.now,
+        default=now_utc,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

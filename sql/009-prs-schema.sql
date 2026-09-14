@@ -78,7 +78,7 @@ CREATE TABLE admin.client_request_personal_id_types (
     organization_id UUID NOT NULL,
     personal_id_type_id INTEGER NOT NULL REFERENCES admin.personal_id_types(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (client_id, personal_id_type_id),
+    PRIMARY KEY (client_id, organization_id, personal_id_type_id),
     FOREIGN KEY (organization_id, personal_id_type_id)
       REFERENCES admin.organization_request_personal_id_types(organization_id, personal_id_type_id)
 );

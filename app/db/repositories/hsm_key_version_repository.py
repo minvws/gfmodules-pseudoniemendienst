@@ -1,3 +1,4 @@
+from app.utils.datetime import now_utc
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -188,7 +189,7 @@ class HsmKeyVersionRepository(RepositoryBase):
         Flags an existing key version as removed, leaving its dates untouched.
         Returns `None` when no version exists for that ID.
         """
-        now = datetime.now(timezone.utc)
+        now = now_utc()
         statement = (
             update(HsmKeyVersionEntity)
             .where(

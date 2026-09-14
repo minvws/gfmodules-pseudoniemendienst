@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.utils.datetime import now_utc
 
 import uuid
 from datetime import datetime, timezone
@@ -25,20 +26,26 @@ class ClientPersonalIdTypeEntity(Base):
         {"schema": "admin"},
     )
 
-    client_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.clients.id"), primary_key=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("admin.clients.id"), primary_key=True
+    )
 
     personal_id_type_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("admin.personal_id_types.id"), primary_key=True
     )
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"), primary_key=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("admin.organizations.id"), primary_key=True
+    )
 
-    client: Mapped[ClientEntity] = relationship(back_populates="request_personal_id_types")
+    client: Mapped[ClientEntity] = relationship(
+        back_populates="request_personal_id_types"
+    )
 
     personal_id_type: Mapped[PersonalIdTypeEntity] = relationship()
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.now(tz=timezone.utc),
+        default=now_utc,
     )

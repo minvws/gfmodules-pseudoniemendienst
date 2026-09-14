@@ -1,3 +1,4 @@
+from app.utils.datetime import now_utc
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -75,7 +76,7 @@ class HsmKeyVersionService:
         Returns all key versions that are active at the given moment (defaults to
         the current date/time), restricted to a single organization id.
         """
-        at = at or datetime.now(timezone.utc)
+        at = at or now_utc()
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
             versions = repo.get_active_versions(at, organization_id=organization_id)
@@ -96,7 +97,7 @@ class HsmKeyVersionService:
                 return False
             return version.until_dt is None or version.until_dt > now
 
-        now = datetime.now(timezone.utc)
+        now = now_utc()
         with self.__db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_external_id)
@@ -114,7 +115,7 @@ class HsmKeyVersionService:
         Returns all key versions that have expired (until_dt in the past) but are
         not yet removed, at the given moment (defaults to the current date/time).
         """
-        at = at or datetime.now(timezone.utc)
+        at = at or now_utc()
         with self.__db.get_db_session() as session:
             repo = session.get_repository(HsmKeyVersionRepository)
             versions = repo.get_expired_versions(at)
@@ -132,7 +133,7 @@ class HsmKeyVersionService:
         highest existing version for that organization. When no start moment is
         given, the version becomes active immediately.
         """
-        from_dt = from_dt or datetime.now(timezone.utc)
+        from_dt = from_dt or now_utc()
         with self.__db.get_db_session(commit=True) as session:
             org = session.get_repository(OrganizationRepository).get_one_by_external_id(
                 organization_external_id

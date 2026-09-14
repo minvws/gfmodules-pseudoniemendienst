@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.utils.datetime import now_utc
 
 import uuid
 from datetime import datetime, timezone
@@ -24,5 +25,5 @@ class PersonalIdTypeEntity(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=datetime.now(tz=timezone.utc),
+        default=now_utc,
     )

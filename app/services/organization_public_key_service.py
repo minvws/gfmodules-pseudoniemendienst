@@ -1,3 +1,4 @@
+from app.utils.datetime import now_utc
 import json
 import logging
 import uuid
@@ -63,9 +64,10 @@ class OrganizationPublicKeyService:
             raise HTTPException(status_code=422, detail="Missing 'iat' in payload")
         if "oin" not in payload:
             raise HTTPException(status_code=422, detail="Missing 'oin' in payload")
-        if datetime.fromtimestamp(payload["iat"], tz=timezone.utc) + timedelta(
-            hours=1
-        ) < datetime.now(tz=timezone.utc):
+        if (
+            datetime.fromtimestamp(payload["iat"], tz=timezone.utc) + timedelta(hours=1)
+            < now_utc()
+        ):
             raise HTTPException(status_code=422, detail="JWS expired")
         if payload["oin"] != org_id.value:
             raise HTTPException(
