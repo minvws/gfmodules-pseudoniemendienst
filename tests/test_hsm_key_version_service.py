@@ -17,9 +17,9 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import (
-    HsmKeyLabel,
     HsmOprfEvaluator,
     LocalOprfEvaluator,
+    OprfHsmKeyLabel,
 )
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
@@ -211,9 +211,11 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     )
 
     with (
-        patch.object(evaluator, "_label_exists", return_value=True) as label_exists,
         patch.object(
-            evaluator, "_evaluate_label", return_value=b"evaluated"
+            evaluator._client, "label_exists", return_value=True
+        ) as label_exists,
+        patch.object(
+            evaluator._client, "oprf_evaluate", return_value=b"evaluated"
         ) as evaluate_label,
     ):
         result = evaluator.evaluate(TEST_OIN_78000, b"blinded")
@@ -221,15 +223,15 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     assert result == {1: b"evaluated", 2: b"evaluated", 7: b"evaluated"}
 
     assert [str(c.args[0]) for c in label_exists.call_args_list] == [
-        "oin-00000000012345678000-v1",
-        "oin-00000000012345678000-v2",
-        "oin-00000000012345678000-v7",
+        "oin-00000000012345678000-oprf-v1",
+        "oin-00000000012345678000-oprf-v2",
+        "oin-00000000012345678000-oprf-v7",
     ]
 
     assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
-        ("oin-00000000012345678000-v1", b"blinded"),
-        ("oin-00000000012345678000-v2", b"blinded"),
-        ("oin-00000000012345678000-v7", b"blinded"),
+        ("oin-00000000012345678000-oprf-v1", b"blinded"),
+        ("oin-00000000012345678000-oprf-v2", b"blinded"),
+        ("oin-00000000012345678000-oprf-v7", b"blinded"),
     ]
 
     assert label_exists.call_count == 3
@@ -256,10 +258,12 @@ def test_eval_generates_keys_if_needed(
     )
 
     with (
-        patch.object(evaluator, "_label_exists", return_value=False) as label_exists,
-        patch.object(evaluator, "_generate_key") as generate_key,
         patch.object(
-            evaluator, "_evaluate_label", return_value=b"evaluated"
+            evaluator._client, "label_exists", return_value=False
+        ) as label_exists,
+        patch.object(evaluator._client, "generate_oprf_key") as generate_key,
+        patch.object(
+            evaluator._client, "oprf_evaluate", return_value=b"evaluated"
         ) as evaluate_label,
     ):
         result = evaluator.evaluate(TEST_OIN_79000, b"blinded")
@@ -267,18 +271,18 @@ def test_eval_generates_keys_if_needed(
     assert result == {1: b"evaluated", 2: b"evaluated"}
 
     assert [str(c.args[0]) for c in label_exists.call_args_list] == [
-        "oin-00000000012345679000-v1",
-        "oin-00000000012345679000-v2",
+        "oin-00000000012345679000-oprf-v1",
+        "oin-00000000012345679000-oprf-v2",
     ]
 
     assert [str(c.args[0]) for c in generate_key.call_args_list] == [
-        "oin-00000000012345679000-v1",
-        "oin-00000000012345679000-v2",
+        "oin-00000000012345679000-oprf-v1",
+        "oin-00000000012345679000-oprf-v2",
     ]
 
     assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
-        ("oin-00000000012345679000-v1", b"blinded"),
-        ("oin-00000000012345679000-v2", b"blinded"),
+        ("oin-00000000012345679000-oprf-v1", b"blinded"),
+        ("oin-00000000012345679000-oprf-v2", b"blinded"),
     ]
 
     assert label_exists.call_count == 2
@@ -343,7 +347,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
+    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 2, 7)
@@ -444,7 +448,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         recipientScope="scope",
     )
 
-    with patch("app.services.oprf.evaluators.requests.post", side_effect=fake_post):
+    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 3, 5)
@@ -489,11 +493,11 @@ def test_eval_generate_key_without_result_raises_value_error() -> None:
     )
 
     with (
-        patch.object(evaluator, "_hsm_post", return_value={}) as hsm_post,
-        pytest.raises(ValueError, match="could not generate the OPRF secret in HSM"),
+        patch.object(evaluator._client, "post", return_value={}) as hsm_post,
+        pytest.raises(ValueError, match="could not generate OPRF secret"),
     ):
-        evaluator._generate_key(
-            HsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1)
+        evaluator._client.generate_oprf_key(
+            str(OprfHsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1))
         )
 
     assert hsm_post.call_count == 1

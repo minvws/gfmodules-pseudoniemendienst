@@ -106,7 +106,7 @@ def test_new_key_version_is_added_to_jwe(
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
     try:
         with patch(
-            "app.services.oprf.evaluators.requests.post", side_effect=_fake_hsm_post
+            "app.services.hsm.client.requests.post", side_effect=_fake_hsm_post
         ):
             # We get a pseudonym back, carrying only version 1.
             eval_resp = _eval(

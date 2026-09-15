@@ -36,6 +36,10 @@ def test_emit_attaches_event_id_and_streams() -> None:
 @pytest.mark.parametrize(
     "event,expected_id,expected_level",
     [
+        (Log.AUTHORIZATION_DENIED, "200402", logging.WARNING),
+        (Log.PSEUDONYM_REVERSIBLE_CREATED, "220400", logging.INFO),
+        (Log.PSEUDONYM_CREATE_FAILED, "220403", logging.ERROR),
+        (Log.PERSONAL_ID_VALIDATION_FAILED, "220404", logging.WARNING),
         (Log.OPRF_EVAL_OK, "210400", logging.INFO),
         (Log.OPRF_EVAL_FAILED, "210402", logging.ERROR),
         (Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY, "210403", logging.WARNING),
@@ -134,7 +138,7 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
 
     with (
         patch(
-            "app.services.oprf.evaluators.requests.post",
+            "app.services.hsm.client.requests.post",
             side_effect=RuntimeError("HSM unreachable"),
         ),
         pytest.raises(OprfEvaluationError) as exc,
