@@ -3,7 +3,7 @@ import logging
 from app.config import ConfigOprf
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.evaluators import HsmKeyLabel
+from app.services.oprf.evaluators import OprfHsmKeyLabel
 from app.services.reversible.keys import reversible_key_labels
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class HsmKeyCleanupService:
         for version in expired:
             try:
                 oin = version.organization.external_id
-                labels = [str(HsmKeyLabel(oin, version.version))] + [
+                labels = [str(OprfHsmKeyLabel(oin, version.version))] + [
                     str(label) for label in reversible_key_labels(oin, version.version)
                 ]
             except ValueError:

@@ -27,6 +27,7 @@ IV_LENGTH = 16
 AES_BLOCK = 16
 _HEADER_LENGTH = 1 + 2
 _MIN_LENGTH = _HEADER_LENGTH + AES_BLOCK + IV_LENGTH
+DELIMITER = "|"
 
 
 class ReversiblePseudonymError(ValueError):
@@ -130,7 +131,7 @@ class ReversiblePseudonymService:
                 "invalid_pseudonym", "pseudonym integrity check failed"
             )
 
-        parts = subject.decode("utf-8").split("|")
+        parts = subject.decode("utf-8").split(DELIMITER)
         if len(parts) != 3 or parts[1] != _recipient_organization(recipient):
             raise ReversiblePseudonymError(
                 "invalid_pseudonym", "pseudonym was not issued for this organization"
@@ -146,12 +147,12 @@ class ReversiblePseudonymService:
     def _subject(
         self, personal_id: PersonalId, recipient: Oin, recipient_scope: str
     ) -> bytes:
-        if "|" in recipient_scope:
+        if DELIMITER in recipient_scope:
             raise ReversiblePseudonymError(
                 "crypto_failure", "recipient scope must not contain '|'"
             )
         return (
-            f"{personal_id.as_str()}|{_recipient_organization(recipient)}|{recipient_scope}"
+            f"{personal_id.as_str()}{DELIMITER}{_recipient_organization(recipient)}{DELIMITER}{recipient_scope}"
         ).encode()
 
     def _derive_iv(self, recipient: Oin, version: int, subject: bytes) -> bytes:

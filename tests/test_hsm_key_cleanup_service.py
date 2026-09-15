@@ -119,8 +119,8 @@ def _destroyed_labels(post: MagicMock) -> set[str]:
             ],
             2,
             {
-                f"oin-{TEST_OIN}-v1",
-                f"oin-{TEST_OIN_EXPIRED_OTHER}-v1",
+                f"oin-{TEST_OIN}-oprf-v1",
+                f"oin-{TEST_OIN_EXPIRED_OTHER}-oprf-v1",
             },
             {TEST_OIN_ACTIVE: {2}},
             (),
@@ -129,7 +129,7 @@ def _destroyed_labels(post: MagicMock) -> set[str]:
         pytest.param(
             [HsmKeyVersionData(TEST_OIN, 1, timedelta(days=1), timedelta(0), None)],
             1,
-            {f"oin-{TEST_OIN}-v1"},
+            {f"oin-{TEST_OIN}-oprf-v1"},
             {},
             (0,),
             id="until_dt_equal_to_now",
@@ -220,7 +220,7 @@ def test_cleanup_destroys_reversible_pseudonym_keys_of_the_version(
 
     assert cleaned == 1
     assert _destroyed_labels(post) == {
-        f"oin-{TEST_OIN}-v1",
+        f"oin-{TEST_OIN}-oprf-v1",
         f"oin-{TEST_OIN}-rp-v1-aes",
         f"oin-{TEST_OIN}-rp-v1-hmac",
     }

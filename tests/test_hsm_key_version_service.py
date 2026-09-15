@@ -17,9 +17,9 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import (
-    HsmKeyLabel,
     HsmOprfEvaluator,
     LocalOprfEvaluator,
+    OprfHsmKeyLabel,
 )
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
@@ -223,15 +223,15 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     assert result == {1: b"evaluated", 2: b"evaluated", 7: b"evaluated"}
 
     assert [str(c.args[0]) for c in label_exists.call_args_list] == [
-        "oin-00000000012345678000-v1",
-        "oin-00000000012345678000-v2",
-        "oin-00000000012345678000-v7",
+        "oin-00000000012345678000-oprf-v1",
+        "oin-00000000012345678000-oprf-v2",
+        "oin-00000000012345678000-oprf-v7",
     ]
 
     assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
-        ("oin-00000000012345678000-v1", b"blinded"),
-        ("oin-00000000012345678000-v2", b"blinded"),
-        ("oin-00000000012345678000-v7", b"blinded"),
+        ("oin-00000000012345678000-oprf-v1", b"blinded"),
+        ("oin-00000000012345678000-oprf-v2", b"blinded"),
+        ("oin-00000000012345678000-oprf-v7", b"blinded"),
     ]
 
     assert label_exists.call_count == 3
@@ -271,18 +271,18 @@ def test_eval_generates_keys_if_needed(
     assert result == {1: b"evaluated", 2: b"evaluated"}
 
     assert [str(c.args[0]) for c in label_exists.call_args_list] == [
-        "oin-00000000012345679000-v1",
-        "oin-00000000012345679000-v2",
+        "oin-00000000012345679000-oprf-v1",
+        "oin-00000000012345679000-oprf-v2",
     ]
 
     assert [str(c.args[0]) for c in generate_key.call_args_list] == [
-        "oin-00000000012345679000-v1",
-        "oin-00000000012345679000-v2",
+        "oin-00000000012345679000-oprf-v1",
+        "oin-00000000012345679000-oprf-v2",
     ]
 
     assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
-        ("oin-00000000012345679000-v1", b"blinded"),
-        ("oin-00000000012345679000-v2", b"blinded"),
+        ("oin-00000000012345679000-oprf-v1", b"blinded"),
+        ("oin-00000000012345679000-oprf-v2", b"blinded"),
     ]
 
     assert label_exists.call_count == 2
@@ -497,7 +497,7 @@ def test_eval_generate_key_without_result_raises_value_error() -> None:
         pytest.raises(ValueError, match="could not generate OPRF secret"),
     ):
         evaluator._client.generate_oprf_key(
-            str(HsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1))
+            str(OprfHsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1))
         )
 
     assert hsm_post.call_count == 1

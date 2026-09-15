@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 API_DESCRIPTION = """
 The Pseudoniemendienst (PRS) lets parties exchange data about a person without
-sharing their BSN. Instead of a BSN, parties exchange **RIDs** and **pseudonyms**
+sharing their BSN. Instead of a BSN, parties exchange **reversible pseudonyms** and **pseudonyms**
 that are scoped to a recipient organization and scope.
 
 A recipient organization is always identified by a OIN in the form
@@ -96,7 +96,7 @@ TAGS_METADATA = [
     {
         "name": "Key Registration Services",
         "description": (
-            "Register and manage the public keys that pseudonyms and RIDs are "
+            "Register and manage the public keys that pseudonyms and reversible pseudonyms are "
             "encrypted to. The organization and its public key are derived from the "
             "mTLS client certificate, so they are not part of the request body."
         ),
@@ -126,9 +126,9 @@ EXCHANGE_TAGS_METADATA = [
     {
         "name": "Exchange Services",
         "description": (
-            "Exchange a personal ID for a reversible pseudonym or RID targeted at a "
-            "recipient organization/scope, and redeem a previously issued RID for a "
-            "pseudonym (or the BSN, when permitted by both the RID usage and the "
+            "Exchange a personal ID for a reversible pseudonym or reversible pseudonyms targeted at a "
+            "recipient organization/scope, and redeem a previously issued reversible pseudonyms for a "
+            "pseudonym (or the BSN, when permitted by both the reversible pseudonyms usage and the "
             "organization's `max_key_usage`). Exchanges that involve a personal ID "
             "require both the calling and the recipient organization to be "
             "authorized for that personal ID type by a PRS administrator."

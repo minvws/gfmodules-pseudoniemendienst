@@ -57,7 +57,7 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
                 "reversible pseudonyms."
             )
         },
-        403: {"description": "The token lacks the `prs:reversible-pseudonym` scope."},
+        403: {"description": "Insufficient scope. The authorization token requires the `prs:reversible-pseudonym` scope."},
         404: {
             "description": (
                 "The recipient organization is unknown, is not allowed to receive "
@@ -65,7 +65,7 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
                 "scope."
             )
         },
-        503: {"description": "The HSM that holds the pseudonym keys is unreachable."},
+        500: {"description": "Service temporarily unavailable."},
     },
     description="""
 Exchange a personal ID for a reversible pseudonym bound to the recipient
@@ -74,10 +74,9 @@ can only be reversed to the personal ID by the PRS itself.
 
 Requires the `prs:reversible-pseudonym` OAuth scope. Before the personal ID is
 processed, two administrator-managed authorizations are checked: the calling
-organization (the verified `x-gf-sub` identity) must be allowed to request
-reversible pseudonyms, and the recipient organization must be allowed to
-receive them. The sender is checked first, so an unauthorized caller cannot
-probe which recipient organizations exist.
+organization must be allowed to request reversible pseudonyms, and the recipient
+organization must be allowed to receive them. The sender is checked first, so an
+unauthorized caller cannot probe which recipient organizations exist.
 """,
 )
 def exchange_reversible_pseudonym(

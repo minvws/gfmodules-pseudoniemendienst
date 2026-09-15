@@ -19,12 +19,12 @@ class OprfEvaluator(Protocol):
 
 
 @dataclass(frozen=True)
-class HsmKeyLabel:
+class OprfHsmKeyLabel:
     oin: Oin
     version: int
 
     def __str__(self) -> str:
-        return f"oin-{self.oin}-v{self.version}"
+        return f"oin-{self.oin}-oprf-v{self.version}"
 
 
 class LocalOprfEvaluator:
@@ -57,7 +57,7 @@ class HsmOprfEvaluator:
 
         ret: dict[int, bytes] = {}
         for version in active_versions:
-            label = str(HsmKeyLabel(recipient_org_oin, version))
+            label = str(OprfHsmKeyLabel(recipient_org_oin, version))
             if not self._client.label_exists(label):
                 self._client.generate_oprf_key(label)
 

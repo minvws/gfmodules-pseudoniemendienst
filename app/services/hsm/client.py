@@ -86,6 +86,7 @@ class HsmClient:
             "/sign",
             {
                 "label": label,
+                "objtype": "SECRET_KEY",
                 "data": base64.b64encode(data).decode(),
                 "mechanism": mechanism,
             },
@@ -98,8 +99,10 @@ class HsmClient:
             "/encrypt",
             {
                 "label": label,
+                "objtype": "SECRET_KEY",
                 "data": base64.b64encode(data).decode(),
                 "iv": base64.b64encode(iv).decode(),
+                "mechanism": "AES_CBC_PAD",
             },
         )
         return base64.b64decode(result["result"]["data"])
@@ -109,6 +112,7 @@ class HsmClient:
             "/decrypt",
             {
                 "label": label,
+                "objtype": "SECRET_KEY",
                 "data": base64.b64encode(data).decode(),
                 "iv": base64.b64encode(iv).decode(),
             },
