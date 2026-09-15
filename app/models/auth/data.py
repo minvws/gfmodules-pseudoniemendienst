@@ -1,28 +1,24 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class AuthorizationScope(str, Enum):
+class AuthorizationScope(StrEnum):
     ADMINISTRATION = "prs:administration"
-    OPRF = "prs:oprf"
     PSEUDONYM = "prs:pseudonym"
-    REVERSIBLE_PSEUDONYM = "prs:reversible-pseudonym"
-    SAML_REVERSIBLE_PSEUDONYM = "prs:saml-reversible-pseudonym"
+    OPRF_PSEUDONYM = "prs:oprf-pseudonym"
+    SAML_PSEUDONYM = "prs:saml-pseudonym"
 
 
 SCOPE_DESCRIPTIONS: dict[AuthorizationScope, str] = {
     AuthorizationScope.ADMINISTRATION: (
-        "Manage the public keys and HSM key versions of the authorized organization."
-    ),
-    AuthorizationScope.OPRF: (
-        "Evaluate a blinded personal identifier through the OPRF."
+        "This scope gives authorization to manage administration features for the authorized organization"
     ),
     AuthorizationScope.PSEUDONYM: (
-        "Exchange a personal ID for an irreversible pseudonym."
+        "This scope gives authorization to use the general pseudonymisation feature of the Pseudoniemendienst"
     ),
-    AuthorizationScope.REVERSIBLE_PSEUDONYM: (
-        "Exchange a personal ID for a reversible pseudonym or a BSN."
+    AuthorizationScope.OPRF_PSEUDONYM: (
+        "This scope gives authorization to use the oprf pseudonymisation feature of the Pseudoniemendienst"
     ),
-    AuthorizationScope.SAML_REVERSIBLE_PSEUDONYM: (
-        "Exchange a DigiD SAML response for a reversible pseudonym."
+    AuthorizationScope.SAML_PSEUDONYM: (
+        "This scope gives authorization to use the saml pseudonymisation feature of the Pseudoniemendienst"
     ),
 }

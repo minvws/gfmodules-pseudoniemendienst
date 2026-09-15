@@ -31,9 +31,7 @@ class _FailingSamlServiceClient:
 @pytest.fixture
 def client(app: FastAPI) -> TestClient:
     """Test client with the PRS-SAML client replaced by an in-process echo."""
-    app.dependency_overrides[container.get_saml_service_client] = (
-        _EchoSamlServiceClient
-    )
+    app.dependency_overrides[container.get_saml_service_client] = _EchoSamlServiceClient
     return TestClient(app)
 
 
@@ -109,7 +107,7 @@ def test_saml_exchange_rejects_wrong_scope(
 def test_saml_exchange_accepts_scope_among_others(
     client: TestClient, valid_headers: dict[str, str]
 ) -> None:
-    valid_headers["x-gf-scope"] = "nvi:read prs:saml-reversible-pseudonym other"
+    valid_headers["x-gf-scope"] = "nvi:read prs:saml-pseudonym other"
     response = client.post(ENDPOINT, json={"foo": "bar"}, headers=valid_headers)
     assert response.status_code == 200
 
@@ -135,8 +133,8 @@ def test_saml_exchange_service_error_returns_502_and_logs(
     valid_headers: dict[str, str],
     record_logs: Callable[[str], list[logging.LogRecord]],
 ) -> None:
-    app.dependency_overrides[container.get_saml_service_client] = (
-        lambda: _FailingSamlServiceClient("saml_service_error")
+    app.dependency_overrides[container.get_saml_service_client] = lambda: (
+        _FailingSamlServiceClient("saml_service_error")
     )
     records = record_logs("app.routers.saml_exchange")
 

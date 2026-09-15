@@ -28,7 +28,7 @@ _ENDPOINT = "/saml-exchange/reversible-pseudonym"
 service (the SAML-ontvanger), which currently echoes it back unchanged; no SAML
 decryption or validation is performed, and no pseudonym is derived.
 
-Requires the `prs:saml-reversible-pseudonym` OAuth scope; the token itself is
+Requires the `prs:saml-pseudonym` OAuth scope; the token itself is
 validated upstream by the OIN-verifier proxy, which forwards its scopes in the
 `x-gf-scope` header.
 """,
@@ -37,7 +37,7 @@ def post_reversible_pseudonym(
     payload: Any = Body(...),
     auth: AuthContext = Security(
         require_scopes,
-        scopes=[AuthorizationScope.SAML_REVERSIBLE_PSEUDONYM.value],
+        scopes=[AuthorizationScope.SAML_PSEUDONYM.value],
     ),
     saml_client: SamlServiceClient = Depends(container.get_saml_service_client),
 ) -> JSONResponse:
