@@ -8,7 +8,7 @@ import pyoprf
 from app.config import ConfigOprf
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
-from app.services.hsm.client import HsmClient
+from app.services.hsm.client import HsmClient, HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
 logger = logging.getLogger(__name__)
@@ -60,15 +60,19 @@ class HsmOprfEvaluator:
         ret: dict[int, bytes] = {}
         for version in active_versions:
             label = OprfHsmKeyLabel(recipient_org_oin, version)
-            if not self._client.label_exists(str(label)):
+            try:
+                ret[version] = self._client.oprf_evaluate(str(label), blinded_bytes)
+            except HsmKeyNotFound:
+                # First use of this key version: create the secret and retry.
                 self._generate_key(label)
-
-            ret[version] = self._client.oprf_evaluate(str(label), blinded_bytes)
+                ret[version] = self._client.oprf_evaluate(str(label), blinded_bytes)
 
         return ret
 
     def _generate_key(self, label: OprfHsmKeyLabel) -> None:
-        self._client.generate_oprf_key(str(label))
+        if not self._client.generate_oprf_key(str(label)):
+            # Another instance won the race; its key is the one we use.
+            return
         # PRS-KEY-001: OPRF secrets are generated lazily on first use.
         gflog.emit(
             logger,

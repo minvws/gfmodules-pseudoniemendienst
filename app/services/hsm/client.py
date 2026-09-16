@@ -18,6 +18,35 @@ HSM_UNREACHABLE_ERRORS = (
 )
 
 
+class HsmKeyNotFound(Exception):
+    """The HSM holds no key with the requested label."""
+
+
+class HsmKeyExists(Exception):
+    """A key with the requested label already exists in the HSM."""
+
+
+def _expected_error(response: requests.Response) -> Exception | None:
+    """
+    The HSM API answers every HSMError with a 422 and only distinguishes them
+    by text. Two of them are expected in normal operation: a missing key on
+    first use and a duplicate create when two instances race on that first use.
+    """
+    if response.status_code != 422:
+        return None
+    try:
+        description = response.json().get("error_description", "")
+    except Exception:  # noqa: BLE001 - a body that is not JSON is just not one of ours
+        return None
+    if not isinstance(description, str):
+        return None
+    if description == "Object already exists":
+        return HsmKeyExists(description)
+    if description.startswith("No such key") or description.endswith("not found"):
+        return HsmKeyNotFound(description)
+    return None
+
+
 class HsmClient:
     """Client for nl-rdo-hsm-api-service. Keys are addressed by label."""
 
@@ -56,6 +85,9 @@ class HsmClient:
         try:
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
+            expected = _expected_error(response)
+            if expected is not None:
+                raise expected from e
             # PRS-KEY-007: the HSM was reachable but refused the operation.
             gflog.emit(
                 logger,
@@ -70,8 +102,14 @@ class HsmClient:
             raise
         return response.json()
 
-    def _generate(self, path: str, payload: dict[str, Any], label: str) -> None:
-        data = self.post(path, payload, "keygen")
+    def _generate(self, path: str, payload: dict[str, Any], label: str) -> bool:
+        """Create the key. Returns False when it already existed, which happens
+        when another instance created it first; that is not an error."""
+        try:
+            data = self.post(path, payload, "keygen")
+        except HsmKeyExists:
+            logger.info("HSM key %r already exists", label)
+            return False
         if "result" not in data:
             gflog.emit(
                 logger,
@@ -83,19 +121,20 @@ class HsmClient:
                 },
             )
             raise ValueError(f"could not generate key {label!r} in HSM")
+        return True
 
     def label_exists(self, label: str, objtype: str = "SECRET_KEY") -> bool:
         data = self.post("", {"label": label, "objtype": objtype}, "lookup")
         return len(data["objects"] or []) > 0
 
-    def generate_oprf_key(self, label: str) -> None:
-        self._generate("/generate/oprf", {"label": label}, label)
+    def generate_oprf_key(self, label: str) -> bool:
+        return self._generate("/generate/oprf", {"label": label}, label)
 
-    def generate_aes_key(self, label: str) -> None:
-        self._generate("/generate/aes", {"label": label}, label)
+    def generate_aes_key(self, label: str) -> bool:
+        return self._generate("/generate/aes", {"label": label}, label)
 
-    def generate_secret_key(self, label: str, bits: int = 256) -> None:
-        self._generate("/generate/secret", {"label": label, "bits": bits}, label)
+    def generate_secret_key(self, label: str, bits: int = 256) -> bool:
+        return self._generate("/generate/secret", {"label": label, "bits": bits}, label)
 
     def destroy(self, label: str) -> None:
         self.post("/destroy", {"label": label}, "destroy")

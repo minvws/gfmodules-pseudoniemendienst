@@ -86,7 +86,6 @@ class ReversiblePseudonymService:
         version = max(active)
 
         try:
-            self._keys.ensure_keys(recipient, version)
             iv = self._derive_iv(recipient, version, subject)
             ciphertext = self._keys.encrypt(recipient, version, iv, subject)
         except HSM_UNREACHABLE_ERRORS as e:

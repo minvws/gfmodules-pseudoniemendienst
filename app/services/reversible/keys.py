@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
@@ -10,7 +11,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from app.logging.events import SLEUTELTYPE_REVERSIBLE_KEY, Log
 from app.models.oin import Oin
-from app.services.hsm.client import HsmClient
+from app.services.hsm.client import HsmClient, HsmKeyNotFound
 from app.services.pseudonym_service import hkdf_derive
 
 logger = logging.getLogger(__name__)
@@ -41,9 +42,8 @@ def reversible_key_labels(oin: Oin, version: int) -> tuple[ReversibleKeyLabel, .
 
 
 class ReversibleKeyOperations(Protocol):
-    def ensure_keys(self, oin: Oin, version: int) -> None:
-        """Make sure the keys for this organization/version exist."""
-        ...
+    """Keys are created on first use by hmac/encrypt; decrypt never creates
+    them, since a missing key there means the pseudonym cannot be genuine."""
 
     def hmac(self, oin: Oin, version: int, data: bytes) -> bytes:
         """HMAC-SHA256 with the organization/version HMAC key."""
@@ -65,9 +65,6 @@ class LocalReversibleKeyOperations:
     def _key(self, oin: Oin, version: int, kind: KeyKind) -> bytes:
         info = f"prs:rp:{kind}:{oin.value}:v{version}".encode()
         return hkdf_derive(self._master_key, info, 32)
-
-    def ensure_keys(self, oin: Oin, version: int) -> None:
-        return None
 
     def hmac(self, oin: Oin, version: int, data: bytes) -> bytes:
         return hmac.new(self._key(oin, version, "hmac"), data, hashlib.sha256).digest()
@@ -93,14 +90,26 @@ class HsmReversibleKeyOperations:
     def __init__(self, client: HsmClient) -> None:
         self._client = client
 
-    def ensure_keys(self, oin: Oin, version: int) -> None:
+    def _with_keys(
+        self, oin: Oin, version: int, operation: Callable[[], bytes]
+    ) -> bytes:
+        """Run the operation; on the first use of a key version create the keys
+        and run it once more. Saves a lookup round trip on every other call."""
+        try:
+            return operation()
+        except HsmKeyNotFound:
+            self._create_keys(oin, version)
+            return operation()
+
+    def _create_keys(self, oin: Oin, version: int) -> None:
         for label in reversible_key_labels(oin, version):
-            if self._client.label_exists(str(label)):
-                continue
             if label.kind == "aes":
-                self._client.generate_aes_key(str(label))
+                created = self._client.generate_aes_key(str(label))
             else:
-                self._client.generate_secret_key(str(label))
+                created = self._client.generate_secret_key(str(label))
+            if not created:
+                # Another instance won the race; its key is the one we use.
+                continue
             # PRS-KEY-001: reversible pseudonym keys are generated lazily on first use.
             gflog.emit(
                 logger,
@@ -115,11 +124,13 @@ class HsmReversibleKeyOperations:
             )
 
     def hmac(self, oin: Oin, version: int, data: bytes) -> bytes:
-        return self._client.hmac(str(ReversibleKeyLabel(oin, version, "hmac")), data)
+        label = str(ReversibleKeyLabel(oin, version, "hmac"))
+        return self._with_keys(oin, version, lambda: self._client.hmac(label, data))
 
     def encrypt(self, oin: Oin, version: int, iv: bytes, data: bytes) -> bytes:
-        return self._client.encrypt(
-            str(ReversibleKeyLabel(oin, version, "aes")), iv, data
+        label = str(ReversibleKeyLabel(oin, version, "aes"))
+        return self._with_keys(
+            oin, version, lambda: self._client.encrypt(label, iv, data)
         )
 
     def decrypt(self, oin: Oin, version: int, iv: bytes, data: bytes) -> bytes:

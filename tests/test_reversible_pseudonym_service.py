@@ -270,16 +270,31 @@ class FakeHsm:
         self.keys: dict[str, bytes] = {}
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
+    @staticmethod
+    def _hsm_error(resp: MagicMock, description: str) -> MagicMock:
+        resp.status_code = 422
+        resp.raise_for_status.side_effect = requests.HTTPError(description)
+        resp.json.return_value = {
+            "error": "Unprocessible HSM Request",
+            "error_description": description,
+        }
+        return resp
+
     def post(self, url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
         path = url.split("/SoftHSMLabel", 1)[1]
         self.calls.append((path, json))
         resp = MagicMock()
+        resp.status_code = 200
         label = json["label"]
         if path == "":
             resp.json.return_value = {"objects": ["obj"] if label in self.keys else []}
         elif path in ("/generate/aes", "/generate/secret"):
+            if label in self.keys:
+                return self._hsm_error(resp, "Object already exists")
             self.keys[label] = os.urandom(32)
             resp.json.return_value = {"result": "created"}
+        elif label not in self.keys:
+            return self._hsm_error(resp, f"No such key: {label!r}")
         elif path == "/sign":
             assert json["mechanism"] == "SHA256_HMAC"
             digest = hmac.new(
@@ -345,6 +360,9 @@ def test_hsm_keys_are_created_once_and_pseudonym_matches_reference(
     }
     generated = [c for c in fake_hsm.calls if c[0].startswith("/generate/")]
     assert len(generated) == 2
+    # No lookups: the operation is tried first and the keys are created only
+    # when the HSM reports them missing.
+    assert not [c for c in fake_hsm.calls if c[0] == ""]
 
     subject = f"{PID.as_str()}|oin:{OIN.value}|{SCOPE}".encode()
     assert first.value == _reference(
@@ -353,6 +371,40 @@ def test_hsm_keys_are_created_once_and_pseudonym_matches_reference(
         subject,
         1,
     )
+
+
+def test_hsm_keys_created_concurrently_by_another_instance_are_used(
+    hsm_keys: ReversibleKeyOperations, fake_hsm: FakeHsm, recipient: Oin
+) -> None:
+    """Another instance created the AES key between our failed first attempt
+    and our create: the HSM says "already exists", which is not an error."""
+    service = ReversiblePseudonymService(hsm_keys, _key_versions({recipient: [1]}))
+    fake_hsm.keys[f"oin-{OIN}-rp-v1-aes"] = os.urandom(32)
+
+    with _with_fake_hsm(fake_hsm):
+        pseudonym = service.generate(PID, recipient, SCOPE)
+        assert service.reverse(pseudonym.value, recipient).personal_id == PID
+
+    generated = [c for c in fake_hsm.calls if c[0].startswith("/generate/")]
+    assert len(generated) == 2
+    assert set(fake_hsm.keys) == {
+        f"oin-{OIN}-rp-v1-aes",
+        f"oin-{OIN}-rp-v1-hmac",
+    }
+
+
+def test_reverse_never_creates_keys(
+    hsm_keys: ReversibleKeyOperations, fake_hsm: FakeHsm, recipient: Oin
+) -> None:
+    service = ReversiblePseudonymService(hsm_keys, _key_versions({recipient: [1]}))
+    blob = bytes([1]) + (1).to_bytes(2, "big") + b"\x00" * 32
+    value = base64.urlsafe_b64encode(blob).decode()
+
+    with _with_fake_hsm(fake_hsm), pytest.raises(ReversiblePseudonymError) as e:
+        service.reverse(value, recipient)
+
+    assert e.value.error_type == "invalid_pseudonym"
+    assert not [c for c in fake_hsm.calls if c[0].startswith("/generate/")]
 
 
 def test_hsm_roundtrip(

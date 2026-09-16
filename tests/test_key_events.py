@@ -1,5 +1,6 @@
 """Asserts the PRS-KEY events (issue 1039) are emitted correctly."""
 
+import base64
 import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -39,6 +40,11 @@ def _hsm_response(payload: object, status_code: int = 200) -> MagicMock:
     if status_code >= 400:
         response.raise_for_status.side_effect = requests.HTTPError("boom")
     return response
+
+
+def _hsm_no_such_key() -> MagicMock:
+    """What the HSM API answers when the label has no key: a 422 HSMError."""
+    return _hsm_response({"error_description": f"OPRF key '{TEST_OIN}' not found"}, 422)
 
 
 def _evaluator() -> HsmOprfEvaluator:
@@ -86,9 +92,9 @@ def test_lazy_oprf_key_generation_emits_key_generated(
         patch(
             "app.services.hsm.client.requests.post",
             side_effect=[
-                _hsm_response({"objects": []}),  # lookup: key does not exist yet
+                _hsm_no_such_key(),  # oprf_evaluate: key does not exist yet
                 _hsm_response({"result": "ok"}),  # keygen
-                _hsm_response({"result": "AAAA"}),  # oprf_evaluate
+                _hsm_response({"result": "AAAA"}),  # oprf_evaluate, retried
             ],
         ),
     ):
@@ -114,15 +120,38 @@ def test_existing_oprf_key_does_not_emit_key_generated(
         caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
         patch(
             "app.services.hsm.client.requests.post",
-            side_effect=[
-                _hsm_response({"objects": [{"label": "x"}]}),
-                _hsm_response({"result": "AAAA"}),
-            ],
+            side_effect=[_hsm_response({"result": "AAAA"})],
         ),
     ):
         _evaluator().evaluate(TEST_OIN, b"blinded")
 
     assert not _events(records, "250400")
+
+
+def test_oprf_key_created_by_another_instance_emits_nothing(
+    record_logs: RecordLogs, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Two instances race on first use: the loser's keygen gets "already
+    exists", which is neither a key generation nor a failure."""
+    records = record_logs(EVALUATOR_LOGGER)
+    client_records = record_logs(HSM_CLIENT_LOGGER)
+
+    with (
+        caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
+        patch(
+            "app.services.hsm.client.requests.post",
+            side_effect=[
+                _hsm_no_such_key(),
+                _hsm_response({"error_description": "Object already exists"}, 422),
+                _hsm_response({"result": "AAAA"}),
+            ],
+        ),
+    ):
+        result = _evaluator().evaluate(TEST_OIN, b"blinded")
+
+    assert result == {1: base64.b64decode("AAAA")}
+    assert not _events(records, "250400")
+    assert not _events(client_records, "250406")
 
 
 def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
@@ -141,7 +170,7 @@ def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.ERROR
-    assert record.operation_type == "lookup"  # type: ignore[attr-defined]
+    assert record.operation_type == "oprf_evaluate"  # type: ignore[attr-defined]
     assert record.error_reason == "http_500"  # type: ignore[attr-defined]
     assert record.exc_info is not None
     # PRS-SYS-006 is for an unreachable HSM only.
@@ -158,7 +187,7 @@ def test_hsm_keygen_without_result_emits_operation_failed(
         patch(
             "app.services.hsm.client.requests.post",
             side_effect=[
-                _hsm_response({"objects": []}),
+                _hsm_no_such_key(),
                 _hsm_response({"error": "denied"}),
             ],
         ),

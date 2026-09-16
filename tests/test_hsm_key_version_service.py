@@ -15,6 +15,7 @@ from app.db.repositories.personal_id_type_repository import PersonalIdTypeReposi
 from app.db.session import DbSession
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
+from app.services.hsm.client import HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import (
     HsmOprfEvaluator,
@@ -211,9 +212,7 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     )
 
     with (
-        patch.object(
-            evaluator._client, "label_exists", return_value=True
-        ) as label_exists,
+        patch.object(evaluator._client, "generate_oprf_key") as generate_key,
         patch.object(
             evaluator._client, "oprf_evaluate", return_value=b"evaluated"
         ) as evaluate_label,
@@ -222,20 +221,15 @@ def test_eval_via_hsm_returns_entry_per_active_version(
 
     assert result == {1: b"evaluated", 2: b"evaluated", 7: b"evaluated"}
 
-    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
-        "oin-00000000012345678000-oprf-v1",
-        "oin-00000000012345678000-oprf-v2",
-        "oin-00000000012345678000-oprf-v7",
-    ]
-
     assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
         ("oin-00000000012345678000-oprf-v1", b"blinded"),
         ("oin-00000000012345678000-oprf-v2", b"blinded"),
         ("oin-00000000012345678000-oprf-v7", b"blinded"),
     ]
 
-    assert label_exists.call_count == 3
+    # Existing keys are used directly, without a lookup or a create.
     assert evaluate_label.call_count == 3
+    assert generate_key.call_count == 0
 
 
 def test_eval_generates_keys_if_needed(
@@ -257,37 +251,41 @@ def test_eval_generates_keys_if_needed(
         HsmKeyVersionService(database),
     )
 
+    created: set[str] = set()
+
+    def fake_evaluate(label: str, blinded: bytes) -> bytes:
+        if label not in created:
+            raise HsmKeyNotFound(f"No such key: {label}")
+        return b"evaluated"
+
+    def fake_generate(label: str) -> bool:
+        created.add(label)
+        return True
+
     with (
         patch.object(
-            evaluator._client, "label_exists", return_value=False
-        ) as label_exists,
-        patch.object(evaluator._client, "generate_oprf_key") as generate_key,
+            evaluator._client, "generate_oprf_key", side_effect=fake_generate
+        ) as generate_key,
         patch.object(
-            evaluator._client, "oprf_evaluate", return_value=b"evaluated"
+            evaluator._client, "oprf_evaluate", side_effect=fake_evaluate
         ) as evaluate_label,
     ):
         result = evaluator.evaluate(TEST_OIN_79000, b"blinded")
 
     assert result == {1: b"evaluated", 2: b"evaluated"}
 
-    assert [str(c.args[0]) for c in label_exists.call_args_list] == [
-        "oin-00000000012345679000-oprf-v1",
-        "oin-00000000012345679000-oprf-v2",
-    ]
-
     assert [str(c.args[0]) for c in generate_key.call_args_list] == [
         "oin-00000000012345679000-oprf-v1",
         "oin-00000000012345679000-oprf-v2",
     ]
 
+    # Evaluate first; only a missing key triggers a create and one retry.
     assert [(str(c.args[0]), c.args[1]) for c in evaluate_label.call_args_list] == [
         ("oin-00000000012345679000-oprf-v1", b"blinded"),
+        ("oin-00000000012345679000-oprf-v1", b"blinded"),
+        ("oin-00000000012345679000-oprf-v2", b"blinded"),
         ("oin-00000000012345679000-oprf-v2", b"blinded"),
     ]
-
-    assert label_exists.call_count == 2
-    assert evaluate_label.call_count == 2
-    assert generate_key.call_count == 2
 
 
 def test_eval_blind_subject_is_latest_with_extra_versions(
