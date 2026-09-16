@@ -12,3 +12,5 @@ coverage.xml
 
 # Certificates / keys (never commit secrets)
 *.pem
+
+version.json
