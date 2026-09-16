@@ -2,9 +2,11 @@ import logging
 from dataclasses import dataclass
 from typing import Protocol
 
+import gfmodules.logging as gflog
 import pyoprf
 
 from app.config import ConfigOprf
+from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -57,10 +59,25 @@ class HsmOprfEvaluator:
 
         ret: dict[int, bytes] = {}
         for version in active_versions:
-            label = str(OprfHsmKeyLabel(recipient_org_oin, version))
-            if not self._client.label_exists(label):
-                self._client.generate_oprf_key(label)
+            label = OprfHsmKeyLabel(recipient_org_oin, version)
+            if not self._client.label_exists(str(label)):
+                self._generate_key(label)
 
-            ret[version] = self._client.oprf_evaluate(label, blinded_bytes)
+            ret[version] = self._client.oprf_evaluate(str(label), blinded_bytes)
 
         return ret
+
+    def _generate_key(self, label: OprfHsmKeyLabel) -> None:
+        self._client.generate_oprf_key(str(label))
+        # PRS-KEY-001: OPRF secrets are generated lazily on first use.
+        gflog.emit(
+            logger,
+            Log.KEY_GENERATED,
+            "OPRF secret generated in HSM",
+            fields={
+                "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                "organisatie_oin": label.oin.value,
+                "secret_id": str(label),
+                "sleutel_versie": label.version,
+            },
+        )

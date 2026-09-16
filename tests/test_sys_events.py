@@ -97,7 +97,7 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
                 "x-gf-act-sub": persisted_organization.external_id.value,
                 "x-gf-act-cn": persisted_organization.external_id.value,
                 "x-gf-audience": "prs.service",
-                "x-gf-scope": AuthorizationScope.OPRF.value,
+                "x-gf-scope": AuthorizationScope.OPRF_PSEUDONYM.value,
             },
         )
     finally:

@@ -43,7 +43,7 @@ def post_eval(
         AuthorizationService, Depends(container.get_authorization_service)
     ],
     auth_ctx: AuthContext = Security(
-        require_scopes, scopes=[AuthorizationScope.OPRF.value]
+        require_scopes, scopes=[AuthorizationScope.OPRF_PSEUDONYM.value]
     ),
 ) -> JSONResponse:
     recipient_oin = req.recipientOrganization

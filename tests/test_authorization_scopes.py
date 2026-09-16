@@ -72,9 +72,9 @@ def test_scope_header_without_a_known_scope_is_rejected(
 @pytest.mark.parametrize(
     "value",
     [
-        "prs:oprf prs:read",
-        "nvi:read prs:oprf",
-        "nvi:read prs:oprf lmr:write",
+        "prs:oprf-pseudonym prs:read",
+        "nvi:read prs:oprf-pseudonym",
+        "nvi:read prs:oprf-pseudonym lmr:write",
     ],
 )
 def test_unknown_scopes_are_ignored_alongside_a_known_one(
@@ -91,7 +91,7 @@ def test_unknown_scopes_are_ignored_alongside_a_known_one(
 def test_scope_header_accepts_extra_whitespace(
     client: TestClient, valid_headers: Headers
 ) -> None:
-    headers = {**valid_headers, "x-gf-scope": "  prs:oprf   prs:pseudonym  "}
+    headers = {**valid_headers, "x-gf-scope": "  prs:oprf-pseudonym   prs:pseudonym  "}
 
     response = client.post("/oprf/eval", json=OPRF_BODY, headers=headers)
 
@@ -104,7 +104,7 @@ def test_oprf_eval_requires_the_oprf_scope(
     without = headers_with_scopes(AuthorizationScope.ADMINISTRATION)
     assert client.post("/oprf/eval", json=OPRF_BODY, headers=without).status_code == 403
 
-    granted = headers_with_scopes(AuthorizationScope.OPRF)
+    granted = headers_with_scopes(AuthorizationScope.OPRF_PSEUDONYM)
     assert client.post("/oprf/eval", json=OPRF_BODY, headers=granted).status_code != 403
 
 
@@ -120,9 +120,8 @@ def test_administration_routes_require_the_administration_scope(
     client: TestClient, headers_with_scopes: HeaderBuilder, method: str, path: str
 ) -> None:
     without = headers_with_scopes(
-        AuthorizationScope.OPRF,
+        AuthorizationScope.OPRF_PSEUDONYM,
         AuthorizationScope.PSEUDONYM,
-        AuthorizationScope.REVERSIBLE_PSEUDONYM,
     )
     assert client.request(method, path, headers=without).status_code == 403
 
@@ -146,11 +145,11 @@ def test_test_routes_are_authenticated_but_not_scoped(
     )
 
 
-def test_exchange_reversible_pseudonym_requires_the_reversible_pseudonym_scope(
+def test_exchange_reversible_pseudonym_requires_the_pseudonym_scope(
     client: TestClient, headers_with_scopes: HeaderBuilder
 ) -> None:
     without = headers_with_scopes(
-        AuthorizationScope.PSEUDONYM, AuthorizationScope.ADMINISTRATION
+        AuthorizationScope.OPRF_PSEUDONYM, AuthorizationScope.ADMINISTRATION
     )
     denied = client.post(
         "/exchange/reversible-pseudonym",
@@ -159,7 +158,7 @@ def test_exchange_reversible_pseudonym_requires_the_reversible_pseudonym_scope(
     )
     assert denied.status_code == 403
 
-    granted = headers_with_scopes(AuthorizationScope.REVERSIBLE_PSEUDONYM)
+    granted = headers_with_scopes(AuthorizationScope.PSEUDONYM)
     allowed = client.post(
         "/exchange/reversible-pseudonym",
         json=REVERSIBLE_PSEUDONYM_BODY,

@@ -188,14 +188,16 @@ def test_scope_changes_the_pseudonym(
     assert claims_one["subject"] != claims_other["subject"]
 
 
-def test_requires_the_reversible_pseudonym_scope(
+def test_requires_the_pseudonym_scope(
     client: TestClient,
     headers_with_scopes: Callable[..., dict[str, str]],
     sender: None,
     make_recipient: MakeRecipient,
 ) -> None:
     make_recipient()
-    headers = headers_with_scopes(AuthorizationScope.PSEUDONYM, AuthorizationScope.OPRF)
+    headers = headers_with_scopes(
+        AuthorizationScope.ADMINISTRATION, AuthorizationScope.OPRF_PSEUDONYM
+    )
 
     response = client.post(ENDPOINT, json=BODY, headers=headers)
 

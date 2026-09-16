@@ -494,7 +494,7 @@ def test_eval_generate_key_without_result_raises_value_error() -> None:
 
     with (
         patch.object(evaluator._client, "post", return_value={}) as hsm_post,
-        pytest.raises(ValueError, match="could not generate OPRF secret"),
+        pytest.raises(ValueError, match="could not generate key"),
     ):
         evaluator._client.generate_oprf_key(
             str(OprfHsmKeyLabel(RecipientOrganizationOin(TEST_OIN_WITH_PREFIX), 1))

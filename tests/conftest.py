@@ -262,13 +262,17 @@ def generate_rsa_keypair() -> tuple[str, str]:
     return private_key_pem, public_key_pem
 
 
-def create_signed_jws(private_key_pem: str, oin: Oin) -> str:
+def create_signed_jws(
+    private_key_pem: str,
+    oin: Oin,
+    algorithm: str = "RS256",
+) -> str:
     key = JWK.from_pem(private_key_pem.encode())
     claims = {
         "iat": int(datetime.now(timezone.utc).timestamp()),
         "oin": oin.value,
     }
-    header = {"alg": "RS256", "jwk": key.export_public(as_dict=True)}
+    header = {"alg": algorithm, "jwk": key.export_public(as_dict=True)}
 
     token = JWT(header=header, claims=claims)
     token.make_signed_token(key)

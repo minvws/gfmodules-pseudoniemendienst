@@ -1,6 +1,9 @@
 import logging
 
+import gfmodules.logging as gflog
+
 from app.config import ConfigOprf
+from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import OprfHsmKeyLabel
@@ -53,15 +56,32 @@ class HsmKeyCleanupService:
                 for label in labels:
                     if self._destroy_if_present(label):
                         logger.info("removed expired HSM key %r", label)
-            except Exception:
+            except Exception as e:  # noqa: BLE001 - any HSM failure must not stop the run
                 # Leave the version untouched so the next run retries it.
-                logger.exception(
-                    "failed to destroy HSM keys for version %s", version.id
+                gflog.emit(
+                    logger,
+                    Log.HSM_OPERATION_FAILED,
+                    "failed to destroy expired HSM keys",
+                    fields={
+                        "operation_type": "destroy",
+                        "error_reason": type(e).__name__,
+                    },
+                    exc_info=e,
                 )
                 continue
 
             self.__version_service.mark_removed(version.id)
             cleaned += 1
+            gflog.emit(
+                logger,
+                Log.KEY_VERSION_DESTROYED,
+                "expired HSM key version destroyed",
+                fields={
+                    "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                    "organisatie_oin": oin.value,
+                    "vernietigde_versie": version.version,
+                },
+            )
 
         if cleaned:
             logger.info("cleaned up %d expired HSM key version(s)", cleaned)

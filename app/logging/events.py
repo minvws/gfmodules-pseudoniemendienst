@@ -7,6 +7,11 @@ _SIEM = LoggingStreams.SIEM
 
 _Base = DefaultEventCatalogue
 
+# PRS-KEY "sleuteltype" for the per-organisation OPRF secret and its derived keys.
+SLEUTELTYPE_OPRF_SECRET = "oprf_secret"
+# PRS-KEY "sleuteltype" for the per-organisation reversible pseudonym AES/HMAC keys.
+SLEUTELTYPE_REVERSIBLE_KEY = "reversible_pseudonym_key"
+
 
 class Log(_Base):
     # Authentication and authorization events (PRS-AUTH), see
@@ -143,8 +148,101 @@ class Log(_Base):
         logging.ERROR,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "namens_oin", "doel_oin", "error_type", "endpoint"),
+            _APP: (
+                "handelende_oin",
+                "namens_oin",
+                "doel_oin",
+                "error_type",
+                "endpoint",
+            ),
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+        },
+    )
+
+    # Key management, versioning and rotation events (PRS-KEY), see
+    # https://github.com/minvws/gfmodules-coordination-private/issues/1039
+    # Key material is never logged; only labels and version numbers. The four-eyes
+    # fields of PRS-KEY-002 (initiated_by, approved_by) are not defined: this
+    # service has no four-eyes flow yet.
+    KEY_GENERATED = LogEvent(  # PRS-KEY-001
+        "250400",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "sleuteltype",
+                "organisatie_oin",
+                "domein",
+                "secret_id",
+                "sleutel_versie",
+            ),
+            _SIEM: ("sleuteltype", "organisatie_oin"),
+        },
+    )
+    KEY_ROTATION_STARTED = LogEvent(  # PRS-KEY-002
+        "250401",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "sleuteltype",
+                "organisatie_oin",
+                "domein",
+                "oude_versie",
+                "nieuwe_versie",
+            ),
+            _SIEM: ("sleuteltype", "organisatie_oin", "oude_versie", "nieuwe_versie"),
+        },
+    )
+    KEY_GRACE_STARTED = LogEvent(  # PRS-KEY-003
+        "250402",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "sleuteltype",
+                "organisatie_oin",
+                "oude_versie",
+                "grace_start",
+                "grace_eind",
+            ),
+            _SIEM: ("sleuteltype", "organisatie_oin", "oude_versie"),
+        },
+    )
+    KEY_VERSION_DESTROYED = LogEvent(  # PRS-KEY-004
+        "250403",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: ("sleuteltype", "organisatie_oin", "vernietigde_versie"),
+            _SIEM: ("sleuteltype", "organisatie_oin", "vernietigde_versie"),
+        },
+    )
+    DECRYPT_PUBKEY_REGISTERED = LogEvent(  # PRS-KEY-005
+        "250404",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: ("organisatie_oin", "key_algoritme", "key_lengte", "key_versie"),
+            _SIEM: ("organisatie_oin", "key_algoritme"),
+        },
+    )
+    DECRYPT_PUBKEY_REJECTED = LogEvent(  # PRS-KEY-006
+        "250405",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: ("organisatie_oin", "key_algoritme", "rejection_reason"),
+            _SIEM: ("organisatie_oin", "key_algoritme", "rejection_reason"),
+        },
+    )
+    HSM_OPERATION_FAILED = LogEvent(  # PRS-KEY-007
+        "250406",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {
+            _APP: ("operation_type", "error_reason", "retry_attempt"),
+            _SIEM: ("operation_type", "error_reason"),
         },
     )
 

@@ -25,7 +25,11 @@ class HsmClient:
         self._config = config
         self._timeout = timeout
 
-    def post(self, path: str, payload: dict[str, Any]) -> Any:
+    def post(self, path: str, payload: dict[str, Any], operation: str) -> Any:
+        """
+        POST to the HSM API. ``operation`` names the HSM operation in the
+        PRS-KEY-007 event when the HSM refuses it.
+        """
         cfg = self._config
         url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}{path}"
         try:
@@ -49,35 +53,58 @@ class HsmClient:
                 fields={"error_reason": str(e)},
             )
             raise
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            # PRS-KEY-007: the HSM was reachable but refused the operation.
+            gflog.emit(
+                logger,
+                Log.HSM_OPERATION_FAILED,
+                "HSM operation failed",
+                fields={
+                    "operation_type": operation,
+                    "error_reason": f"http_{response.status_code}",
+                },
+                exc_info=e,
+            )
+            raise
         return response.json()
 
+    def _generate(self, path: str, payload: dict[str, Any], label: str) -> None:
+        data = self.post(path, payload, "keygen")
+        if "result" not in data:
+            gflog.emit(
+                logger,
+                Log.HSM_OPERATION_FAILED,
+                "HSM operation failed",
+                fields={
+                    "operation_type": "keygen",
+                    "error_reason": "no_result_in_response",
+                },
+            )
+            raise ValueError(f"could not generate key {label!r} in HSM")
+
     def label_exists(self, label: str, objtype: str = "SECRET_KEY") -> bool:
-        data = self.post("", {"label": label, "objtype": objtype})
+        data = self.post("", {"label": label, "objtype": objtype}, "lookup")
         return len(data["objects"] or []) > 0
 
     def generate_oprf_key(self, label: str) -> None:
-        data = self.post("/generate/oprf", {"label": label})
-        if "result" not in data:
-            raise ValueError(f"could not generate OPRF secret {label!r} in HSM")
+        self._generate("/generate/oprf", {"label": label}, label)
 
     def generate_aes_key(self, label: str) -> None:
-        data = self.post("/generate/aes", {"label": label})
-        if "result" not in data:
-            raise ValueError(f"could not generate AES key {label!r} in HSM")
+        self._generate("/generate/aes", {"label": label}, label)
 
     def generate_secret_key(self, label: str, bits: int = 256) -> None:
-        data = self.post("/generate/secret", {"label": label, "bits": bits})
-        if "result" not in data:
-            raise ValueError(f"could not generate secret key {label!r} in HSM")
+        self._generate("/generate/secret", {"label": label, "bits": bits}, label)
 
     def destroy(self, label: str) -> None:
-        self.post("/destroy", {"label": label})
+        self.post("/destroy", {"label": label}, "destroy")
 
     def oprf_evaluate(self, label: str, blinded: bytes) -> bytes:
         data = self.post(
             "/oprf/evaluate",
             {"label": label, "blinded_point": base64.b64encode(blinded).decode()},
+            "oprf_evaluate",
         )
         return base64.b64decode(data["result"])
 
@@ -90,6 +117,7 @@ class HsmClient:
                 "data": base64.b64encode(data).decode(),
                 "mechanism": mechanism,
             },
+            "hmac",
         )
         return base64.b64decode(result["result"]["data"])
 
@@ -104,6 +132,7 @@ class HsmClient:
                 "iv": base64.b64encode(iv).decode(),
                 "mechanism": "AES_CBC_PAD",
             },
+            "encrypt",
         )
         return base64.b64decode(result["result"]["data"])
 
@@ -116,5 +145,6 @@ class HsmClient:
                 "data": base64.b64encode(data).decode(),
                 "iv": base64.b64encode(iv).decode(),
             },
+            "decrypt",
         )
         return base64.b64decode(result["result"]["data"])

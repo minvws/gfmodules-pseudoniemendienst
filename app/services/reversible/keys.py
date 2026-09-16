@@ -1,14 +1,19 @@
 import hashlib
 import hmac
+import logging
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+import gfmodules.logging as gflog
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from app.logging.events import SLEUTELTYPE_REVERSIBLE_KEY, Log
 from app.models.oin import Oin
 from app.services.hsm.client import HsmClient
 from app.services.pseudonym_service import hkdf_derive
+
+logger = logging.getLogger(__name__)
 
 KeyKind = Literal["aes", "hmac"]
 
@@ -96,6 +101,18 @@ class HsmReversibleKeyOperations:
                 self._client.generate_aes_key(str(label))
             else:
                 self._client.generate_secret_key(str(label))
+            # PRS-KEY-001: reversible pseudonym keys are generated lazily on first use.
+            gflog.emit(
+                logger,
+                Log.KEY_GENERATED,
+                "reversible pseudonym key generated in HSM",
+                fields={
+                    "sleuteltype": SLEUTELTYPE_REVERSIBLE_KEY,
+                    "organisatie_oin": oin.value,
+                    "secret_id": str(label),
+                    "sleutel_versie": version,
+                },
+            )
 
     def hmac(self, oin: Oin, version: int, data: bytes) -> bytes:
         return self._client.hmac(str(ReversibleKeyLabel(oin, version, "hmac")), data)

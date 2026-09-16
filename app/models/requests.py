@@ -1,3 +1,4 @@
+from app.utils.datetime import now_utc
 import base64
 import logging
 from datetime import datetime, timezone
@@ -77,7 +78,7 @@ class HsmKeyVersionRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_temporal_window(self) -> "HsmKeyVersionRequest":
-        now = datetime.now(timezone.utc)
+        now = now_utc()
 
         if self.until_dt and self.until_dt <= now:
             raise ValueError("until_dt must be later than now")
@@ -129,7 +130,7 @@ class HsmKeyVersionUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_temporal_window(self) -> "HsmKeyVersionUpdateRequest":
-        if self.until_dt and self.until_dt <= datetime.now(timezone.utc):
+        if self.until_dt and self.until_dt <= now_utc():
             raise ValueError("until_dt must be later than now")
 
         return self

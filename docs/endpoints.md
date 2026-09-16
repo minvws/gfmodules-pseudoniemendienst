@@ -97,7 +97,7 @@ Update the end date for one key version.
 ## Exchange Services
 
 #### `POST /exchange/reversible-pseudonym`
-Exchange a personal ID for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:reversible-pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>` and its `keyVersion` claim the recipient's HSM key version the pseudonym was made with. The pseudonym is deterministic for the same personal ID, organization, scope and key version, is computed with keys held in the HSM (see [component-crypto.md](component-crypto.md)), and can only be reversed to the personal ID by the PRS. When the HSM cannot be reached the endpoint returns `503`.
+Exchange a personal ID for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>` and its `keyVersion` claim the recipient's HSM key version the pseudonym was made with. The pseudonym is deterministic for the same personal ID, organization, scope and key version, is computed with keys held in the HSM (see [component-crypto.md](component-crypto.md)), and can only be reversed to the personal ID by the PRS. When the HSM cannot be reached the endpoint returns `503`.
 
 ```json
 {
@@ -181,4 +181,4 @@ These routes are only mounted when `enable_saml_exchange_routes` is set
 #### `POST /saml-exchange/reversible-pseudonym`
 **Mock** of the [DigiD SAML exchange API](https://github.com/minvws/generiekefuncties-architectuur/blob/main/docs/prs/concepts/to/PRS-DOC-DRFT.md#digid-saml-exchange-api-prs-int-saml), available so the VAD/MGO can start integrating before the real implementation lands. It accepts any JSON body and forwards it to the internal [PRS-SAML service](https://github.com/minvws/gfmodules-prs-saml) (the SAML-ontvanger, configured via `saml_service.url`), which currently echoes it back unchanged; no SAML decryption or validation is performed and no pseudonym is derived. If the PRS-SAML service is unreachable the endpoint returns 502.
 
-Requires the `prs:saml-reversible-pseudonym` OAuth scope: the OIN-verifier proxy validates the token and forwards its scopes in the `x-gf-scope` header, and the endpoint rejects requests without this scope (403).
+Requires the `prs:saml-pseudonym` OAuth scope: the OIN-verifier proxy validates the token and forwards its scopes in the `x-gf-scope` header, and the endpoint rejects requests without this scope (403).
