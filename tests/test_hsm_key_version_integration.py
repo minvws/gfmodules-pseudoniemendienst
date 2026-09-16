@@ -30,7 +30,6 @@ from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.oprf.oprf_service import OprfService
-from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 SCOPE = "nvi"
 

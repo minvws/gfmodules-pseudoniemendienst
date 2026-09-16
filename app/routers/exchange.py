@@ -1,18 +1,6 @@
 import logging
 
-from fastapi import APIRouter, HTTPException
-
-from typing import Annotated, Any, Dict
-
-from fastapi import APIRouter, Depends, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-
-from app import container
-from app.models.auth.context import AuthContext
-from app.models.auth.data import AuthorizationScope
-from app.models.oin import Oin
+from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

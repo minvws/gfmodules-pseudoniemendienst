@@ -1,4 +1,3 @@
-from app.utils.datetime import now_utc
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from app.db.repositories.hsm_key_version_repository import HsmKeyVersionReposito
 from app.db.repositories.organization_repository import OrganizationRepository
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
+from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
 

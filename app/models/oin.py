@@ -46,7 +46,7 @@ class Oin:
             value = value.value
 
         if not isinstance(value, (int, str)):
-            raise ValueError(
+            raise ValueError(  # noqa: TRY004 This is not an actual typecheck, but a validation on the input
                 f"OIN must be a string or integer, got {type(value).__name__}"
             )
 
