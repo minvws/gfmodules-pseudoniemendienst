@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import and_, delete, select
+from sqlalchemy import delete, select
 
 from app.db.models.organization_public_key import OrganizationPublicKeyEntity
 from app.db.repositories.repository_base import RepositoryBase

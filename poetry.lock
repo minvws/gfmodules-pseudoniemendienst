@@ -100,18 +100,6 @@ files = [
 ]
 
 [[package]]
-name = "async-timeout"
-version = "5.0.1"
-description = "Timeout context manager for asyncio programs"
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
-    {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
-]
-
-[[package]]
 name = "ble-serial"
 version = "3.0.0"
 description = "Connects BLE adapters with virtual serial ports"
@@ -3069,4 +3057,4 @@ dev = ["pytest", "setuptools"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.14"
-content-hash = "b0fedc71a34f20770d196c37c723a3f476c12a12021d37450e95fe5e2b88c442"
+content-hash = "ea37d98db9bf47dcc09547240c7e6522d5de6e9f90ff4cf23b2ec32e4784b156"

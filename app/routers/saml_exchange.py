@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 import gfmodules.logging as gflog
 from fastapi import APIRouter, Body, Depends, Security
@@ -34,12 +34,17 @@ validated upstream by the OIN-verifier proxy, which forwards its scopes in the
 """,
 )
 def post_reversible_pseudonym(
-    payload: Any = Body(...),
-    auth: AuthContext = Security(
-        require_scopes,
-        scopes=[AuthorizationScope.SAML_PSEUDONYM.value],
-    ),
-    saml_client: SamlServiceClient = Depends(container.get_saml_service_client),
+    payload: Annotated[Any, Body(...)],
+    auth: Annotated[
+        AuthContext,
+        Security(
+            require_scopes,
+            scopes=[AuthorizationScope.SAML_PSEUDONYM.value],
+        ),
+    ],
+    saml_client: Annotated[
+        SamlServiceClient, Depends(container.get_saml_service_client)
+    ],
 ) -> JSONResponse:
     handelende_oin = str(auth.claims.client_organization_id)
 

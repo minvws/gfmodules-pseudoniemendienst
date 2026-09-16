@@ -21,7 +21,7 @@ fi
 OPRF_SECRET_KEY_PATH="${OPRF_SECRET_KEY_PATH:-secrets/oprf-server.key}"
 if [ ! -s $OPRF_SECRET_KEY_PATH ]; then
   echo "➡️ Generating OPRF secret key"
-  python app/generate-oprf-key.py >$OPRF_SECRET_KEY_PATH
+  python app/generate_oprf_key.py >$OPRF_SECRET_KEY_PATH
 else
   echo "⚠️ OPRF secret key already exists. Skipping."
 fi

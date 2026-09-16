@@ -1,4 +1,3 @@
-
 from sqlalchemy import and_, select
 
 from app.db.models.organization import OrganizationEntity

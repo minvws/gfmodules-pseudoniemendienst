@@ -1,6 +1,5 @@
-from typing import Annotated, Any, Self
 import logging
-from typing import Annotated, Any, Dict, Self
+from typing import Annotated, Any, Self
 
 from fastapi import Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator

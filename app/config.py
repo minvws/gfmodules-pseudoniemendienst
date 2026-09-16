@@ -178,7 +178,6 @@ def set_config(config: Config) -> None:
 
 def get_config(path: str | None = None) -> Config:
     global _CONFIG
-    global _PATH
 
     if _CONFIG is not None:
         return _CONFIG

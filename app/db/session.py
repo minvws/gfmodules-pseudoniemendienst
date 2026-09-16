@@ -1,5 +1,6 @@
 import logging
 import random
+import types
 from collections.abc import Callable
 from time import sleep
 from typing import Any, TypeVar
@@ -48,7 +49,12 @@ class DbSession:
         self.session = Session(self._engine, expire_on_commit=False)
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """
         Close the session when exiting the context manager
         """
@@ -57,8 +63,8 @@ class DbSession:
         self.session.close()
 
     def get_repository(
-        self, repository_class: type["repository_base.TRepositoryBase"]
-    ) -> "repository_base.TRepositoryBase":
+        self, repository_class: type["repository_base.TRepositoryBase_co"]
+    ) -> "repository_base.TRepositoryBase_co":
         """
         Returns an instantiated repository for the given model class
         """

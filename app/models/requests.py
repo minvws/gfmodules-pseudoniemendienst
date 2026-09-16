@@ -1,7 +1,7 @@
-from app.utils.datetime import now_utc
 import base64
+import binascii
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.oin import RecipientOrganizationOin
 from app.personal_id import PersonalId
 from app.rid import RidUsage
+from app.services.pseudonym_service import PseudonymType
+from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +156,7 @@ class BlindRequest(BaseModel):
             pad = "=" * ((4 - len(v) % 4) % 4)
             normalized = v + pad
             base64.urlsafe_b64decode(normalized)
-        except Exception as e:
+        except binascii.Error as e:
             raise ValueError(f"must be base64url: {e}")
 
         return normalized
