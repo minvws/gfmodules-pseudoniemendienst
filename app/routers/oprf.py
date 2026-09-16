@@ -40,7 +40,7 @@ def post_eval(
         AuthContext,
         Security(
             require_scopes,
-            scopes=[AuthorizationScope.SAML_PSEUDONYM.value],
+            scopes=[AuthorizationScope.OPRF_PSEUDONYM.value],
         ),
     ],
 ) -> JSONResponse:
