@@ -1,19 +1,13 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Security
 from jwcrypto.jwk import JWK
 from starlette.responses import JSONResponse
 
 from app import container
-from app.auth import get_auth_ctx
-from app.enums.personal_id_type import PersonalIdType
-from fastapi import APIRouter, Depends, Security
-from jwcrypto import jwk
-from starlette.responses import JSONResponse
-
-from app import container
 from app.auth import require_scopes
+from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
@@ -42,9 +36,13 @@ def post_eval(
     authorization_service: Annotated[
         AuthorizationService, Depends(container.get_authorization_service)
     ],
-    auth_ctx: AuthContext = Security(
-        require_scopes, scopes=[AuthorizationScope.OPRF_PSEUDONYM.value]
-    ),
+    auth_ctx: Annotated[
+        AuthContext,
+        Security(
+            require_scopes,
+            scopes=[AuthorizationScope.SAML_PSEUDONYM.value],
+        ),
+    ],
 ) -> JSONResponse:
     recipient_oin = req.recipientOrganization
     personal_id_type = PersonalIdType.OPRF

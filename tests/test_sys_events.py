@@ -15,9 +15,8 @@ from app import container
 from app.config import ConfigOprf, get_config
 from app.db.db import Database
 from app.db.models import OrganizationEntity
-from app.models.oin import RecipientOrganizationOin
 from app.models.auth.data import AuthorizationScope
-from app.models.oin import Oin, RecipientOrganizationOin
+from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService

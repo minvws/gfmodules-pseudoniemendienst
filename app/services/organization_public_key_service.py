@@ -1,4 +1,3 @@
-from app.utils.datetime import now_utc
 import json
 import logging
 import uuid
@@ -19,6 +18,7 @@ from app.db.repositories.organization_public_key_repository import (
 from app.db.repositories.organization_repository import OrganizationRepository
 from app.logging.events import Log
 from app.models.oin import Oin
+from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
 

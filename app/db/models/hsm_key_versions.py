@@ -13,13 +13,21 @@ class HsmKeyVersionEntity(Base):
     __tablename__ = "hsm_key_versions"
     __table_args__ = ({"schema": "prs"},)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     organization_id = Column(UUID, ForeignKey(OrganizationEntity.id))
     version: Mapped[int] = mapped_column("version", Integer, nullable=False)
     from_dt: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    until_dt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    organization: Mapped[OrganizationEntity] = Relationship(back_populates="hsm_key_versions")
+    until_dt: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    removed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    organization: Mapped[OrganizationEntity] = Relationship(
+        back_populates="hsm_key_versions"
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

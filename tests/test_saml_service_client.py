@@ -72,9 +72,7 @@ def test_client_requires_both_cert_and_key(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_client_raises_on_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        requests, "post", lambda url, **kwargs: _FakeResponse(500, {})
-    )
+    monkeypatch.setattr(requests, "post", lambda url, **kwargs: _FakeResponse(500, {}))
 
     with pytest.raises(SamlServiceError) as exc_info:
         SamlServiceClient(url="http://localhost:8504").decrypt({})

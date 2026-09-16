@@ -1,7 +1,6 @@
-from typing import Annotated
 import logging
+from typing import Annotated
 
-from fastapi import Depends, HTTPException
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
@@ -25,14 +24,14 @@ bearer_auth = HTTPBearer(
 
 def get_auth_ctx(
     request: Request,
-    auth_headers_service: AuthHeaderService = Depends(
-        container.get_auth_headers_service
-    ),
+    auth_headers_service: Annotated[
+        AuthHeaderService, Depends(container.get_auth_headers_service)
+    ],
 ) -> AuthContext:
     try:
         auth_headers = AuthHeaders.from_request(request)
-    except ValueError as e:
-        logger.exception(f"Invalid Authorization Headers in request: {e}")
+    except ValueError:
+        logger.exception("Invalid Authorization Headers in request")
         raise HTTPException(status_code=403, detail="Unauthorized request")
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)
@@ -63,7 +62,7 @@ def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
 def require_scopes(
     security_scopes: SecurityScopes,
     _credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_auth)],
-    ctx: AuthContext = Depends(get_auth_ctx),
+    ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
 ) -> AuthContext:
     for scope in security_scopes.scopes:
         assert_scope(ctx, AuthorizationScope(scope))

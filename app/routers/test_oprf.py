@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from jwcrypto import jwe, jwk
@@ -45,7 +46,7 @@ or as a string:
 )
 def post_test_eval(
     req: InputRequest,
-    oprf_service: OprfService = Depends(container.get_oprf_service),
+    oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
 
     res = oprf_service.blind_input(req.personalId.as_str())
@@ -72,7 +73,7 @@ and should be all on a single line.
 )
 def post_test_receiver(
     req: ReceiverRequest,
-    oprf_service: OprfService = Depends(container.get_oprf_service),
+    oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
 
     token = jwe.JWE()
@@ -91,7 +92,7 @@ def post_test_receiver(
         plain_data = json.loads(plaintext)
         subject = plain_data.get("subject", "").split(":")[-1]
         pseudonym = oprf_service.finalize(req.blind_factor, subject)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         plain_data = "Could not decrypt JWE: " + str(e)
 
     res = {
@@ -134,7 +135,7 @@ def post_test_jwe_decode(
         token.decrypt(priv_key)
         plaintext = token.payload.decode("utf-8")
         plain_data = json.loads(plaintext)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         plain_data = "Could not decrypt JWE: " + str(e)
 
     res = {

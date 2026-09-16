@@ -1,14 +1,14 @@
 from __future__ import annotations
-from app.utils.datetime import now_utc
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import INTEGER, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
 from app.enums.personal_id_type import PersonalIdType
+from app.utils.datetime import now_utc
 
 
 class PersonalIdTypeEntity(Base):

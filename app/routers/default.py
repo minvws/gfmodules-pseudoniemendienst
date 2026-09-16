@@ -30,7 +30,9 @@ def index() -> Response:
     try:
         with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
             data = json.load(file)
-            content += "\nVersion: {}\nCommit: {}".format(data["version"], data["git_ref"])
+            content += "\nVersion: {}\nCommit: {}".format(
+                data["version"], data["git_ref"]
+            )
     except (OSError, json.JSONDecodeError, KeyError) as e:
         content += "\nNo version information found"
         logger.info(f"version info could not be loaded: {e}")

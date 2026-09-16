@@ -12,4 +12,4 @@ class RepositoryBase:
         self.db_session = db_session
 
 
-TRepositoryBase = TypeVar("TRepositoryBase", bound=RepositoryBase, covariant=True)
+TRepositoryBase_co = TypeVar("TRepositoryBase_co", bound=RepositoryBase, covariant=True)
