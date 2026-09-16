@@ -21,7 +21,9 @@ class CertificateEntity(Base, WithTimestamps):
 
     domain: Mapped[str] = mapped_column(String)
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("admin.organizations.id")
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

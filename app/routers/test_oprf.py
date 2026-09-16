@@ -91,7 +91,7 @@ def post_test_receiver(
         plain_data = json.loads(plaintext)
         subject = plain_data.get("subject", "").split(":")[-1]
         pseudonym = oprf_service.finalize(req.blind_factor, subject)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - test endpoint reports any decode failure as-is
         plain_data = "Could not decrypt JWE: " + str(e)
 
     res = {
@@ -134,7 +134,7 @@ def post_test_jwe_decode(
         token.decrypt(priv_key)
         plaintext = token.payload.decode("utf-8")
         plain_data = json.loads(plaintext)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - test endpoint reports any decode failure as-is
         plain_data = "Could not decrypt JWE: " + str(e)
 
     res = {

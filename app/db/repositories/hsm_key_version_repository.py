@@ -1,15 +1,14 @@
-from app.utils.datetime import now_utc
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import and_, func, insert, literal, or_, select, update
+from sqlalchemy import and_, func, insert, or_, select, update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.repositories.repository_base import RepositoryBase
-from app.models.oin import Oin
+from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
 

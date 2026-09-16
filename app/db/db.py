@@ -66,7 +66,7 @@ class Database:
             with Session(self.engine) as session:
                 session.execute(text("SELECT 1"))
             return None
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - any DB failure must be reported as unhealthy
             logger.info("database is not healthy: %s", e)
             return str(e)
 

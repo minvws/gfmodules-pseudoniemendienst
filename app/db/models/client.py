@@ -23,11 +23,15 @@ class ClientEntity(Base, WithUUID, WithTimestamps):
     __tablename__ = "clients"
     __table_args__ = ({"schema": "admin"},)
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("admin.organizations.id")
+    )
 
     organization: Mapped[OrganizationEntity] = Relationship(back_populates="clients")
 
-    certificates: Mapped[list[CertificateEntity]] = Relationship(secondary=client_certificates)
+    certificates: Mapped[list[CertificateEntity]] = Relationship(
+        secondary=client_certificates
+    )
 
     request_personal_id_types: Mapped[list[ClientPersonalIdTypeEntity]] = relationship(
         back_populates="client", cascade="all, delete-orphan"
@@ -39,5 +43,7 @@ class ClientEntity(Base, WithUUID, WithTimestamps):
             **WithTimestamps.to_dict(self),
             "organization_id": self.organization_id,
             "certificates": [c.id for c in self.certificates],
-            "request_personal_id_types": [ra.personal_id_type.name for ra in self.request_personal_id_types],
+            "request_personal_id_types": [
+                ra.personal_id_type.name for ra in self.request_personal_id_types
+            ],
         }

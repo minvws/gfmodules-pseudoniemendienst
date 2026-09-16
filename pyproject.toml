@@ -58,6 +58,9 @@ include = [
     "tests/*.py",
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Security", "fastapi.Body"]
+
 [tool.mypy]
 files = "app,tests"
 python_version = "3.14"

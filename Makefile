@@ -51,7 +51,7 @@ check: lint type-check safety-check spelling-check test ## Runs all checks
 fix: lint-fix spelling-fix ## Runs all fixers
 
 generate-oprf-key: ## Generate OPRF key
-	$(RUN_PREFIX) python app/generate-oprf-key.py
+	$(RUN_PREFIX) python app/generate_oprf_key.py
 
 cleanup: ## Remove expired HSM key versions (run periodically via cron)
 	$(RUN_PREFIX) python -m app.cleanup

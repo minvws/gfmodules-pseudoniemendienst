@@ -1,7 +1,6 @@
-from typing import Annotated
 import logging
+from typing import Annotated
 
-from fastapi import Depends, HTTPException
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
@@ -31,8 +30,8 @@ def get_auth_ctx(
 ) -> AuthContext:
     try:
         auth_headers = AuthHeaders.from_request(request)
-    except ValueError as e:
-        logger.exception(f"Invalid Authorization Headers in request: {e}")
+    except ValueError:
+        logger.exception("Invalid Authorization Headers in request")
         raise HTTPException(status_code=403, detail="Unauthorized request")
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)

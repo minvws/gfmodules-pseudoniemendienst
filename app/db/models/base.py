@@ -1,6 +1,5 @@
-from app.utils.datetime import now_utc
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -13,6 +12,8 @@ from sqlalchemy import (
     Table,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from app.utils.datetime import now_utc
 
 
 class Base(DeclarativeBase):
