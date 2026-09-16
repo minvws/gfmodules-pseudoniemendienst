@@ -14,7 +14,7 @@ from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import ReversiblePseudonymExchangeRequest
 from app.personal_id import PersonalId
-from app.services.authorization_service import AuthorizationService
+from app.services.authorization_service import AuthorizationService, MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.service import (
@@ -63,8 +63,8 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
         404: {
             "description": (
                 "The recipient organization is unknown, is not allowed to receive "
-                "reversible pseudonyms, or has no public key registered for the "
-                "scope."
+                "reversible pseudonyms, has no public key registered for the "
+                "scope, or has no active HSM key version."
             )
         },
         500: {"description": "Service temporarily unavailable."},
@@ -178,6 +178,13 @@ def exchange_reversible_pseudonym(
                 "endpoint": _ENDPOINT,
             },
         )
+        if e.error_type == "no_active_key_version":
+            # Must be the same message as for when we don't find the server, so we cannot
+            # differentiate between the two cases and leak information about the recipient organization.
+            raise HTTPException(
+                status_code=404,
+                detail=MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION,
+            )
         status = 503 if e.error_type == "hsm_unreachable" else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 

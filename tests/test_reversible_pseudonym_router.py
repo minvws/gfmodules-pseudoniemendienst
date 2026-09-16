@@ -66,6 +66,7 @@ def make_organization(
         oin: Oin,
         request: list[PersonalIdType] | None = None,
         receive: list[PersonalIdType] | None = None,
+        active_key_version: bool = True,
     ) -> OrganizationEntity:
         org = OrganizationEntity(
             external_id=oin,
@@ -76,9 +77,11 @@ def make_organization(
             receive_personal_id_types=list(
                 personal_id_type_repository.get_many(receive or [])
             ),
-            hsm_key_versions=[
-                HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-            ],
+            hsm_key_versions=(
+                [HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))]
+                if active_key_version
+                else []
+            ),
         )
         db_session.add(org)
         db_session.commit()
@@ -105,10 +108,13 @@ def make_recipient(
         receive: list[PersonalIdType] | None = None,
         with_key: bool = True,
         domains: list[str] | None = None,
+        active_key_version: bool = True,
     ) -> str:
         if receive is None:
             receive = [PersonalIdType.REVERSIBLE_PSEUDONYM]
-        org = make_organization(RECIPIENT_OIN, receive=receive)
+        org = make_organization(
+            RECIPIENT_OIN, receive=receive, active_key_version=active_key_version
+        )
         if not with_key:
             return ""
         return setup_org_and_key(
@@ -297,6 +303,30 @@ def test_recipient_without_public_key_for_scope_is_not_found(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Organization domain is not registered"}
+
+
+def test_recipient_without_active_key_version_is_not_found(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    sender: None,
+    make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
+) -> None:
+    make_recipient(active_key_version=False)
+    records = record_logs(LOGGER)
+
+    response = client.post(ENDPOINT, json=BODY, headers=valid_headers)
+
+    # Same answer as for an unknown recipient: the caller must not be able to
+    # tell the recipient's key rotation state apart from its non-existence.
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Unable to find requested recipient organization"
+    }
+    failed = _events(records, "220403")
+    assert len(failed) == 1
+    assert failed[0].error_type == "no_active_key_version"  # type: ignore[attr-defined]
+    assert _events(records, "220400") == []
 
 
 @pytest.mark.parametrize(

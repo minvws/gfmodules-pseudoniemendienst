@@ -114,7 +114,7 @@ Before the personal ID is processed, two administrator-managed authorizations ar
 - the calling organization (the verified `x-gf-sub` identity) must be allowed to *request* the `reversible_pseudonym` personal ID type;
 - the recipient organization must be allowed to *receive* the `reversible_pseudonym` personal ID type, since the pseudonym can be reversed to the personal ID by the PRS.
 
-Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing, `401` when the caller is unknown or not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, or has no public key for the scope, `400` when `personalId` is malformed.
+Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing, `401` when the caller is unknown or not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed.
 
 Irreversible pseudonyms are not exchanged through this section: use `POST /oprf/eval`.
 
