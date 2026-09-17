@@ -27,6 +27,7 @@ from app.routers.default import router as default_router
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
 from app.routers.oprf import router as oprf_router
+from app.routers.reversible_pseudonym import router as reversible_pseudonym_router
 from app.routers.saml_exchange import router as saml_exchange_router
 from app.routers.test_oprf import router as test_oprf_router
 
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 API_DESCRIPTION = """
 The Pseudoniemendienst (PRS) lets parties exchange data about a person without
-sharing their BSN. Instead of a BSN, parties exchange **RIDs** and **pseudonyms**
+sharing their BSN. Instead of a BSN, parties exchange **reversible pseudonyms** and **pseudonyms**
 that are scoped to a recipient organization and scope.
 
 A recipient organization is always identified by a OIN in the form
@@ -95,7 +96,7 @@ TAGS_METADATA = [
     {
         "name": "Key Registration Services",
         "description": (
-            "Register and manage the public keys that pseudonyms and RIDs are "
+            "Register and manage the public keys that pseudonyms and reversible pseudonyms are "
             "encrypted to. The organization and its public key are derived from the "
             "mTLS client certificate, so they are not part of the request body."
         ),
@@ -125,10 +126,12 @@ EXCHANGE_TAGS_METADATA = [
     {
         "name": "Exchange Services",
         "description": (
-            "Exchange a personal ID for a pseudonym or RID targeted at a recipient "
-            "organization/scope, and redeem a previously issued RID for a pseudonym "
-            "(or the BSN, when permitted by both the RID usage and the "
-            "organization's `max_key_usage`)."
+            "Exchange a personal ID for a reversible pseudonym or reversible pseudonyms targeted at a "
+            "recipient organization/scope, and redeem a previously issued reversible pseudonyms for a "
+            "pseudonym (or the BSN, when permitted by both the reversible pseudonyms usage and the "
+            "organization's `max_key_usage`). Exchanges that involve a personal ID "
+            "require both the calling and the recipient organization to be "
+            "authorized for that personal ID type by a PRS administrator."
         ),
     },
 ]
@@ -310,6 +313,7 @@ def setup_fastapi() -> FastAPI:
     ]
     if config.app.enable_exchange_services_routes:
         routers.append(exchange_router)
+        routers.append(reversible_pseudonym_router)
     if config.app.enable_saml_exchange_routes:
         routers.append(saml_exchange_router)
     if config.app.enable_test_routes:
