@@ -304,11 +304,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
         logger,
         Log.SYS_UNHANDLED_EXCEPTION,
         "Unhandled exception",
-        fields={
-            "exception_type": type(exc).__name__,
-            "endpoint": request.url.path,
-            "method": request.method,
-        },
+        fields={"exception_type": type(exc).__name__},
         exc_info=exc,
     )
     return JSONResponse(status_code=500, content={"error": "Internal server error"})

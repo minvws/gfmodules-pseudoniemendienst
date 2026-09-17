@@ -39,7 +39,6 @@ class Log(_Base):
                 "namens_oin",
                 "doel_oin",
                 "error_type",
-                "endpoint",
             ),
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
         },
@@ -49,7 +48,7 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "namens_oin", "doel_oin", "endpoint"),
+            _APP: ("handelende_oin", "namens_oin", "doel_oin"),
             _SIEM: ("handelende_oin", "doel_oin"),
         },
     )
@@ -85,7 +84,6 @@ class Log(_Base):
                 "namens_oin",
                 "doel_oin",
                 "error_type",
-                "endpoint",
             ),
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
         },
