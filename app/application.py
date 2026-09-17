@@ -9,7 +9,6 @@ from typing import Any
 import gfmodules.logging as gflog
 import uvicorn
 from fastapi import Depends, FastAPI, Request, Security
-from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 from gfmodules.logging.middleware import (
@@ -49,15 +48,74 @@ are derived from the client certificate.
 SCOPES_EXTENSION = "x-authorization-scopes"
 
 
-def install_scope_catalogue(fastapi: FastAPI) -> None:
+GF_HEADER_SECURITY_SCHEMES: dict[str, dict[str, str]] = {
+    "AudienceHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-gf-audience",
+        "description": "The accepted audience, e.g.: `https://localhost:6502`",
+    },
+    "SubjectHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-gf-sub",
+        "description": "The organization name (should be an OIN), e.g.: `00000003123456780000`",
+    },
+    "ActorCnHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-gf-act-cn",
+        "description": "The client's (actor) CN, e.g.: `www.example.com`",
+    },
+    "ActorSubjectHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-gf-act-sub",
+        "description": "The client's (actor) subject (should be an OIN), e.g.: `00000003123456780000`",
+    },
+}
+
+BEARER_SECURITY_SCHEME: dict[str, dict[str, str]] = {
+    "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",  # Optional, helps UI display context
+    }
+}
+
+
+def install_openapi_extensions(fastapi: FastAPI, document_gf_headers: bool) -> None:
+    """
+    Extend the generated OpenAPI schema with the authorization scope catalogue
+    and the security schemes. Wraps FastAPI's own schema builder so the title,
+    description, tags and root path configured on the app are preserved.
+    """
     build_schema = fastapi.openapi
 
     def openapi() -> dict[str, Any]:
+        if fastapi.openapi_schema:
+            return fastapi.openapi_schema
+
         schema = build_schema()
-        scope_extension = {
+
+        schema[SCOPES_EXTENSION] = {
             scope.value: SCOPE_DESCRIPTIONS[scope] for scope in AuthorizationScope
         }
-        schema[SCOPES_EXTENSION] = scope_extension
+
+        security_schemes = schema.setdefault("components", {}).setdefault(
+            "securitySchemes", {}
+        )
+        security_schemes.update(
+            GF_HEADER_SECURITY_SCHEMES
+            if document_gf_headers
+            else BEARER_SECURITY_SCHEME
+        )
+
+        # Apply the security schemes globally in the schema (UI only) so the
+        # "lock" icon appears on all endpoints, WITHOUT enforcing it in the code.
+        schema["security"] = [{name: [] for name in security_schemes}]
+
+        fastapi.openapi_schema = schema
         return schema
 
     fastapi.openapi = openapi  # type: ignore[method-assign]
@@ -288,7 +346,6 @@ def setup_fastapi() -> FastAPI:
         if config.uvicorn.swagger_enabled
         else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     )
-    install_scope_catalogue(fastapi)
 
     fastapi.add_middleware(
         RequestContextMiddleware,
@@ -334,76 +391,5 @@ def setup_fastapi() -> FastAPI:
                 ),
             ],
         )
-    set_authorization_headers_openapi(fastapi, config.uvicorn.document_gf_headers)
+    install_openapi_extensions(fastapi, config.uvicorn.document_gf_headers)
     return fastapi
-
-
-def set_authorization_headers_openapi(
-    fastapi: FastAPI, document_gf_headers: bool
-) -> None:
-    def custom_openapi() -> dict[str, Any] | None:
-        if fastapi.openapi_schema:
-            return fastapi.openapi_schema
-
-        openapi_schema = get_openapi(
-            title=fastapi.title,
-            version=fastapi.version,
-            routes=fastapi.routes,
-        )
-
-        security_schemes = openapi_schema["components"].get("securitySchemes", {})
-        if document_gf_headers:
-            security_schemes.update(
-                {
-                    "AudienceHeader": {
-                        "type": "apiKey",
-                        "in": "header",
-                        "name": "x-gf-audience",
-                        "description": "The accepted audience, e.g.: `https://localhost:6502`",
-                    },
-                    "SubjectHeader": {
-                        "type": "apiKey",
-                        "in": "header",
-                        "name": "x-gf-sub",
-                        "description": "The organization name (should be an OIN), e.g.: `00000003123456780000`",
-                    },
-                    "ActorCnHeader": {
-                        "type": "apiKey",
-                        "in": "header",
-                        "name": "x-gf-act-cn",
-                        "description": "The client's (actor) CN, e.g.: `www.example.com`",
-                    },
-                    "ActorSubjectHeader": {
-                        "type": "apiKey",
-                        "in": "header",
-                        "name": "x-gf-act-sub",
-                        "description": "The client's (actor) subject (should be an OIN), e.g.: `00000003123456780000`",
-                    },
-                }
-            )
-        else:
-            security_schemes.update(
-                {
-                    "BearerAuth": {
-                        "type": "http",
-                        "scheme": "bearer",
-                        "bearerFormat": "JWT",  # Optional, helps UI display context
-                    }
-                }
-            )
-
-        # Add the security scheme definition
-        openapi_schema["components"]["securitySchemes"] = security_schemes
-
-        # Optional: Apply security globally in the schema (UI only)
-        # so the "lock" icon appears on all endpoints,
-        # but WITHOUT enforcing it in the code.
-        security: dict[str, list[Any]] = {}
-        for name in security_schemes:
-            security[name] = []
-        openapi_schema["security"] = [security]
-
-        fastapi.openapi_schema = openapi_schema
-        return fastapi.openapi_schema
-
-    fastapi.openapi = custom_openapi  # type: ignore[method-assign, assignment]
