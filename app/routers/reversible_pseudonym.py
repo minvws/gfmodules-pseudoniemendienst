@@ -14,7 +14,10 @@ from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import ReversiblePseudonymExchangeRequest
 from app.personal_id import PersonalId
-from app.services.authorization_service import AuthorizationService, MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION
+from app.services.authorization_service import (
+    MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION,
+    AuthorizationService,
+)
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.service import (

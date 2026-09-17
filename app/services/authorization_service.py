@@ -9,7 +9,9 @@ from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 
-MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION: str = "Unable to find requested recipient organization"
+MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION: str = (
+    "Unable to find requested recipient organization"
+)
 
 
 class AuthorizationService:
