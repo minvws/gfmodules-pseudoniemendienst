@@ -7,3 +7,4 @@ coverage.xml
 sonar-project.properties
 LICENSES/
 app.test.conf
+version.json
