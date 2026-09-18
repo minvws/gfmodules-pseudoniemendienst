@@ -19,4 +19,4 @@ class PersonalIdTypeRepository(RepositoryBase):
         stmt = select(PersonalIdTypeEntity)
         if conditions:
             stmt = stmt.where(and_(*conditions))
-        return self.db_session.session.execute(stmt).scalars().all()
+        return self.db_session.execute(stmt).scalars().all()

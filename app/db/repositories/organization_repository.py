@@ -17,4 +17,4 @@ class OrganizationRepository(RepositoryBase):
                 OrganizationEntity.deleted_at.is_(None),
             )
         )
-        return self.db_session.session.execute(stmt).scalar()
+        return self.db_session.execute(stmt).scalar()
