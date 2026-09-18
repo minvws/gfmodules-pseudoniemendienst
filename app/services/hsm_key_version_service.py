@@ -142,25 +142,36 @@ class HsmKeyVersionService:
             )
             if not org:
                 raise HTTPException(status_code=401, detail="unauthorized")
-            current_version = org.hsm_key_versions[-1].version
+            # The relationship is ordered by version, so the last entry (if
+            # any) holds the highest version number.
+            current = org.hsm_key_versions[-1] if org.hsm_key_versions else None
             hsm_key_version = HsmKeyVersionEntity(
-                version=current_version + 1,
+                version=current.version + 1 if current else 1,
                 from_dt=from_dt,
                 until_dt=until_dt,
             )
             org.hsm_key_versions.append(hsm_key_version)
             session.flush()
-            gflog.emit(
-                logger,
-                Log.KEY_ROTATION_STARTED,
-                "HSM key version rotation started",
-                fields={
-                    "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
-                    "organisatie_oin": organization_external_id.value,
-                    "oude_versie": current_version,
-                    "nieuwe_versie": hsm_key_version.version,
-                },
-            )
+            if current is None:
+                # First version for this organization: nothing is rotated, and
+                # the OPRF secret itself is generated lazily on first use
+                # (PRS-KEY-001).
+                logger.info(
+                    "created initial hsm key version for organization %s",
+                    organization_external_id.value,
+                )
+            else:
+                gflog.emit(
+                    logger,
+                    Log.KEY_ROTATION_STARTED,
+                    "HSM key version rotation started",
+                    fields={
+                        "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                        "organisatie_oin": organization_external_id.value,
+                        "oude_versie": current.version,
+                        "nieuwe_versie": hsm_key_version.version,
+                    },
+                )
             return hsm_key_version
 
     def update_version_by_organization_id(
