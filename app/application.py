@@ -273,20 +273,19 @@ def setup_fastapi() -> FastAPI:
     if config.app.enable_test_routes:
         openapi_tags += TEST_TAGS_METADATA
 
-    fastapi = (
-        FastAPI(
-            docs_url=config.uvicorn.docs_url,
-            redoc_url=config.uvicorn.redoc_url,
-            title="Pseudoniemendienst API",
-            summary="API for the Pseudoniemendienst",
-            description=API_DESCRIPTION,
-            openapi_tags=openapi_tags,
-            root_path=config.uvicorn.root_path,
-            lifespan=_lifespan,
-            dependencies=gf_header_params(config.uvicorn.document_gf_headers),
-        )
-        if config.uvicorn.swagger_enabled
-        else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
+    # Swagger only toggles the documentation UI; the app metadata, root path
+    # and header documentation apply regardless.
+    swagger = config.uvicorn.swagger_enabled
+    fastapi = FastAPI(
+        docs_url=config.uvicorn.docs_url if swagger else None,
+        redoc_url=config.uvicorn.redoc_url if swagger else None,
+        title="Pseudoniemendienst API",
+        summary="API for the Pseudoniemendienst",
+        description=API_DESCRIPTION,
+        openapi_tags=openapi_tags,
+        root_path=config.uvicorn.root_path,
+        lifespan=_lifespan,
+        dependencies=gf_header_params(config.uvicorn.document_gf_headers),
     )
     install_scope_catalogue(fastapi)
 
