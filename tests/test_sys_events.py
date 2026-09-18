@@ -8,6 +8,7 @@ import pytest
 import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from gfmodules.logging.testing import capture_records
 from jwcrypto import jwk
 from sqlalchemy.exc import DatabaseError, OperationalError
 
@@ -15,6 +16,7 @@ from app import container
 from app.config import ConfigOprf, get_config
 from app.db.db import Database
 from app.db.models import OrganizationEntity
+from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
@@ -68,12 +70,9 @@ def test_lifespan_shutdown_emits_sys_app_stopped(
 
 
 def test_unhandled_exception_emits_sys_event_and_returns_500(
-    record_logs: RecordLogs,
     app: FastAPI,
     persisted_organization: OrganizationEntity,
 ) -> None:
-    records = record_logs("app.application")
-
     class ExplodingOrgService:
         def get_by_org_and_domain(self, oin: object, domain: object) -> None:
             raise RuntimeError("boom")
@@ -83,22 +82,23 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
     )
     client = TestClient(app, raise_server_exceptions=False)
     try:
-        response = client.post(
-            "/oprf/eval",
-            json={
-                "encryptedPersonalId": "Zm9v",
-                "recipientOrganization": "oin:"
-                + persisted_organization.external_id.value,
-                "recipientScope": "nvi",
-            },
-            headers={
-                "x-gf-sub": persisted_organization.external_id.value,
-                "x-gf-act-sub": persisted_organization.external_id.value,
-                "x-gf-act-cn": persisted_organization.external_id.value,
-                "x-gf-audience": "prs.service",
-                "x-gf-scope": AuthorizationScope.OPRF_PSEUDONYM.value,
-            },
-        )
+        with capture_records("app.application") as captured:
+            response = client.post(
+                "/oprf/eval",
+                json={
+                    "encryptedPersonalId": "Zm9v",
+                    "recipientOrganization": "oin:"
+                    + persisted_organization.external_id.value,
+                    "recipientScope": "nvi",
+                },
+                headers={
+                    "x-gf-sub": persisted_organization.external_id.value,
+                    "x-gf-act-sub": persisted_organization.external_id.value,
+                    "x-gf-act-cn": persisted_organization.external_id.value,
+                    "x-gf-audience": "prs.service",
+                    "x-gf-scope": AuthorizationScope.OPRF_PSEUDONYM.value,
+                },
+            )
     finally:
         app.dependency_overrides.pop(
             container.get_organization_public_key_service, None
@@ -106,13 +106,13 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
 
     assert response.status_code == 500
     assert response.json() == {"error": "Internal server error"}
-    events = _events(records, "270404")
+    events = captured.for_event(Log.SYS_UNHANDLED_EXCEPTION)
     assert len(events) == 1
-    record = events[0]
-    assert record.levelno == logging.ERROR
-    assert record.exception_type == "RuntimeError"  # type: ignore[attr-defined]
-    assert record.endpoint == "/oprf/eval"  # type: ignore[attr-defined]
-    assert record.method == "POST"  # type: ignore[attr-defined]
+    entry = events[0]
+    assert entry.record.levelno == logging.ERROR
+    assert entry.message["exception_type"] == "RuntimeError"
+    assert entry.message["endpoint"] == "/oprf/eval"
+    assert entry.message["method"] == "POST"
 
 
 def test_db_retry_emits_connection_events(

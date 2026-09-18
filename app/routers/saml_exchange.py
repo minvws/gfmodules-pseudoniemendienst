@@ -58,7 +58,6 @@ def post_reversible_pseudonym(
             fields={
                 "handelende_oin": handelende_oin,
                 "error_type": e.error_type,
-                "endpoint": _ENDPOINT,
             },
         )
         return JSONResponse({"error": "SAML exchange failed"}, status_code=502)

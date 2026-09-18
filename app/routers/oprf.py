@@ -76,7 +76,7 @@ def post_eval(
             logger,
             Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
             f"OPRF refused: {e.detail}",
-            fields={**audit_oins, "endpoint": _ENDPOINT},
+            fields=audit_oins,
         )
         raise
 
@@ -91,7 +91,6 @@ def post_eval(
             fields={
                 **audit_oins,
                 "error_type": getattr(e, "error_type", "crypto_evaluation_failure"),
-                "endpoint": _ENDPOINT,
             },
         )
         raise HTTPException(status_code=400, detail="Unable to evaluate blind") from e

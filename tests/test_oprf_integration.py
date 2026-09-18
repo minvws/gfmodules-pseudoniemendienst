@@ -11,11 +11,13 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import FastAPI
 from gfmodules.logging import LoggingStreams
+from gfmodules.logging.testing import capture_records
 from jwcrypto import jwe, jwk
 from starlette.testclient import TestClient
 
 from app import container
 from app.db.models import OrganizationEntity
+from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.oprf.oprf_service import OprfEvaluationError
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -285,29 +287,29 @@ def test_oprf_eval_success_emits_audit_event(
 def test_oprf_eval_unknown_scope_emits_refused_event(
     client: TestClient,
     oprf_context: OprfIntegrationContext,
-    oprf_event_records: list[logging.LogRecord],
     valid_headers: dict[str, str],
     valid_client_organization_id: Oin,
 ) -> None:
-    response = client.post(
-        "/oprf/eval",
-        json={
-            "encryptedPersonalId": "Zm9v",
-            "recipientOrganization": oprf_context.recipient_organization,
-            "recipientScope": "invalid-scope",
-        },
-        headers=valid_headers,
-    )
+    with capture_records("app.routers.oprf") as captured:
+        response = client.post(
+            "/oprf/eval",
+            json={
+                "encryptedPersonalId": "Zm9v",
+                "recipientOrganization": oprf_context.recipient_organization,
+                "recipientScope": "invalid-scope",
+            },
+            headers=valid_headers,
+        )
 
     assert response.status_code == 404
-    events = _events(oprf_event_records, "210403")
+    events = captured.for_event(Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY)
     assert len(events) == 1
-    record = events[0]
-    assert record.levelno == logging.WARNING
-    assert record.handelende_oin == valid_client_organization_id.value  # type: ignore[attr-defined]
-    assert record.doel_oin == oprf_context.recipient_organization  # type: ignore[attr-defined]
-    assert record.endpoint == "/oprf/eval"  # type: ignore[attr-defined]
-    assert not _events(oprf_event_records, "210400")
+    entry = events[0]
+    assert entry.record.levelno == logging.WARNING
+    assert entry.message["handelende_oin"] == valid_client_organization_id.value
+    assert entry.message["doel_oin"] == oprf_context.recipient_organization
+    assert entry.message["endpoint"] == "/oprf/eval"
+    assert not captured.for_event(Log.OPRF_EVAL_OK)
 
 
 def test_oprf_eval_unknown_recipient_emits_refused_event(
