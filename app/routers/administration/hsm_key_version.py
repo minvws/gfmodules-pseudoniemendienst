@@ -10,10 +10,7 @@ from app import container
 from app.auth import get_auth_ctx
 from app.models.auth.context import AuthContext
 from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
-from app.services.hsm_key_version_service import (
-    HsmKeyVersionNotFoundError,
-    HsmKeyVersionService,
-)
+from app.services.hsm_key_version_service import HsmKeyVersionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -89,13 +86,6 @@ def put_key_version(
         )
     except HTTPException:
         raise
-    except HsmKeyVersionNotFoundError:
-        logger.warning(
-            "key version %s not found for organization %s",
-            id,
-            auth_ctx.claims.organization_id,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
     except Exception:
         logger.exception("failed to update key version %s", id)
         raise HTTPException(status_code=500, detail="failed to update key version")

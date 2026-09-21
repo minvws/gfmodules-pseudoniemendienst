@@ -17,28 +17,6 @@ from app.utils.datetime import now_utc
 logger = logging.getLogger(__name__)
 
 
-class HsmKeyVersionNotFoundError(ValueError):
-    """Raised when the key version does not exist, is already removed, or mismatches."""
-
-    def __init__(self, version_id: uuid.UUID, organization_id: uuid.UUID):
-        super().__init__(
-            f"key version {version_id} for organization {organization_id} not found"
-        )
-        self.version_id = version_id
-        self.organization_id = organization_id
-
-
-class HsmKeyVersionCreateConflictError(ValueError):
-    """Raised when creating a key version conflicts with an existing row."""
-
-    def __init__(self, organization_id: uuid.UUID):
-        super().__init__(
-            f"hsm key version creation for organization_id {organization_id} conflicts "
-            "with existing version"
-        )
-        self.organization_id = organization_id
-
-
 class HsmKeyVersionService:
     """Manages HSM key versions in the local database."""
 
