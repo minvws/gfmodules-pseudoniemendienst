@@ -68,7 +68,7 @@ def test_create_with_explicit_window(
     assert body["until_dt"] == until_dt.isoformat()
 
 
-def test_create_unknown_org_is_unauthorized(
+def test_create_unknown_org_is_forbidden(
     client: TestClient,
     database: Database,
     valid_headers: dict[str, str],
@@ -78,8 +78,8 @@ def test_create_unknown_org_is_unauthorized(
         headers=valid_headers,
     )
 
-    assert response.status_code == 401
-    assert response.json() == {"detail": "unauthorized"}
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Organization does not exist"}
 
 
 def test_update_rejects_unknown_fields(
@@ -172,7 +172,7 @@ def test_update_clears_until_dt(
     assert body["removed_at"] is None
 
 
-def test_update_removed_version_is_unauthorized(
+def test_update_removed_version_is_conflict(
     client: TestClient,
     database: Database,
     persisted_organization: OrganizationEntity,
@@ -193,8 +193,8 @@ def test_update_removed_version_is_unauthorized(
         headers=valid_headers,
     )
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
+    assert response.status_code == 409
+    assert response.json() == {"detail": "KeyVersion has been removed"}
 
 
 def test_update_unknown_version_is_unauthorized(

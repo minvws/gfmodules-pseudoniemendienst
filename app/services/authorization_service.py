@@ -9,6 +9,8 @@ from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 
+MESSAGE_ORG_NOT_EXIST = "Organization does not exist"
+
 
 class AuthorizationService:
     def __init__(self, db: Database):
@@ -21,7 +23,7 @@ class AuthorizationService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_id)
             if not org:
-                raise HTTPException(401, "Organization not found")
+                raise HTTPException(403, MESSAGE_ORG_NOT_EXIST)
             if not personal_id_type in [
                 rpit.name for rpit in org.request_personal_id_types
             ]:

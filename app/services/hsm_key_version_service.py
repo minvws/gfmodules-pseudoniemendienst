@@ -12,6 +12,7 @@ from app.db.repositories.hsm_key_version_repository import HsmKeyVersionReposito
 from app.db.repositories.organization_repository import OrganizationRepository
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
+from app.services.authorization_service import MESSAGE_ORG_NOT_EXIST
 from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
@@ -104,9 +105,7 @@ class HsmKeyVersionService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_external_id)
             if org is None:
-                raise HTTPException(
-                    status_code=405, detail="Organization does not exist"
-                )
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             versions = [v.version for v in org.hsm_key_versions if _is_active(v, now)]
             return versions
 
@@ -141,7 +140,7 @@ class HsmKeyVersionService:
                 organization_external_id
             )
             if not org:
-                raise HTTPException(status_code=401, detail="unauthorized")
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             current_version = org.hsm_key_versions[-1].version
             hsm_key_version = HsmKeyVersionEntity(
                 version=current_version + 1,
@@ -179,13 +178,13 @@ class HsmKeyVersionService:
                 organization_external_id
             )
             if not org:
-                raise HTTPException(status_code=404, detail="Organization not found")
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             versions = [hkv for hkv in org.hsm_key_versions if hkv.id == version_id]
             if len(versions) != 1:
                 raise HTTPException(status_code=404, detail="KeyVersion not found")
             version = versions[0]
             if version.removed_at is not None:
-                raise HTTPException(403, "forbidden")
+                raise HTTPException(409, "KeyVersion has been removed")
             version.until_dt = until_dt
             if until_dt is not None:
                 gflog.emit(

@@ -18,6 +18,7 @@ from app.db.repositories.organization_public_key_repository import (
 from app.db.repositories.organization_repository import OrganizationRepository
 from app.logging.events import Log
 from app.models.oin import Oin
+from app.services.authorization_service import MESSAGE_ORG_NOT_EXIST
 from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
@@ -164,9 +165,7 @@ class OrganizationPublicKeyService:
             if org is None:
                 # TODO GB: This can only happen when authorization is revoked but token is still valid.
                 # For consistency we need to decide how to handle this throughout all apps
-                raise HTTPException(
-                    status_code=401, detail="Organization does not exist"
-                )
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
 
             domains_as_set = set(domains)
             key_with_same_domain = [
@@ -202,9 +201,7 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if org is None:
-                raise HTTPException(
-                    status_code=405, detail="Organization does not exist"
-                )
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             public_key_for_id = [pk for pk in org.public_keys if pk.id == id]
 
             domains_as_set = set(domains)
@@ -240,9 +237,7 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if not org:
-                raise HTTPException(
-                    status_code=404, detail="Organization does not exist"
-                )
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             return [pk.to_dict() for pk in org.public_keys]
 
     def get_by_org_and_domain(
@@ -252,9 +247,7 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if not org:
-                raise HTTPException(
-                    status_code=404, detail="Organization does not exist"
-                )
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             public_key = [pk for pk in org.public_keys if domain in pk.domains]
             if not public_key:
                 public_key = [pk for pk in org.public_keys if "*" in pk.domains]
@@ -269,9 +262,7 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_id)
             if not org:
-                raise HTTPException(
-                    status_code=404, detail="Organization does not exist"
-                )
+                raise HTTPException(status_code=403, detail=MESSAGE_ORG_NOT_EXIST)
             return session.get_repository(OrganizationPublicKeyRepository).delete(
                 key_id, org.id
             )
