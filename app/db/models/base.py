@@ -8,7 +8,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
-    MetaData,
     Table,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -57,8 +56,6 @@ class WithTimestamps:
         }
 
 
-admin_metadata_obj = MetaData(schema="admin")
-
 client_certificates = Table(
     "client_certificates",
     Base.metadata,
@@ -87,7 +84,6 @@ organization_receive_personal_id_types = Table(
 organization_request_personal_id_types = Table(
     "organization_request_personal_id_types",
     Base.metadata,
-    admin_metadata_obj,
     Column(
         "organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True
     ),
