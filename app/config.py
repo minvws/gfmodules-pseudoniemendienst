@@ -31,7 +31,6 @@ class ConfigApp(BaseModel):
 class ConfigDatabase(BaseModel):
     # SecretStr so the DSN password never appears in reprs or logs
     dsn: SecretStr
-    create_tables: bool = Field(default=False)
     retry_backoff: list[float] = Field(
         default=[0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 4.8, 6.4, 10.0]
     )
@@ -43,14 +42,6 @@ class ConfigDatabase(BaseModel):
     _split_retry_backoff = field_validator("retry_backoff", mode="before")(
         split_comma_separated(float)
     )
-
-    @field_validator("create_tables", mode="before")
-    def validate_create_tables(cls, v: Any) -> bool:
-        if v in (None, "", " "):
-            return False
-        if isinstance(v, str):
-            return v.lower() in ("yes", "true", "t", "1")
-        return bool(v)
 
     @field_validator("pool_size", mode="before")
     def validate_pool_size(cls, v: Any) -> int:

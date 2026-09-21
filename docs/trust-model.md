@@ -96,10 +96,3 @@ proxy can close — a caller authenticated as OIN X can operate on OIN Y's data 
 simply naming Y in the request. Such endpoints should be reviewed and made to
 enforce the same "target OIN must match the verified caller" rule (except where a
 cross-organisation operation is explicitly intended and separately authorized).
-
-## Development bypass
-
-For local development without a proxy, `app.mtls_override_cert` can be set to a
-certificate file on disk. When set, `MtlsService` uses that certificate instead
-of reading it from the request header. This bypass is for development only and
-must never be configured in a deployed environment.

@@ -19,15 +19,6 @@ class OrganizationPublicKeyRepository(RepositoryBase):
         )
         return self.db_session.execute(query).scalars().first()
 
-    def get_by_org(self, org_id: uuid.UUID) -> list[OrganizationPublicKeyEntity]:
-        """
-        Fetches key entries for a given organization id and matching domain.
-        """
-        query = select(OrganizationPublicKeyEntity).where(
-            OrganizationPublicKeyEntity.organization_id == org_id
-        )
-        return list(self.db_session.execute(query).scalars())
-
     def create(
         self, organization_public_key: OrganizationPublicKeyEntity
     ) -> OrganizationPublicKeyEntity:
