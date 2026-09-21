@@ -12,7 +12,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.14"
-uvicorn = ">=0.40,<0.53"
+uvicorn = ">=0.40,<0.54"
 fastapi = ">=0.136.3,<0.142.0"
 pydantic-settings = "^2.13.0"
 inject = "^5.3.0"
