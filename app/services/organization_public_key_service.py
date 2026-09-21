@@ -88,10 +88,6 @@ class AlreadyExistsError(Exception):
     pass
 
 
-class KeyNotFoundError(Exception):
-    pass
-
-
 class OrganizationPublicKeyService:
     def __init__(self, db: Database):
         self.db = db

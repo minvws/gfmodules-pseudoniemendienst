@@ -13,7 +13,6 @@ from app.models.organization_public_key import (
 )
 from app.services.organization_public_key_service import (
     AlreadyExistsError,
-    KeyNotFoundError,
     OrganizationPublicKeyService,
 )
 
@@ -104,13 +103,8 @@ def put_key(
             req.domains,
             req.jws,
         )
-    except KeyNotFoundError:
-        logger.warning(
-            "key %s not found for organization %s",
-            id,
-            auth_ctx.claims.organization_id,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
+    except HTTPException:
+        raise
     except AlreadyExistsError:
         logger.warning(
             "key already exists for org_id=%s scope=%r",

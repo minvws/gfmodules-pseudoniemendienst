@@ -238,3 +238,133 @@ def test_delete_other_org_is_unauthorized(
     assert response.status_code == 403
     assert response.json() == {"detail": "forbidden"}
     assert organization_public_key_service.get_by_id(created["id"]) is not None
+
+
+def _create_key(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    organization: OrganizationEntity,
+    domains: list[str],
+) -> tuple[dict[str, str], str]:
+    private_key, _ = generate_rsa_keypair()
+    signed_jws = create_signed_jws(private_key, organization.external_id)
+    response = client.post(
+        "/administration/keys",
+        json={"domains": domains, "jws": signed_jws},
+        headers=_auth_headers(valid_headers, organization.external_id),
+    )
+    assert response.status_code == 201
+    return response.json(), private_key
+
+
+def test_update_key_replaces_domains_and_jwk(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+    organization_public_key_service: OrganizationPublicKeyService,
+) -> None:
+    created, _ = _create_key(client, valid_headers, persisted_organization, ["nvi"])
+    new_private_key, new_public_key = generate_rsa_keypair()
+
+    response = client.put(
+        f"/administration/keys/{created['id']}",
+        json={
+            "domains": ["nvi", "lmr"],
+            "jws": create_signed_jws(
+                new_private_key, persisted_organization.external_id
+            ),
+        },
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == created["id"]
+    assert body["domains"] == ["nvi", "lmr"]
+    assert body["jwk"] == JWK.from_pem(new_public_key.encode()).export(as_dict=True)
+    stored = organization_public_key_service.get_by_id(uuid.UUID(created["id"]))
+    assert stored is not None and stored.domains == ["nvi", "lmr"]
+
+
+def test_update_unknown_key_is_not_found(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+) -> None:
+    private_key, _ = generate_rsa_keypair()
+
+    response = client.put(
+        f"/administration/keys/{uuid.uuid4()}",
+        json={
+            "domains": ["nvi"],
+            "jws": create_signed_jws(private_key, persisted_organization.external_id),
+        },
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "public key not found"}
+
+
+def test_update_other_org_key_is_not_found(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+    db_session: DbSession,
+    personal_id_type_repository: PersonalIdTypeRepository,
+) -> None:
+    other_org = create_organization(
+        db_session, personal_id_type_repository, Oin("00000099000000001000")
+    )
+    created, _ = _create_key(client, valid_headers, persisted_organization, ["nvi"])
+    private_key, _ = generate_rsa_keypair()
+
+    response = client.put(
+        f"/administration/keys/{created['id']}",
+        json={
+            "domains": ["nvi"],
+            "jws": create_signed_jws(private_key, other_org.external_id),
+        },
+        headers=_auth_headers(valid_headers, other_org.external_id),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "public key not found"}
+
+
+def test_update_key_with_invalid_jws_is_unprocessable(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+) -> None:
+    created, _ = _create_key(client, valid_headers, persisted_organization, ["nvi"])
+
+    response = client.put(
+        f"/administration/keys/{created['id']}",
+        json={"domains": ["nvi"], "jws": "x" * 64},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "JWS invalid"}
+
+
+def test_update_key_to_domain_of_other_key_is_conflict(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+) -> None:
+    _create_key(client, valid_headers, persisted_organization, ["nvi"])
+    second, _ = _create_key(client, valid_headers, persisted_organization, ["lmr"])
+    private_key, _ = generate_rsa_keypair()
+
+    response = client.put(
+        f"/administration/keys/{second['id']}",
+        json={
+            "domains": ["nvi"],
+            "jws": create_signed_jws(private_key, persisted_organization.external_id),
+        },
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+
+    assert response.status_code == 409
