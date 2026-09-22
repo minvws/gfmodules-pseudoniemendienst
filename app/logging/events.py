@@ -28,8 +28,6 @@ class Log(_Base):
                 "namens_oin",
                 "doel_oin",
                 "requested_operation",
-                "endpoint",
-                "method",
             ),
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "requested_operation"),
         },
@@ -65,7 +63,6 @@ class Log(_Base):
                 "namens_oin",
                 "doel_oin",
                 "error_type",
-                "endpoint",
             ),
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
         },
@@ -75,7 +72,7 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "namens_oin", "validation_error", "endpoint"),
+            _APP: ("handelende_oin", "namens_oin", "validation_error"),
             _SIEM: ("handelende_oin", "validation_error"),
         },
     )
