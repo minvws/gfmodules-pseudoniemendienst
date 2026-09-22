@@ -101,14 +101,14 @@ class HsmKeyVersionService:
             versions = repo.get_expired_versions(at)
             return versions
 
-    def create_version_by_organization_external_id(
+    def increase_version_for_org(
         self,
         organization_external_id: Oin,
         from_dt: datetime | None = None,
         until_dt: datetime | None = None,
     ) -> HsmKeyVersionEntity:
         """
-        Creates a new key version for the organization identified by the
+        Increases the key version for the organization identified by the
         organization id. The version number is automatically derived from the
         highest existing version for that organization. When no start moment is
         given, the version becomes active immediately.
@@ -120,6 +120,17 @@ class HsmKeyVersionService:
             )
             if not org:
                 raise HTTPException(status_code=401, detail="unauthorized")
+            # Make sure we have at least one hsm_key_version
+            if not org.hsm_key_versions:
+                logger.error(
+                    "organization %s has no hsm key version to rotate from",
+                    organization_external_id.value,
+                )
+                raise HTTPException(
+                    status_code=409, detail="Organization has no key version"
+                )
+            # The relationship is ordered by version, so the last entry holds
+            # the highest version number.
             current_version = org.hsm_key_versions[-1].version
             hsm_key_version = HsmKeyVersionEntity(
                 version=current_version + 1,

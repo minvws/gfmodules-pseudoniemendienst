@@ -5,6 +5,9 @@ from starlette.testclient import TestClient
 
 from app.db.db import Database
 from app.db.models import OrganizationEntity
+from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
+from app.db.session import DbSession
+from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -43,6 +46,32 @@ def test_create_increments_version(
 
     assert first.json()["version"] == 2
     assert second.json()["version"] == 3
+
+
+def test_create_for_organization_without_versions_is_rejected(
+    client: TestClient,
+    db_session: DbSession,
+    personal_id_type_repository: PersonalIdTypeRepository,
+    valid_headers: dict[str, str],
+    valid_organization_id: Oin,
+) -> None:
+    personal_ids = personal_id_type_repository.get_many([PersonalIdType.OPRF])
+    db_session.add(
+        OrganizationEntity(
+            external_id=valid_organization_id,
+            name="fresh_org",
+            receive_personal_id_types=list(personal_ids),
+            request_personal_id_types=list(personal_ids),
+        )
+    )
+    db_session.commit()
+
+    response = client.post("/administration/key-versions", headers=valid_headers)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Organization has no key version"}
+    listed = client.get("/administration/key-versions", headers=valid_headers)
+    assert listed.json() == []
 
 
 def test_create_with_explicit_window(
