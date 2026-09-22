@@ -119,8 +119,6 @@ def exchange_reversible_pseudonym(
                 "namens_oin": namens_oin,
                 "doel_oin": doel_oin,
                 "requested_operation": _OPERATION,
-                "endpoint": _ENDPOINT,
-                "method": "POST",
             },
         )
         return error
@@ -151,7 +149,6 @@ def exchange_reversible_pseudonym(
                 "handelende_oin": handelende_oin,
                 "namens_oin": namens_oin,
                 "validation_error": "format",
-                "endpoint": _ENDPOINT,
             },
         )
         raise HTTPException(status_code=400, detail="Invalid personal ID")
@@ -178,7 +175,6 @@ def exchange_reversible_pseudonym(
                 "namens_oin": namens_oin,
                 "doel_oin": doel_oin,
                 "error_type": e.error_type,
-                "endpoint": _ENDPOINT,
             },
         )
         if e.error_type == "no_active_key_version":
