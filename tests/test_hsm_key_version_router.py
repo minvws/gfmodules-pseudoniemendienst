@@ -48,7 +48,7 @@ def test_create_increments_version(
     assert second.json()["version"] == 3
 
 
-def test_create_first_version_for_organization_without_versions(
+def test_create_for_organization_without_versions_is_rejected(
     client: TestClient,
     db_session: DbSession,
     personal_id_type_repository: PersonalIdTypeRepository,
@@ -68,8 +68,10 @@ def test_create_first_version_for_organization_without_versions(
 
     response = client.post("/administration/key-versions", headers=valid_headers)
 
-    assert response.status_code == 201
-    assert response.json()["version"] == 1
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Organization has no key version"}
+    listed = client.get("/administration/key-versions", headers=valid_headers)
+    assert listed.json() == []
 
 
 def test_create_with_explicit_window(

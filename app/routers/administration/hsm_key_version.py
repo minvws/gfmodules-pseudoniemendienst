@@ -32,7 +32,7 @@ def post_key_version(
     req: HsmKeyVersionRequest | None = None,
 ) -> JSONResponse:
     try:
-        entry = hsm_key_version_service.create_version_by_organization_external_id(
+        entry = hsm_key_version_service.increase_version_for_org(
             auth_ctx.claims.organization_id,
             req.from_dt if req else None,
             req.until_dt if req else None,
