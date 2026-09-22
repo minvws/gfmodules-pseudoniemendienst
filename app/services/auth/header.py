@@ -1,7 +1,6 @@
 import logging
 
-from fastapi import HTTPException
-
+from app.exceptions import InvalidAudienceError
 from app.models.auth.headers import AuthHeaders
 
 logger = logging.getLogger(__name__)
@@ -18,6 +17,6 @@ class AuthHeaderService:
             logger.error(
                 f"Invalid audience value {audience} value should be {self.expected_audiences}. Check config values in case incoming value is correct"
             )
-            raise HTTPException(status_code=403, detail="Unauthorized request")
+            raise InvalidAudienceError()
 
         return auth_headers

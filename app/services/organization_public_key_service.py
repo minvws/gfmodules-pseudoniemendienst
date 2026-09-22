@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import gfmodules.logging as gflog
-from fastapi import HTTPException
 from jwcrypto.common import base64url_decode
 from jwcrypto.jwk import JWK
 from jwcrypto.jws import JWS, InvalidJWSObject, InvalidJWSSignature
@@ -16,6 +15,13 @@ from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
 from app.db.repositories.organization_repository import OrganizationRepository
+from app.exceptions import (
+    DomainAlreadyRegisteredError,
+    DomainNotRegisteredError,
+    InvalidJwsError,
+    OrganizationNotRegisteredError,
+    PublicKeyNotFoundError,
+)
 from app.logging.events import Log
 from app.models.oin import Oin
 from app.utils.datetime import now_utc
@@ -84,10 +90,6 @@ def _log_registered(org_id: Oin, jwk: dict[str, Any]) -> None:
     )
 
 
-class AlreadyExistsError(Exception):
-    pass
-
-
 class OrganizationPublicKeyService:
     def __init__(self, db: Database):
         self.db = db
@@ -104,47 +106,41 @@ class OrganizationPublicKeyService:
             return self._extract_verified_key(jws, org_id)
         except InvalidJWSObject:
             _log_rejected(org_id, key_algoritme, "JWS invalid")
-            raise HTTPException(status_code=422, detail="JWS invalid")
-        except HTTPException as e:
-            _log_rejected(org_id, key_algoritme, str(e.detail))
+            raise InvalidJwsError("JWS invalid")
+        except InvalidJwsError as e:
+            _log_rejected(org_id, key_algoritme, e.message)
             raise
 
     def _extract_verified_key(self, jws: JWS, org_id: Oin) -> JWK:
         if "jwk" not in jws.jose_header:
-            raise HTTPException(status_code=422, detail="Missing 'jwk' in header")
+            raise InvalidJwsError("Missing 'jwk' in header")
 
         private_components = ["d", "p", "q", "dp", "dq", "qi"]
         if any(p in jws.jose_header["jwk"] for p in private_components):
-            raise HTTPException(
-                status_code=422, detail="'jwk' contains private components"
-            )
+            raise InvalidJwsError("'jwk' contains private components")
         if "kid" not in jws.jose_header["jwk"]:
-            raise HTTPException(status_code=422, detail="'jwk' is missing an 'kid'")
+            raise InvalidJwsError("'jwk' is missing an 'kid'")
 
         jwk = JWK(**jws.jose_header["jwk"])
         try:
             jws.verify(jwk)
         except InvalidJWSSignature:
-            raise HTTPException(status_code=422, detail="Verification of jws failed")
+            raise InvalidJwsError("Verification of jws failed")
         try:
             payload = json.loads(jws.payload)
         except Exception as e:
-            raise HTTPException(
-                status_code=422, detail="Unable to decode jws payload"
-            ) from e
+            raise InvalidJwsError("Unable to decode jws payload") from e
         if "iat" not in payload:
-            raise HTTPException(status_code=422, detail="Missing 'iat' in payload")
+            raise InvalidJwsError("Missing 'iat' in payload")
         if "oin" not in payload:
-            raise HTTPException(status_code=422, detail="Missing 'oin' in payload")
+            raise InvalidJwsError("Missing 'oin' in payload")
         if (
             datetime.fromtimestamp(payload["iat"], tz=timezone.utc) + timedelta(hours=1)
             < now_utc()
         ):
-            raise HTTPException(status_code=422, detail="JWS expired")
+            raise InvalidJwsError("JWS expired")
         if payload["oin"] != org_id.value:
-            raise HTTPException(
-                status_code=422, detail="Unautorized for supplied `oin`"
-            )
+            raise InvalidJwsError("Unautorized for supplied `oin`")
         return jwk
 
     def create(
@@ -160,9 +156,7 @@ class OrganizationPublicKeyService:
             if org is None:
                 # TODO GB: This can only happen when authorization is revoked but token is still valid.
                 # For consistency we need to decide how to handle this throughout all apps
-                raise HTTPException(
-                    status_code=401, detail="Organization does not exist"
-                )
+                raise OrganizationNotRegisteredError()
 
             domains_as_set = set(domains)
             key_with_same_domain = [
@@ -174,9 +168,7 @@ class OrganizationPublicKeyService:
                 _log_rejected(
                     org_id, _key_algorithm(jwk_dict), "domain already registered"
                 )
-                raise AlreadyExistsError(
-                    "Domain is already registered to different key"
-                )
+                raise DomainAlreadyRegisteredError()
             public_key = OrganizationPublicKeyEntity(
                 domains=domains,
                 jwk=jwk_dict,
@@ -198,14 +190,12 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if org is None:
-                raise HTTPException(
-                    status_code=405, detail="Organization does not exist"
-                )
+                raise OrganizationNotRegisteredError()
             public_key_for_id = [pk for pk in org.public_keys if pk.id == id]
 
             domains_as_set = set(domains)
             if len(public_key_for_id) != 1:
-                raise HTTPException(status_code=404, detail="public key not found")
+                raise PublicKeyNotFoundError()
             key_with_same_domain = [
                 pk
                 for pk in org.public_keys
@@ -215,9 +205,7 @@ class OrganizationPublicKeyService:
                 _log_rejected(
                     org_id, _key_algorithm(jwk_dict), "domain already registered"
                 )
-                raise AlreadyExistsError(
-                    "Domain is already registered to different key"
-                )
+                raise DomainAlreadyRegisteredError()
             public_key = public_key_for_id[0]
             public_key.domains = domains
             public_key.jwk = jwk_dict
@@ -236,9 +224,7 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if not org:
-                raise HTTPException(
-                    status_code=404, detail="Organization does not exist"
-                )
+                raise OrganizationNotRegisteredError()
             return [pk.to_dict() for pk in org.public_keys]
 
     def get_by_org_and_domain(
@@ -248,16 +234,12 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if not org:
-                raise HTTPException(
-                    status_code=404, detail="Organization does not exist"
-                )
+                raise OrganizationNotRegisteredError()
             public_key = [pk for pk in org.public_keys if domain in pk.domains]
             if not public_key:
                 public_key = [pk for pk in org.public_keys if "*" in pk.domains]
             if not public_key:
-                raise HTTPException(
-                    status_code=404, detail="Organization domain is not registered"
-                )
+                raise DomainNotRegisteredError()
             return public_key[0]
 
     def delete(self, key_id: uuid.UUID, organization_id: Oin) -> bool:
@@ -265,9 +247,7 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_id)
             if not org:
-                raise HTTPException(
-                    status_code=404, detail="Organization does not exist"
-                )
+                raise OrganizationNotRegisteredError()
             return session.get_repository(OrganizationPublicKeyRepository).delete(
                 key_id, org.id
             )

@@ -85,7 +85,7 @@ def test_register_certificate_rejects_duplicate_scope_with_conflict(
     assert duplicate.json() == {"detail": "key for this org/scope already exists"}
 
 
-def test_register_certificate_for_unknown_org_is_unauthorized(
+def test_register_certificate_for_unknown_org_is_forbidden(
     client: TestClient,
     valid_headers: dict[str, str],
 ) -> None:
@@ -100,7 +100,7 @@ def test_register_certificate_for_unknown_org_is_unauthorized(
         headers=_auth_headers(valid_headers, oin),
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert response.json() == {"detail": "Organization does not exist"}
 
 
@@ -140,7 +140,7 @@ def test_list_keys_returns_entries_for_authenticated_org(
     }
 
 
-def test_list_keys_for_unknown_org_is_unauthorized(
+def test_list_keys_for_unknown_org_is_forbidden(
     client: TestClient,
     valid_headers: dict[str, str],
 ) -> None:
@@ -149,7 +149,7 @@ def test_list_keys_for_unknown_org_is_unauthorized(
         headers=_auth_headers(valid_headers, Oin("00000099000000002000")),
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 403
     assert response.json() == {"detail": "Organization does not exist"}
 
 

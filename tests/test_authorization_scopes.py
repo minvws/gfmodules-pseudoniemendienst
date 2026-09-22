@@ -3,7 +3,7 @@ from collections.abc import Callable
 import pytest
 from starlette.testclient import TestClient
 
-from app.db.db import Database
+from app.db.models import OrganizationEntity
 from app.models.auth.data import AuthorizationScope
 
 Headers = dict[str, str]
@@ -23,9 +23,11 @@ REVERSIBLE_PSEUDONYM_BODY = {
 
 
 @pytest.fixture(autouse=True)
-def _tables(database: Database) -> None:
-    """A request that passes the scope check goes on to query the database, so the
-    tables have to exist for this file to run on its own."""
+def _caller_organization(persisted_organization: OrganizationEntity) -> None:
+    """A request that passes the scope check goes on to look up the caller in the
+    database, so the organization the headers name has to exist. Otherwise every
+    granted request answers 403 "Organization does not exist" and the tests could
+    not tell it apart from a scope refusal."""
 
 
 def test_missing_scope_header_is_rejected(

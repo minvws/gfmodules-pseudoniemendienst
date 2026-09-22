@@ -217,7 +217,8 @@ def test_unregistered_caller_is_rejected(
 
     response = client.post(ENDPOINT, json=BODY, headers=valid_headers)
 
-    assert response.status_code == 401
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Organization does not exist"}
 
 
 def test_sender_not_allowed_to_request_is_refused_before_anything_else(
