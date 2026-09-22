@@ -1,5 +1,6 @@
 """Asserts the PRS-KEY events (issue 1039) are emitted correctly."""
 
+import base64
 import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -18,12 +19,14 @@ from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.oprf.evaluators import HsmOprfEvaluator
+from app.services.oprf.evaluators import HsmOprfEvaluator, OprfHsmKeyLabel
 
 RecordLogs = Callable[[str], list[logging.LogRecord]]
 
 TEST_OIN = Oin("00000099000000001000")
 EVALUATOR_LOGGER = "app.services.oprf.evaluators"
+# HTTP-level and key generation failures are logged by the shared HSM client.
+HSM_CLIENT_LOGGER = "app.services.hsm.client"
 
 
 def _events(records: list[logging.LogRecord], event_id: str) -> list[logging.LogRecord]:
@@ -37,6 +40,11 @@ def _hsm_response(payload: object, status_code: int = 200) -> MagicMock:
     if status_code >= 400:
         response.raise_for_status.side_effect = requests.HTTPError("boom")
     return response
+
+
+def _hsm_no_such_key() -> MagicMock:
+    """What the HSM API answers when the label has no key: a 422 HSMError."""
+    return _hsm_response({"error_description": f"OPRF key '{TEST_OIN}' not found"}, 422)
 
 
 def _evaluator() -> HsmOprfEvaluator:
@@ -82,11 +90,11 @@ def test_lazy_oprf_key_generation_emits_key_generated(
     with (
         caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
         patch(
-            "app.services.oprf.evaluators.requests.post",
+            "app.services.hsm.client.requests.post",
             side_effect=[
-                _hsm_response({"objects": []}),  # lookup: key does not exist yet
+                _hsm_no_such_key(),  # oprf_evaluate: key does not exist yet
                 _hsm_response({"result": "ok"}),  # keygen
-                _hsm_response({"result": "AAAA"}),  # oprf_evaluate
+                _hsm_response({"result": "AAAA"}),  # oprf_evaluate, retried
             ],
         ),
     ):
@@ -98,7 +106,7 @@ def test_lazy_oprf_key_generation_emits_key_generated(
     assert record.levelno == logging.INFO
     assert record.sleuteltype == "oprf_secret"  # type: ignore[attr-defined]
     assert record.organisatie_oin == TEST_OIN.value  # type: ignore[attr-defined]
-    assert record.secret_id == f"oin-{TEST_OIN}-v1"  # type: ignore[attr-defined]
+    assert record.secret_id == str(OprfHsmKeyLabel(TEST_OIN, 1))  # type: ignore[attr-defined]
     assert record.sleutel_versie == 1  # type: ignore[attr-defined]
     assert not _events(records, "250406")
 
@@ -111,11 +119,8 @@ def test_existing_oprf_key_does_not_emit_key_generated(
     with (
         caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
         patch(
-            "app.services.oprf.evaluators.requests.post",
-            side_effect=[
-                _hsm_response({"objects": [{"label": "x"}]}),
-                _hsm_response({"result": "AAAA"}),
-            ],
+            "app.services.hsm.client.requests.post",
+            side_effect=[_hsm_response({"result": "AAAA"})],
         ),
     ):
         _evaluator().evaluate(TEST_OIN, b"blinded")
@@ -123,12 +128,38 @@ def test_existing_oprf_key_does_not_emit_key_generated(
     assert not _events(records, "250400")
 
 
-def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
+def test_oprf_key_created_by_another_instance_emits_nothing(
+    record_logs: RecordLogs, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Two instances race on first use: the loser's keygen gets "already
+    exists", which is neither a key generation nor a failure."""
     records = record_logs(EVALUATOR_LOGGER)
+    client_records = record_logs(HSM_CLIENT_LOGGER)
+
+    with (
+        caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
+        patch(
+            "app.services.hsm.client.requests.post",
+            side_effect=[
+                _hsm_no_such_key(),
+                _hsm_response({"error_description": "Object already exists"}, 422),
+                _hsm_response({"result": "AAAA"}),
+            ],
+        ),
+    ):
+        result = _evaluator().evaluate(TEST_OIN, b"blinded")
+
+    assert result == {1: base64.b64decode("AAAA")}
+    assert not _events(records, "250400")
+    assert not _events(client_records, "250406")
+
+
+def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
+    records = record_logs(HSM_CLIENT_LOGGER)
 
     with (
         patch(
-            "app.services.oprf.evaluators.requests.post",
+            "app.services.hsm.client.requests.post",
             return_value=_hsm_response(None, status_code=500),
         ),
         pytest.raises(requests.HTTPError),
@@ -139,7 +170,7 @@ def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.ERROR
-    assert record.operation_type == "lookup"  # type: ignore[attr-defined]
+    assert record.operation_type == "oprf_evaluate"  # type: ignore[attr-defined]
     assert record.error_reason == "http_500"  # type: ignore[attr-defined]
     assert record.exc_info is not None
     # PRS-SYS-006 is for an unreachable HSM only.
@@ -149,13 +180,14 @@ def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
 def test_hsm_keygen_without_result_emits_operation_failed(
     record_logs: RecordLogs,
 ) -> None:
-    records = record_logs(EVALUATOR_LOGGER)
+    records = record_logs(HSM_CLIENT_LOGGER)
+    evaluator_records = record_logs(EVALUATOR_LOGGER)
 
     with (
         patch(
-            "app.services.oprf.evaluators.requests.post",
+            "app.services.hsm.client.requests.post",
             side_effect=[
-                _hsm_response({"objects": []}),
+                _hsm_no_such_key(),
                 _hsm_response({"error": "denied"}),
             ],
         ),
@@ -167,7 +199,7 @@ def test_hsm_keygen_without_result_emits_operation_failed(
     assert len(events) == 1
     assert events[0].operation_type == "keygen"  # type: ignore[attr-defined]
     assert events[0].error_reason == "no_result_in_response"  # type: ignore[attr-defined]
-    assert not _events(records, "250400")
+    assert not _events(evaluator_records, "250400")
 
 
 def test_create_key_version_emits_rotation_started(
@@ -279,8 +311,8 @@ def test_cleanup_emits_key_version_destroyed(
     _add_expired_version(database, persisted_organization, version=7)
 
     with patch(
-        "app.services.hsm_key_cleanup_service.requests.post",
-        return_value=_hsm_response({}),
+        "app.services.hsm.client.requests.post",
+        return_value=_hsm_response({"objects": [{"label": "x"}]}),
     ):
         cleaned = _cleanup_service(database).cleanup_expired_keys()
 
@@ -307,7 +339,7 @@ def test_cleanup_destroy_failure_emits_operation_failed(
     _add_expired_version(database, persisted_organization, version=7)
 
     with patch(
-        "app.services.hsm_key_cleanup_service.requests.post",
+        "app.services.hsm.client.requests.post",
         return_value=_hsm_response(None, status_code=503),
     ):
         cleaned = _cleanup_service(database).cleanup_expired_keys()

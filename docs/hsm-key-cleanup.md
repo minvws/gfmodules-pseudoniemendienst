@@ -10,9 +10,12 @@ exists in the HSM. A standalone cleanup program removes those expired keys.
 For every key version that has expired (`until_dt` set and at or before now) and is
 not yet marked `removed`, the program:
 
-1. Destroys the corresponding key in the HSM via
-   `POST {hsm_url}/hsm/{module}/{slot}/destroy` with the key's label
-   (`oin-<oin>-v<version>` — the same label used during evaluation).
+1. Destroys every key of that version that exists in the HSM via
+   `POST {hsm_url}/hsm/{module}/{slot}/destroy`, by label: the OPRF secret
+   (`oin-<oin>-v<version>`, the label used during evaluation) and the reversible
+   pseudonym keys (`oin-<oin>-rp-v<version>-aes` and `oin-<oin>-rp-v<version>-hmac`).
+   Keys are created on first use, so a version may have only some of them;
+   labels that do not exist are skipped.
 2. Marks the version as `removed` in the database.
 
 If the HSM call fails for a version, that version is left untouched so the next

@@ -8,12 +8,11 @@ from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.organization_public_key import OrganizationPublicKeyRequest
 from app.models.requests import (
     BlindRequest,
-    ExchangeRequest,
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
+    ReversiblePseudonymExchangeRequest,
     RidExchangeRequest,
 )
-from app.services.pseudonym_service import PseudonymType
 
 
 def test_blind_request_encrypted_personal_id_is_normalized() -> None:
@@ -90,30 +89,54 @@ def test_rid_exchange_request_invalid_recipient_organization_throws_validation_e
         assert "Invalid recipient organization. Format: oin:<oin_number>" in str(e)
 
 
-def test_exchange_request_recipient_organization_is_parsed_to_oin() -> None:
-    request = ExchangeRequest(
+def test_reversible_pseudonym_request_recipient_organization_is_parsed_to_oin() -> None:
+    request = ReversiblePseudonymExchangeRequest(
         personalId={"landCode": "NL", "type": "bsn", "value": "9500009012"},
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
         recipientScope="scope",
-        pseudonymType=PseudonymType.Irreversible,
     )
 
     assert request.recipientOrganization == Oin("00000099000000003000")
 
 
-def test_exchange_request_invalid_recipient_organization_throws_validation_error() -> (
+def test_reversible_pseudonym_request_keeps_personal_id_unparsed() -> None:
+    """Parsing happens in the endpoint, after authorization, so a malformed value
+    is never echoed back in a validation error."""
+    as_str = ReversiblePseudonymExchangeRequest(
+        personalId="not a personal id",
+        recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
+        recipientScope="scope",
+    )
+    as_dict = ReversiblePseudonymExchangeRequest(
+        personalId={"foo": "bar"},
+        recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
+        recipientScope="scope",
+    )
+
+    assert as_str.personalId == "not a personal id"
+    assert as_dict.personalId == {"foo": "bar"}
+
+
+def test_reversible_pseudonym_request_invalid_recipient_organization_throws_validation_error() -> (
     None
 ):
-    try:
-        ExchangeRequest(
+    with pytest.raises(ValidationError) as e:
+        ReversiblePseudonymExchangeRequest(
             personalId={"landCode": "NL", "type": "bsn", "value": "9500009012"},
             recipientOrganization="bad-oin",  # type: ignore[arg-type]
             recipientScope="scope",
-            pseudonymType=PseudonymType.Irreversible,
         )
-        assert False, "Expected ValidationError for invalid organization OIN"
-    except ValidationError as e:
-        assert "Invalid recipient organization. Format: oin:<oin_number>" in str(e)
+    assert "Invalid recipient organization. Format: oin:<oin_number>" in str(e.value)
+
+
+@pytest.mark.parametrize("scope", ["", "a|b", "x" * 101])
+def test_reversible_pseudonym_request_rejects_invalid_scope(scope: str) -> None:
+    with pytest.raises(ValidationError):
+        ReversiblePseudonymExchangeRequest(
+            personalId="NL:bsn:9500009012",
+            recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
+            recipientScope=scope,
+        )
 
 
 def test_register_request_with_key_id() -> None:

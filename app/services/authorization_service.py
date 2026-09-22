@@ -9,6 +9,10 @@ from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
 
+MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION: str = (
+    "Unable to find requested recipient organization"
+)
+
 
 class AuthorizationService:
     def __init__(self, db: Database):
@@ -40,5 +44,5 @@ class AuthorizationService:
             ]:
                 raise HTTPException(
                     status_code=404,
-                    detail="Unable to find requested recipient organization",
+                    detail=MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION,
                 )
