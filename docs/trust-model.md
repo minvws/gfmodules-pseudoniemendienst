@@ -33,8 +33,9 @@ does not, and cannot, re-verify that the OIN is authentic.
                               │                        │
                               │ 1. authenticate caller │
                               │ 2. set trusted headers  │
-                              │    x-gf-oin             │
+                              │    x-gf-sub, x-gf-act-* │
                               │    x-gf-audience        │
+                              │    x-gf-scope           │
                               │ 3. strip any client-    │
                               │    supplied copies      │
                               │                        │ 4. trust headers as-is
@@ -46,15 +47,18 @@ does not, and cannot, re-verify that the OIN is authentic.
 The PRS reads the caller identity from request headers that it assumes the
 OIN-verifier has set and sanitised:
 
-| Header                        | Meaning                                   | Read in |
-|-------------------------------|-------------------------------------------|---------|
-| `x-gf-oin`                    | Verified OIN of the calling organisation  | `app/models/auth/headers.py`, `app/auth.py` |
-| `x-gf-audience`               | Intended audience; checked against a configured allowlist | `app/services/auth/header.py` |
-| `x-gf-scope`                  | Space-separated OAuth scopes from the validated token; enforced per route via `require_scopes` | `app/models/auth/headers.py`, `app/auth.py` |
-| `X-Forwarded-Tls-Client-Cert` | The caller's client certificate (used to derive the source OIN for some endpoints) | `app/services/mtls_service.py` |
+| Header          | Meaning                                   | Read in |
+|-----------------|-------------------------------------------|---------|
+| `x-gf-sub`      | Verified OIN of the organisation on whose behalf the request is made (the token subject). All authorization decisions bind to this value. | `app/models/auth/headers.py`, `app/auth.py` |
+| `x-gf-act-sub`  | Verified OIN of the acting client (the party that holds the token). Recorded in audit events as `handelende_oin`. | `app/models/auth/headers.py` |
+| `x-gf-act-cn`   | Common name of the acting client's certificate | `app/models/auth/headers.py` |
+| `x-gf-audience` | Intended audience; checked against a configured allowlist | `app/services/auth/header.py` |
+| `x-gf-scope`    | Space-separated OAuth scopes from the validated token; enforced per route via `require_scopes` | `app/models/auth/headers.py`, `app/auth.py` |
 
+All five headers are required; a request that lacks one, or whose `x-gf-scope`
+holds no scope this service knows, is rejected with `403` before any route runs.
 `x-gf-audience` is validated against `authorization_headers.expected_audiences`
-from configuration. The `x-gf-oin` value itself is **taken as-is** — its
+from configuration. The OIN values themselves are **taken as-is** — their
 authenticity is the OIN-verifier's responsibility, not the PRS's.
 
 ## Deployment invariants
@@ -67,10 +71,9 @@ arbitrary organisation and the PRS has no way to detect it.
   the OIN-verifier. There is no network path that reaches the PRS while bypassing
   the verifier.
 - **MUST** — The OIN-verifier strips or overwrites any client-supplied
-  `x-gf-oin`, `x-gf-audience`, and `X-Forwarded-Tls-Client-Cert` headers on every
-  inbound request, so a client can never pre-set them. (This is the classic
-  failure mode of trusted-header architectures — the proxy setting the header is
-  not enough; it must also remove the incoming one.)
+  `x-gf-*` headers on every inbound request, so a client can never pre-set
+  them. (This is the classic failure mode of trusted-header architectures — the
+  proxy setting the header is not enough; it must also remove the incoming one.)
 - **SHOULD** — The hop between the OIN-verifier and the PRS is itself
   authenticated (network isolation, mutual TLS, or a shared secret), so that the
   PRS *fails closed* if a request somehow reaches it without passing through the
@@ -78,21 +81,36 @@ arbitrary organisation and the PRS has no way to detect it.
 
 ## What the OIN-verifier does NOT solve: authorization
 
-The OIN-verifier guarantees the *authenticity* of `x-gf-oin` ("the caller really
-is OIN X"). It does **not** guarantee *authorization* ("OIN X is allowed to act
-on OIN Y's resources"). Authorization is entirely the PRS's responsibility and
+The OIN-verifier guarantees the *authenticity* of `x-gf-sub` ("the caller really
+acts for OIN X"). It does **not** guarantee *authorization* ("OIN X is allowed to
+act on OIN Y's resources"). Authorization is entirely the PRS's responsibility and
 must be enforced in the PRS code.
 
 The correct pattern is to bind every action to the **verified header identity**,
-not to an OIN supplied in the request body or path. For example, the key
-update/delete endpoints compare the resource owner against the verified caller:
+not to an OIN supplied in the request body or path. The administration
+endpoints therefore take no organisation from the request at all: the services
+load the caller's organisation by `auth_ctx.claims.organization_id` and only
+operate on that organisation's own keys and key versions. A key or key version
+id that belongs to another organisation is simply not found.
 
-    if entry.organization.oin != auth_ctx.claims.sub.value:
-        raise HTTPException(status_code=403)
+The one place where a request names another organisation is `/oprf/eval`, which
+carries the recipient in its body. That is an intended cross-organisation
+operation and is authorized separately: the caller must be allowed to *request*
+OPRF pseudonyms and the recipient must be allowed to *receive* them, both
+administrative flags on the organisation record. The caller is not the one who
+can decrypt the result; the response is encrypted to the recipient's registered
+key.
 
-Endpoints that instead take an OIN from the request body/path and act on it
-**without** comparing it to `x-gf-oin` are an authorization gap that no upstream
-proxy can close — a caller authenticated as OIN X can operate on OIN Y's data by
-simply naming Y in the request. Such endpoints should be reviewed and made to
-enforce the same "target OIN must match the verified caller" rule (except where a
-cross-organisation operation is explicitly intended and separately authorized).
+Any new endpoint that takes an OIN from the request body/path and acts on it
+**without** either comparing it to `x-gf-sub` or authorizing the
+cross-organisation operation explicitly is an authorization gap that no
+upstream proxy can close — a caller authenticated as OIN X could operate on
+OIN Y's data by simply naming Y in the request.
+
+## Development without a proxy
+
+There is no bypass in the PRS itself. For local development without an
+OIN-verifier, send the `x-gf-*` headers yourself; the README describes the
+headers and the Swagger input fields for them. This only works because a
+development instance is not reachable by anyone else — the deployment
+invariants above still apply to every deployed environment.
