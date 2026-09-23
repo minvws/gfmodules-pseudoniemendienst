@@ -56,59 +56,32 @@ environment.
 
 ### Docker development setup
 
-The docker compose file contains the required databases, an SSL offloading apache container and the python app itself.
-
-You can start the services without the SSL offloading service by running:
+The docker compose file contains the postgres database and the python app itself. Start both by running:
 
 ```bash
 docker compose up
 ```
 
-This will start the project on '<http://localhost:6502>'
+This will start the project on '<http://localhost:6502>'. On first start the entrypoint creates `app.conf` from
+`app.conf.example` with a fresh master key, generates the OPRF server key, runs the database migrations and seeds a
+test organization (see `docker/init.sh`).
 
-#### Using mTLS
+#### Authentication in development
 
-To use/test mTLS, you need to setup the following:
+The PRS does not terminate mTLS or validate tokens itself. In a deployment the OIN-verifier proxy does that and
+passes the verified caller to the PRS in `x-gf-*` headers (see [docs/trust-model.md](docs/trust-model.md)). When you
+run the PRS on its own there is no proxy, so you send those headers yourself:
 
-Generate the required certificates.
+| Header          | Value                                                                        |
+|-----------------|------------------------------------------------------------------------------|
+| `x-gf-sub`      | OIN of the calling organization, e.g. `00000003123456780000`                 |
+| `x-gf-act-sub`  | OIN of the acting client, e.g. `00000003123456780000`                        |
+| `x-gf-act-cn`   | Common name of the client, e.g. `prs.local`                                  |
+| `x-gf-audience` | Must match `authorization_headers.expected_audiences` in `app.conf`          |
+| `x-gf-scope`    | Space separated scopes, e.g. `prs:administration prs:oprf-pseudonym`         |
 
-```bash
-./tools/generate_certs.sh
-```
-
-Next, since the PRS certificate is signed with our own development UZI ca cert, you need to import (temporarily) the UZI
-ca cert into your browser. Normally, this is done via pkcs12:
-
-```bash
-openssl pkcs12 -export -out secrets/uzi-server-ca.p12 -inkey secrets/uzi-server-ca.key -in secrets/uzi-server-ca.crt
-```
-
-It will ask for a password, you can use anything.
-Then import the uzi-server-ca.p12 file into your browser. Again, the password is being asked.
-
-At this point, you would be able to load the mTLS version on <https://prs:6503>. The connection should be secure as the
-browser has the correct CA for the server certificate.
-
-You probably get asked for a client certificate. Here you can use a client certificate that is signed by the UZI ca.
-For this you can use the `prs.local`. Note that you might need to import these
-into your browser through pkcs12 again:
-
-```bash
-openssl pkcs12 -export -out secrets/prs.local.p12 -inkey secrets/prs.local.key -in secrets/prs.local.crt
-```
-
-If you weren't asked for a client certificate, make sure the site is secured correctly (you should see a lock in the
-url bar). If not, client certs are not asked by the browser.
-
-It's also possible that client certificates are disabled for this site. In Firefox, go to: tools | settings | privacy & security |
-certificates | view certificates | authentication decisions and delete the entry for the site. This will make the browser
-ask for a client certificate again.
-
-You can start the services now by running:
-
-```bash
-docker compose --profile ssl up
-```
+The Swagger UI on <http://localhost:6502/docs> offers input fields for these headers when `document_gf_headers = True`
+is set in the `[uvicorn]` section of `app.conf` (the default in `app.conf.example`).
 
 ## Poetry development setup
 
@@ -164,6 +137,28 @@ After installing update the shared library cache by running:
 sudo ldconfig
 ```
 
+### Running the application natively
+
+The container entrypoint (`docker/init.sh`) prepares everything automatically. When running natively you do the same
+steps by hand, with a database available (for example `docker compose up -d postgres`):
+
+1. Create `app.conf` from `app.conf.example` and set `pseudonym.master_key` to a base64 encoded key of at least 32
+   bytes, for example the output of `openssl rand -base64 32`.
+2. Generate the OPRF server key: `poetry run python app/generate_oprf_key.py > secrets/oprf-server.key`
+3. Run the database migrations:
+
+   ```bash
+   DSN=postgresql://postgres:postgres@localhost:5432/postgres tools/migrate_db.sh
+   ```
+
+4. Seed a test organization (OIN `00000003123456780000`, allowed to request and receive OPRF pseudonyms):
+
+   ```bash
+   poetry run python -m tools.seed
+   ```
+
+5. Start the application: `poetry run python -m app.main`
+
 ### Poetry pytest
 
 The tests have a dependency on a postgres database. You can easily setup a database with docker:
@@ -210,7 +205,6 @@ into the container's /src dir.
 ```bash
 docker run -ti --rm -p 6502:6502 \
   --mount type=bind,source=./app.conf.example,target=/src/app.conf \
-  --mount type=bind,source=./auth_cert.json.example,target=/src/auth_cert.json \
   --mount type=bind,source=./secrets,target=/src/secrets \
   gfmodules-pseudoniemendienst
 ```
@@ -224,28 +218,53 @@ This system uses OPRF for pseudonym generation. To test this, there are some ava
 
 To use this system:
 
-1. Authentication is done by the upstream proxy, which passes the verified caller in the `x-gf-*` headers (see
-   `docs/trust-model.md`). For local development without a proxy, send those headers yourself; with
-   `document_gf_headers = True` in `app.conf` Swagger offers input fields for them.
+1. Send the `x-gf-*` headers with every request, as described in
+   [Authentication in development](#authentication-in-development). The examples below use the seeded test
+   organization, so `x-gf-sub` and `x-gf-act-sub` are `00000003123456780000`. The administration call needs the
+   `prs:administration` scope, the evaluation call needs `prs:oprf-pseudonym`.
 
-2. Insert a new organization via a POST to `/orgs`. The organization OIN should be the serialNumber of the OIN certificate you
+2. Make sure the organization exists. The container entrypoint and the native setup both seed the test organization
+   with OIN `00000003123456780000` via `tools/seed.py`. An organization must be allowed to request and to receive
+   OPRF pseudonyms; the seeded one is both.
 
-   will be testing with.
+3. Register the public key of the receiving organization. The PRS encrypts its response to this key. Registration
+   goes through `POST /administration/keys` with a self-signed JWS: the JWS header carries the public key as a `jwk`
+   (including a `kid`), and the payload carries the organization's `oin` and an `iat` that is at most one hour old.
+   The signature proves possession of the matching private key. This snippet generates a key pair and the JWS:
 
-   Note: there is no mTLS check here. You can add multiple organizations with different OIN values for testing.
+   ```python
+   import time
+   from jwcrypto.jwk import JWK
+   from jwcrypto.jwt import JWT
 
-3. Next, you will need to register your public key to the key services. You can do this by calling `/register/certificate` with a JSON body like:
-
-   ```shell
-   POST /register/certificate
-   {
-     "scope": [
-        "nvi",
-     ]
-   }
+   key = JWK.generate(kty="RSA", size=2048)
+   key["kid"] = key.thumbprint()
+   token = JWT(
+       header={"alg": "RS256", "jwk": key.export_public(as_dict=True)},
+       claims={"iat": int(time.time()), "oin": "00000003123456780000"},
+   )
+   token.make_signed_token(key)
+   print(token.serialize())
+   print(key.export_to_pem(private_key=True, password=None).decode())
    ```
 
-   This will take the public key from the uzi server certificate using in this mTLS connection, and register it for the given scope.
+   Keep the printed private key; the receiver needs it in step 6. Then register the JWS for one or more scopes
+   (`domains`); a `*` entry acts as a wildcard for every scope:
+
+   ```shell
+   POST /administration/keys
+   {
+     "domains": ["nvi"],
+     "jws": "eyJhbGciOiJSUzI1NiIsImp3ayI6ey...."
+   }
+
+   201 Created
+   {
+     "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+     "domains": ["nvi"],
+     "jwk": { "kty": "RSA", "kid": "...", "n": "...", "e": "AQAB" }
+   }
+   ```
 
 4. Emulate a client wanting to send a pseudonym over to a receiver by calling `/test/oprf/client` with a JSON body like:
 
@@ -258,7 +277,7 @@ To use this system:
        "value": "950000012"
      }
    }
-   
+
    200 OK
    {
      "blinded_input": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
@@ -282,21 +301,21 @@ To use this system:
    JSON should be canonicalized with RFC8785 for interoperable cryptographic input.
    Current implementation uses compact JSON (`separators=(",", ":")`), which is deterministic but not full RFC8785 canonicalization.
 
-5. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the organization name and scope:
+5. Now we can call the "real" OPRF function `/oprf/eval` with the blinded input, the recipient organization and scope:
 
-      ```shell
-      POST /oprf/eval
-      {
-        "encryptedPersonalId": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
-        "recipientOrganization": "oin:00000099000000001000",
-        "recipientScope": "nvi"
-      }
+   ```shell
+   POST /oprf/eval
+   {
+     "encryptedPersonalId": "EJU9qVhKNmw_UhCXDN_aVM4GL1DCmpDs8QD5WOdUBCU=",
+     "recipientOrganization": "oin:00000003123456780000",
+     "recipientScope": "nvi"
+   }
 
-      200 OK
-      {
-        "jwe": "eyJraWQiOi....bJUqbbSUIjqiw"
-      } 
-      ```
+   200 OK
+   {
+     "jwe": "eyJraWQiOi....bJUqbbSUIjqiw"
+   }
+   ```
 
    At this point we will get back a JWE that contains the evaluated blinded input and
    is encrypted with the public key of the organization. At this point, the client is
@@ -305,53 +324,54 @@ To use this system:
 6. Now emulate the receiving party by calling `/test/oprf/receiver` with a JSON body like:
 
    ```shell
-    POST /test/oprf/receiver
-    {
-      "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
-      "jwe": "eyJraWQiOiA...SzZbJUqbbSUIjqiw",
-      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY----- MIICXAIB...oCfe0= -----END RSA PRIVATE KEY-----"
-    }
+   POST /test/oprf/receiver
+   {
+     "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
+     "jwe": "eyJraWQiOiA...SzZbJUqbbSUIjqiw",
+     "priv_key_pem": "-----BEGIN PRIVATE KEY----- MIIEvQIB...oCfe0= -----END PRIVATE KEY-----"
+   }
    ```
 
-    The blind factor is the one returned by the client, the JWE is the one returned by the prs evaluation, and
-    the private key is returned by the key generation step.
+   The blind factor is the one returned by the client, the JWE is the one returned by the PRS evaluation, and the
+   private key is the one generated in step 3. It must be in PKCS#8 format (starting with
+   `-----BEGIN PRIVATE KEY-----`) and passed as a single line.
 
-    At this point, it will return any diagnostic information about the OPRF process:
+   At this point, it will return any diagnostic information about the OPRF process:
 
-    ```json
-    {
-      "jwe_data": "eyJraWQiOiAi...zZbJUqbbSUIjqiw",
-      "priv_key_pem": "-----BEGIN RSA PRIVATE KEY----- MIICXAIBAAKBgH6gmpXpdhtiE...UpWRvoCfe0= -----END RSA PRIVATE KEY-----",
-      "priv_key_kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
-      "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
-      "jwe": {
-        "headers": {
-          "kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
-          "alg": "RSA-OAEP",
-          "enc": "A256GCM",
-          "cty": "application/json"
-        },
-        "decrypted": {
-          "subject": "pseudonym:eval:-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
-          "aud": "oin:100000099000000001000",
-          "scope": "nvi",
-          "version": "1.1",
-          "iat": 1758616285,
-          "exp": 1758616585,
-          "extra_versions": {}
-        }
-      },
-      "eval_subject": "-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
-      "final_pseudonym": "fDZYIlajLAV3y8fWl1ObFBDmybUEGrR37pDb-5p5pJJGKvvpDvvMdQmYHKqtiQ8tdF4VL3w8nkbssHtOmkjiOg=="
-    }
-    ```
+   ```json
+   {
+     "jwe_data": "eyJraWQiOiAi...zZbJUqbbSUIjqiw",
+     "priv_key_pem": "-----BEGIN PRIVATE KEY----- MIIEvQIBADANBgkqhkiG9w0BAQEFAASC...oCfe0= -----END PRIVATE KEY-----",
+     "priv_key_kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
+     "blind_factor": "eNf80WNHbImaUNU-kokBr7ocELBjMtHcy0re_RKBPQ8=",
+     "jwe": {
+       "headers": {
+         "kid": "rNv1O_mXgxF6QEMfaQGvjev7RbT1FG3sJXxxsu_KHbM",
+         "alg": "RSA-OAEP",
+         "enc": "A256GCM",
+         "cty": "application/json"
+       },
+       "decrypted": {
+         "subject": "pseudonym:eval:-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
+         "aud": "oin:00000003123456780000",
+         "scope": "nvi",
+         "version": "1.1",
+         "iat": 1758616285,
+         "exp": 1758616585,
+         "extra_versions": {}
+       }
+     },
+     "eval_subject": "-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
+     "final_pseudonym": "fDZYIlajLAV3y8fWl1ObFBDmybUEGrR37pDb-5p5pJJGKvvpDvvMdQmYHKqtiQ8tdF4VL3w8nkbssHtOmkjiOg=="
+   }
+   ```
 
-    The `final_pseudonym` is the actual pseudonym that can be stored by the receiver. Note that this pseudonym is deterministic
-    for the same input, organization and scope. However, it is not possible to reverse this into a BSN.
+   The `final_pseudonym` is the actual pseudonym that can be stored by the receiver. Note that this pseudonym is deterministic
+   for the same input, organization and scope. However, it is not possible to reverse this into a BSN.
 
-    The `subject` always carries the evaluation for the latest key version. The `extra_versions` claim is empty when only one
-    key version is active; during key rotation it holds the older versions as `{"<version>": "<base64 eval>"}`, so the receiver
-    can also finalize against an older key version.
+   The `subject` always carries the evaluation for the latest key version. The `extra_versions` claim is empty when only one
+   key version is active; during key rotation it holds the older versions as `{"<version>": "<base64 eval>"}`, so the receiver
+   can also finalize against an older key version.
 
 ## max-key-usage
 
