@@ -22,7 +22,7 @@ The `x-gf-scope` header carries the OAuth scopes of the caller's token. Each gro
 
 A request whose token lacks the required scope is rejected with `403`.
 
-The calling organization (`x-gf-sub`) must also be registered in the PRS database. When it is not, the endpoint answers `403` with `Organization does not exist`.
+The calling organization (`x-gf-sub`) must also be registered in the PRS database. When it is not, the endpoint answers `403` with `Organization does not exist`. A registered organization that is not allowed to request the personal ID type an endpoint produces is refused with `403` as well, with `Not allowed to request personal_id_type: <type>`. The PRS never answers `401`: the OIN-verifier already authenticated the caller, so every refusal is an authorization decision.
 
 ## Service Information
 
@@ -104,7 +104,7 @@ Create a new HSM key version for the calling organization. Version numbers are a
 
 The body is optional. `from_dt` defaults to now and may lie in the past. `until_dt` must be later than now and later than `from_dt`. Both must include a timezone offset.
 
-Returns `201`:
+Returns `201`, or `409` when the organization has no key version yet to rotate from:
 
 ```json
 {
@@ -158,7 +158,7 @@ Response:
 
 The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key registered for `recipientScope` (or the `*` wildcard key), and its `kid` header names that key. The decrypted payload carries the evaluation for the latest key version as `subject` in the form `pseudonym:eval:<base64>`, plus `aud` (the recipient), `scope`, `iat` and `exp` (five minutes). When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extra_versions` claim (`{"<version>": "<base64 eval>"}`).
 
-Errors: `401` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, or has no key registered for the scope, `400` when the blind cannot be evaluated.
+Errors: `403` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, or has no key registered for the scope, `400` when the blind cannot be evaluated.
 
 ## Exchange Services
 
@@ -180,7 +180,7 @@ Before the personal ID is processed, two administrator-managed authorizations ar
 - the calling organization (the verified `x-gf-sub` identity) must be allowed to *request* the `reversible_pseudonym` personal ID type;
 - the recipient organization must be allowed to *receive* the `reversible_pseudonym` personal ID type, since the pseudonym can be reversed to the personal ID by the PRS.
 
-Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing or the calling organization is not registered, `401` when the caller is not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed.
+Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed.
 
 Irreversible pseudonyms are not exchanged through this section: use `POST /oprf/eval`.
 
