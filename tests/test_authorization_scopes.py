@@ -166,4 +166,6 @@ def test_exchange_reversible_pseudonym_requires_the_pseudonym_scope(
         json=REVERSIBLE_PSEUDONYM_BODY,
         headers=granted,
     )
-    assert allowed.status_code != 403
+    # A policy refusal is also 403, so tell the two apart by the message: the
+    # scope check answers "Unauthorized request", the router never does.
+    assert allowed.json().get("detail") != "Unauthorized request"

@@ -5,7 +5,6 @@ from app.db.repositories.organization_repository import OrganizationRepository
 from app.enums.personal_id_type import PersonalIdType
 from app.exceptions import (
     NotAllowedToRequestError,
-    OrganizationNotRegisteredError,
     RecipientNotFoundError,
 )
 from app.models.oin import Oin
@@ -22,9 +21,7 @@ class AuthorizationService:
     ) -> None:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(organization_id)
-            if not org:
-                raise OrganizationNotRegisteredError()
+            org = org_repo.get_registered(organization_id)
             if not personal_id_type in [
                 rpit.name for rpit in org.request_personal_id_types
             ]:

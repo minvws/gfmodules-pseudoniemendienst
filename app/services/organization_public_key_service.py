@@ -21,6 +21,7 @@ from app.exceptions import (
     InvalidJwsError,
     OrganizationNotRegisteredError,
     PublicKeyNotFoundError,
+    RecipientNotFoundError,
 )
 from app.logging.events import Log
 from app.models.oin import Oin
@@ -188,9 +189,7 @@ class OrganizationPublicKeyService:
         jwk_dict = self._validate_and_extract(raw_jws, org_id).export(as_dict=True)
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(org_id)
-            if org is None:
-                raise OrganizationNotRegisteredError()
+            org = org_repo.get_registered(org_id)
             public_key_for_id = [pk for pk in org.public_keys if pk.id == id]
 
             domains_as_set = set(domains)
@@ -222,9 +221,7 @@ class OrganizationPublicKeyService:
     def get_by_org(self, org_id: Oin) -> list[dict[str, Any]]:
         with self.db.get_db_session() as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(org_id)
-            if not org:
-                raise OrganizationNotRegisteredError()
+            org = org_repo.get_registered(org_id)
             return [pk.to_dict() for pk in org.public_keys]
 
     def get_by_org_and_domain(
@@ -234,7 +231,8 @@ class OrganizationPublicKeyService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(org_id)
             if not org:
-                raise OrganizationNotRegisteredError()
+                # The organization is the recipient of an exchange.
+                raise RecipientNotFoundError()
             public_key = [pk for pk in org.public_keys if domain in pk.domains]
             if not public_key:
                 public_key = [pk for pk in org.public_keys if "*" in pk.domains]
@@ -245,9 +243,7 @@ class OrganizationPublicKeyService:
     def delete(self, key_id: uuid.UUID, organization_id: Oin) -> bool:
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(organization_id)
-            if not org:
-                raise OrganizationNotRegisteredError()
+            org = org_repo.get_registered(organization_id)
             return session.get_repository(OrganizationPublicKeyRepository).delete(
                 key_id, org.id
             )

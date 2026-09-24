@@ -13,7 +13,7 @@ from app.exceptions import (
     KeyVersionNotFoundError,
     KeyVersionRemovedError,
     NoKeyVersionError,
-    OrganizationNotRegisteredError,
+    RecipientNotFoundError,
 )
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
@@ -47,9 +47,7 @@ class HsmKeyVersionService:
         with self.__db.get_db_session() as session:
             organization = session.get_repository(
                 OrganizationRepository
-            ).get_one_by_external_id(organization_external_id)
-            if not organization:
-                raise OrganizationNotRegisteredError()
+            ).get_registered(organization_external_id)
             return organization.hsm_key_versions
 
     def get_active_versions_by_organization_id(
@@ -73,6 +71,10 @@ class HsmKeyVersionService:
     ) -> list[int]:
         """
         Returns active version numbers for the organization at the current moment.
+
+        The organization is the recipient of an exchange (its keys are used to
+        derive the pseudonym), so an unknown organization is reported as an
+        unknown recipient.
         """
 
         def _is_active(version: HsmKeyVersionEntity, now: datetime) -> bool:
@@ -87,7 +89,7 @@ class HsmKeyVersionService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_external_id)
             if org is None:
-                raise OrganizationNotRegisteredError()
+                raise RecipientNotFoundError()
             versions = [v.version for v in org.hsm_key_versions if _is_active(v, now)]
             return versions
 
@@ -118,11 +120,9 @@ class HsmKeyVersionService:
         """
         from_dt = from_dt or now_utc()
         with self.__db.get_db_session(commit=True) as session:
-            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+            org = session.get_repository(OrganizationRepository).get_registered(
                 organization_external_id
             )
-            if not org:
-                raise OrganizationNotRegisteredError()
             # Make sure we have at least one hsm_key_version
             if not org.hsm_key_versions:
                 logger.error(
@@ -165,11 +165,9 @@ class HsmKeyVersionService:
         another organization.
         """
         with self.__db.get_db_session(commit=True) as session:
-            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+            org = session.get_repository(OrganizationRepository).get_registered(
                 organization_external_id
             )
-            if not org:
-                raise OrganizationNotRegisteredError()
             versions = [hkv for hkv in org.hsm_key_versions if hkv.id == version_id]
             if len(versions) != 1:
                 raise KeyVersionNotFoundError()

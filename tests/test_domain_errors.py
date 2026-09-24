@@ -68,7 +68,7 @@ def test_handler_answers_with_the_mapped_code_and_the_message(
 ) -> None:
     response = client.get("/refuse")
 
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert response.json() == {
         "detail": "Not allowed to request personal_id_type: oprf"
     }

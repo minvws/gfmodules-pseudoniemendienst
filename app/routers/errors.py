@@ -30,17 +30,20 @@ from app.exceptions import (
 logger = logging.getLogger(__name__)
 
 STATUS_CODES: dict[type[DomainError], int] = {
+    # The proxy already authenticated the caller, so both an unregistered
+    # organization and a policy refusal are 403: known, but not allowed.
     OrganizationNotRegisteredError: 403,
-    NotAllowedToRequestError: 401,
+    NotAllowedToRequestError: 403,
+    InvalidAudienceError: 403,
     RecipientNotFoundError: 404,
     InvalidJwsError: 422,
     PublicKeyNotFoundError: 404,
     DomainAlreadyRegisteredError: 409,
     DomainNotRegisteredError: 404,
     KeyVersionNotFoundError: 404,
+    # The version exists and belongs to the caller; its state forbids the change.
     KeyVersionRemovedError: 409,
     NoKeyVersionError: 409,
-    InvalidAudienceError: 403,
 }
 
 

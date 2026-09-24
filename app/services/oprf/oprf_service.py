@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pyoprf
 from jwcrypto import jwk
 
+from app.exceptions import DomainError
 from app.models.requests import BlindRequest
 from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
 from app.services.oprf.jwe_token import BlindJwe
@@ -64,7 +65,9 @@ class OprfService:
 
         try:
             evals = self.__evaluator.evaluate(req.recipientOrganization, bi)
-        except OprfEvaluationError:
+        except (OprfEvaluationError, DomainError):
+            # Domain errors (e.g. an unknown recipient) keep their meaning and
+            # status code; only unexpected failures become evaluation errors.
             raise
         except Exception as e:
             logger.exception("unable to evaluate blind")

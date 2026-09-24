@@ -52,16 +52,11 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
             "content": {"application/jwe": {}},
         },
         400: {"description": "The personal ID is malformed."},
-        401: {
-            "description": (
-                "The calling organization is not allowed to request reversible "
-                "pseudonyms."
-            )
-        },
         403: {
             "description": (
-                "Insufficient scope (the token requires `prs:pseudonym`), or the "
-                "calling organization is not registered."
+                "Insufficient scope (the token requires `prs:pseudonym`), the "
+                "calling organization is not registered, or it is not allowed to "
+                "request reversible pseudonyms."
             )
         },
         404: {
@@ -71,7 +66,8 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
                 "scope, or has no active HSM key version."
             )
         },
-        500: {"description": "Service temporarily unavailable."},
+        500: {"description": "The pseudonym could not be produced."},
+        503: {"description": "The HSM could not be reached; retry later."},
     },
     description="""
 Exchange a personal ID for a reversible pseudonym bound to the recipient

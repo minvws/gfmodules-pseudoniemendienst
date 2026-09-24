@@ -234,7 +234,7 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
 
     response = client.post(ENDPOINT, json=BODY, headers=valid_headers)
 
-    assert response.status_code == 401
+    assert response.status_code == 403
     assert "Not allowed to request" in response.json()["detail"]
 
     events = _events(records, "200402")
@@ -258,7 +258,7 @@ def test_sender_permission_is_read_from_the_verified_caller_not_the_acting_org(
 
     response = client.post(ENDPOINT, json=BODY, headers=valid_headers)
 
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 def test_recipient_not_allowed_to_receive_is_refused(

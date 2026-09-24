@@ -83,6 +83,15 @@ def post_eval(
 
     try:
         result = oprf_service.eval_blind(req, JWK(**organization_public_key.jwk))
+    except DomainError as e:
+        # PRS-OPRF-004, raised past the checks above (e.g. by the evaluator).
+        gflog.emit(
+            logger,
+            Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+            f"OPRF refused: {e.message}",
+            fields=audit_oins,
+        )
+        raise
     except ValueError as e:
         # PRS-OPRF-003
         gflog.emit(

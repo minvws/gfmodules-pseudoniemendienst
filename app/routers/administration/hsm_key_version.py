@@ -1,4 +1,3 @@
-import logging
 from typing import Annotated
 from uuid import UUID
 
@@ -12,7 +11,6 @@ from app.models.auth.context import AuthContext
 from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
