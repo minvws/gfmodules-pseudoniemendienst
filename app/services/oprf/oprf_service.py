@@ -5,8 +5,9 @@ from dataclasses import dataclass
 import pyoprf
 from jwcrypto import jwk
 
-from app.exceptions import DomainError
+from app.exceptions import DomainError, RecipientNotFoundError
 from app.models.requests import BlindRequest
+from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
 from app.services.oprf.jwe_token import BlindJwe
 
@@ -69,6 +70,10 @@ class OprfService:
             # Domain errors (e.g. an unknown recipient) keep their meaning and
             # status code; only unexpected failures become evaluation errors.
             raise
+        except HSM_UNREACHABLE_ERRORS as e:
+            raise OprfEvaluationError(
+                f"HSM unreachable: {e}", error_type="hsm_unreachable"
+            ) from e
         except Exception as e:
             logger.exception("unable to evaluate blind")
             raise OprfEvaluationError(
@@ -79,6 +84,12 @@ class OprfService:
                     else "crypto_evaluation_failure"
                 ),
             )
+
+        if not evals:
+            # The recipient has no active HSM key version. Reported like an
+            # unknown recipient, as the reversible exchange does, so a caller
+            # cannot tell the two apart.
+            raise RecipientNotFoundError()
 
         # The subject always carries the latest key version in the original,
         # backwards-compatible format so existing clients keep working unchanged.

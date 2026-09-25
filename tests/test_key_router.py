@@ -193,7 +193,7 @@ def test_delete_key_removes_key_for_authenticated_org(
     assert organization_public_key_service.get_by_id(created["id"]) is None
 
 
-def test_delete_key_not_found_is_unauthorized(
+def test_delete_key_not_found_is_not_found(
     client: TestClient,
     valid_headers: dict[str, str],
     persisted_organization: OrganizationEntity,
@@ -203,11 +203,11 @@ def test_delete_key_not_found_is_unauthorized(
         headers=_auth_headers(valid_headers, persisted_organization.external_id),
     )
 
-    assert delete_response.status_code == 403
-    assert delete_response.json() == {"detail": "forbidden"}
+    assert delete_response.status_code == 404
+    assert delete_response.json() == {"detail": "public key not found"}
 
 
-def test_delete_other_org_is_unauthorized(
+def test_delete_other_org_key_is_not_found(
     client: TestClient,
     valid_headers: dict[str, str],
     persisted_organization: OrganizationEntity,
@@ -235,8 +235,8 @@ def test_delete_other_org_is_unauthorized(
         headers=_auth_headers(valid_headers, other_org.external_id),
     )
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "forbidden"}
+    assert response.status_code == 404
+    assert response.json() == {"detail": "public key not found"}
     assert organization_public_key_service.get_by_id(created["id"]) is not None
 
 

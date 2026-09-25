@@ -34,3 +34,22 @@ def test_unexpected_evaluator_failure_becomes_an_evaluation_error() -> None:
         _service(RuntimeError("hsm exploded")).eval_blind(REQUEST, JWK(generate="oct"))
 
     assert e.value.error_type == "crypto_evaluation_failure"
+
+
+def test_unreachable_hsm_becomes_a_retryable_evaluation_error() -> None:
+    import requests
+
+    with pytest.raises(OprfEvaluationError) as e:
+        _service(requests.exceptions.ConnectionError("refused")).eval_blind(
+            REQUEST, JWK(generate="oct")
+        )
+
+    assert e.value.error_type == "hsm_unreachable"
+
+
+def test_recipient_without_active_key_version_is_not_found() -> None:
+    evaluator = MagicMock()
+    evaluator.evaluate.return_value = {}
+
+    with pytest.raises(RecipientNotFoundError):
+        OprfService(evaluator).eval_blind(REQUEST, JWK(generate="oct"))

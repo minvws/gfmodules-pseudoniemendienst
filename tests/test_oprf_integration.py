@@ -436,3 +436,35 @@ def test_domain_error_from_evaluation_keeps_its_status_and_is_audited_as_refusal
     }
     assert len(captured.for_event(Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY)) == 1
     assert not captured.for_event(Log.OPRF_EVAL_FAILED)
+
+
+def test_unreachable_hsm_answers_503_and_is_audited(
+    app: FastAPI,
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    valid_headers: dict[str, str],
+) -> None:
+    class UnreachableOprfService:
+        def eval_blind(self, req: object, pub_key_jwk: object) -> str:
+            raise OprfEvaluationError("HSM unreachable", error_type="hsm_unreachable")
+
+    app.dependency_overrides[container.get_oprf_service] = lambda: (
+        UnreachableOprfService()
+    )
+    try:
+        with capture_records("app.routers.oprf") as captured:
+            response = client.post(
+                "/oprf/eval",
+                json={
+                    "encryptedPersonalId": "Zm9v",
+                    "recipientOrganization": oprf_context.recipient_organization,
+                    "recipientScope": oprf_context.recipient_scope,
+                },
+                headers=valid_headers,
+            )
+    finally:
+        app.dependency_overrides.pop(container.get_oprf_service, None)
+
+    assert response.status_code == 503
+    [event] = captured.for_event(Log.OPRF_EVAL_FAILED)
+    assert event.message["error_type"] == "hsm_unreachable"
