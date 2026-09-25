@@ -142,7 +142,7 @@ def test_saml_exchange_service_error_returns_502_and_logs(
         ENDPOINT, json={"foo": "bar"}, headers=valid_headers
     )
     assert response.status_code == 502
-    assert response.json() == {"error": "SAML exchange failed"}
+    assert response.json() == {"detail": "SAML exchange failed"}
 
     events = [r for r in records if getattr(r, "event_id", None) == "230401"]
     assert len(events) == 1

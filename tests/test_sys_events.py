@@ -105,7 +105,7 @@ def test_unhandled_exception_emits_sys_event_and_returns_500(
         )
 
     assert response.status_code == 500
-    assert response.json() == {"error": "Internal server error"}
+    assert response.json() == {"detail": "Internal server error"}
     events = captured.for_event(Log.SYS_UNHANDLED_EXCEPTION)
     assert len(events) == 1
     entry = events[0]
