@@ -16,7 +16,7 @@ OPRF_BODY = {
 }
 
 REVERSIBLE_PSEUDONYM_BODY = {
-    "personalId": {"landCode": "NL", "type": "bsn", "value": "9500009012"},
+    "personalId": {"landCode": "NL", "type": "bsn", "value": "950000012"},
     "recipientOrganization": "oin:00000099000000001000",
     "recipientScope": "nvi",
 }
@@ -135,7 +135,7 @@ def test_test_routes_are_authenticated_but_not_scoped(
     client: TestClient, headers_with_scopes: HeaderBuilder
 ) -> None:
     headers = headers_with_scopes(AuthorizationScope.ADMINISTRATION)
-    body = {"personalId": "NL:bsn:9500009012"}
+    body = {"personalId": "NL:bsn:950000012"}
     assert (
         client.post("/test/oprf/client", json=body, headers=headers).status_code == 200
     )
