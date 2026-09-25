@@ -311,7 +311,7 @@ def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespon
         fields={"exception_type": type(exc).__name__},
         exc_info=exc,
     )
-    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 def setup_logging() -> None:

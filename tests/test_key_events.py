@@ -442,7 +442,7 @@ def test_register_public_key_for_other_oin_emits_rejected(
     assert record.levelno == logging.WARNING
     assert record.organisatie_oin == oin.value  # type: ignore[attr-defined]
     assert record.key_algoritme == "RSA"  # type: ignore[attr-defined]
-    assert record.rejection_reason == "Unautorized for supplied `oin`"  # type: ignore[attr-defined]
+    assert record.rejection_reason == "Unauthorized for supplied `oin`"  # type: ignore[attr-defined]
     assert not _events(records, "250404")
 
 
