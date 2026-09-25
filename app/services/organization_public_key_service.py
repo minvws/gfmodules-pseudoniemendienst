@@ -240,10 +240,13 @@ class OrganizationPublicKeyService:
                 raise DomainNotRegisteredError()
             return public_key[0]
 
-    def delete(self, key_id: uuid.UUID, organization_id: Oin) -> bool:
+    def delete(self, key_id: uuid.UUID, organization_id: Oin) -> None:
+        """Deletes the key; raises when it does not exist for the organization."""
         with self.db.get_db_session(commit=True) as session:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_registered(organization_id)
-            return session.get_repository(OrganizationPublicKeyRepository).delete(
+            deleted = session.get_repository(OrganizationPublicKeyRepository).delete(
                 key_id, org.id
             )
+            if not deleted:
+                raise PublicKeyNotFoundError()

@@ -2,7 +2,7 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from starlette.responses import JSONResponse
 
 from app import container
@@ -96,16 +96,6 @@ def delete_key(
         Depends(container.get_organization_public_key_service),
     ],
 ) -> JSONResponse:
-    deleted = organization_public_key_service.delete(
-        id, auth_ctx.claims.organization_id
-    )
-    if not deleted:
-        logger.warning(
-            "key %s for organization %s was not deleted",
-            id,
-            auth_ctx.claims.organization_id,
-        )
-        raise HTTPException(status_code=403, detail="forbidden")
-
+    organization_public_key_service.delete(id, auth_ctx.claims.organization_id)
     logger.info("key with id %s deleted successfully", id)
     return JSONResponse(status_code=200, content={"message": "key deleted"})

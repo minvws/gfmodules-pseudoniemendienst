@@ -90,7 +90,7 @@ Replace the domains and the key of one registered key. The body is the same as f
 Returns `200` with the updated key, `404` when the id does not exist for the calling organization, `409` when a domain is already registered to another key, `422` when the JWS is invalid.
 
 #### `DELETE /administration/keys/{id}`
-Delete one registered key. Returns `200` with `{"message": "key deleted"}`, or `403` when the id does not exist for the calling organization.
+Delete one registered key. Returns `200` with `{"message": "key deleted"}`, or `404` when the id does not exist for the calling organization.
 
 #### `POST /administration/key-versions`
 Create a new HSM key version for the calling organization. Version numbers are assigned by the PRS, one higher than the organization's highest version. The OPRF secret for a version is generated in the HSM on first use.
@@ -158,7 +158,7 @@ Response:
 
 The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key registered for `recipientScope` (or the `*` wildcard key), and its `kid` header names that key. The decrypted payload carries the evaluation for the latest key version as `subject` in the form `pseudonym:eval:<base64>`, plus `aud` (the recipient), `scope`, `iat` and `exp` (five minutes). When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extra_versions` claim (`{"<version>": "<base64 eval>"}`).
 
-Errors: `403` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, or has no key registered for the scope, `400` when the blind cannot be evaluated.
+Errors: `403` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, has no key registered for the scope, or has no active HSM key version, `400` when the blind cannot be evaluated, `503` when the HSM cannot be reached.
 
 ## Exchange Services
 

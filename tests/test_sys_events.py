@@ -174,7 +174,7 @@ def test_hsm_unreachable_emits_sys_event(
     ):
         service.eval_blind(_blind_request(), pub)
 
-    assert exc.value.error_type == "crypto_evaluation_failure"
+    assert exc.value.error_type == "hsm_unreachable"
     events = _events(records, "270406")
     assert len(events) == 1
     record = events[0]

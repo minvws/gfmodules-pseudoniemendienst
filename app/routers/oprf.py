@@ -103,6 +103,11 @@ def post_eval(
                 "error_type": getattr(e, "error_type", "crypto_evaluation_failure"),
             },
         )
+        if getattr(e, "error_type", None) == "hsm_unreachable":
+            # Like the reversible exchange: the request may be retried later.
+            raise HTTPException(
+                status_code=503, detail="Unable to evaluate blind"
+            ) from e
         raise HTTPException(status_code=400, detail="Unable to evaluate blind") from e
 
     # PRS-OPRF-001
