@@ -60,7 +60,7 @@ def post_reversible_pseudonym(
                 "error_type": e.error_type,
             },
         )
-        return JSONResponse({"error": "SAML exchange failed"}, status_code=502)
+        return JSONResponse({"detail": "SAML exchange failed"}, status_code=502)
 
     gflog.emit(
         logger,

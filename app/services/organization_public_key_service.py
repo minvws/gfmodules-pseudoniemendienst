@@ -141,7 +141,7 @@ class OrganizationPublicKeyService:
         ):
             raise InvalidJwsError("JWS expired")
         if payload["oin"] != org_id.value:
-            raise InvalidJwsError("Unautorized for supplied `oin`")
+            raise InvalidJwsError("Unauthorized for supplied `oin`")
         return jwk
 
     def create(
