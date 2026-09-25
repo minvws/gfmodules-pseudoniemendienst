@@ -26,7 +26,11 @@ class OprfHsmKeyLabel:
     version: int
 
     def __str__(self) -> str:
-        return f"oin-{self.oin}-oprf-v{self.version}"
+        # Always the bare 20-character OIN, also for a RecipientOrganizationOin
+        # whose str() carries the "oin:" prefix. The evaluator gets the
+        # recipient from the request while the cleanup derives the same label
+        # from the stored organization; both must name the same HSM object.
+        return f"oin-{self.oin.value}-oprf-v{self.version}"
 
 
 class LocalOprfEvaluator:

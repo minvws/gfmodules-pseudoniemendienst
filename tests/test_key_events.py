@@ -16,7 +16,7 @@ from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.logging.events import Log
-from app.models.oin import Oin
+from app.models.oin import Oin, RecipientOrganizationOin
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmOprfEvaluator, OprfHsmKeyLabel
@@ -491,3 +491,15 @@ def test_register_public_key_duplicate_domain_emits_rejected(
     assert len(rejected) == 1
     assert rejected[0].key_algoritme == "RSA"  # type: ignore[attr-defined]
     assert rejected[0].rejection_reason == "domain already registered"  # type: ignore[attr-defined]
+
+
+def test_oprf_label_is_the_same_for_request_and_stored_oin() -> None:
+    """The evaluator builds the label from the recipient in the request (a
+    RecipientOrganizationOin, whose str() carries the "oin:" prefix) and the
+    cleanup builds it from the organization stored in the database (a plain
+    Oin). Both must address the same HSM object."""
+    from_request = OprfHsmKeyLabel(RecipientOrganizationOin(f"oin:{TEST_OIN}"), 3)
+    from_database = OprfHsmKeyLabel(TEST_OIN, 3)
+
+    assert str(from_request) == str(from_database) == f"oin-{TEST_OIN.value}-oprf-v3"
+    assert "oin:" not in str(from_request)
