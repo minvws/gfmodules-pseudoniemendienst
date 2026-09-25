@@ -4,12 +4,17 @@ from datetime import datetime, timezone
 from typing import Any
 
 import gfmodules.logging as gflog
-from fastapi import HTTPException
 
 from app.db.db import Database
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
 from app.db.repositories.organization_repository import OrganizationRepository
+from app.exceptions import (
+    KeyVersionNotFoundError,
+    KeyVersionRemovedError,
+    NoKeyVersionError,
+    RecipientNotFoundError,
+)
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
 from app.utils.datetime import now_utc
@@ -42,9 +47,7 @@ class HsmKeyVersionService:
         with self.__db.get_db_session() as session:
             organization = session.get_repository(
                 OrganizationRepository
-            ).get_one_by_external_id(organization_external_id)
-            if not organization:
-                raise HTTPException(status_code=404, detail="Organization not found")
+            ).get_registered(organization_external_id)
             return organization.hsm_key_versions
 
     def get_active_versions_by_organization_id(
@@ -68,6 +71,10 @@ class HsmKeyVersionService:
     ) -> list[int]:
         """
         Returns active version numbers for the organization at the current moment.
+
+        The organization is the recipient of an exchange (its keys are used to
+        derive the pseudonym), so an unknown organization is reported as an
+        unknown recipient.
         """
 
         def _is_active(version: HsmKeyVersionEntity, now: datetime) -> bool:
@@ -82,9 +89,7 @@ class HsmKeyVersionService:
             org_repo = session.get_repository(OrganizationRepository)
             org = org_repo.get_one_by_external_id(organization_external_id)
             if org is None:
-                raise HTTPException(
-                    status_code=405, detail="Organization does not exist"
-                )
+                raise RecipientNotFoundError()
             versions = [v.version for v in org.hsm_key_versions if _is_active(v, now)]
             return versions
 
@@ -115,20 +120,16 @@ class HsmKeyVersionService:
         """
         from_dt = from_dt or now_utc()
         with self.__db.get_db_session(commit=True) as session:
-            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+            org = session.get_repository(OrganizationRepository).get_registered(
                 organization_external_id
             )
-            if not org:
-                raise HTTPException(status_code=401, detail="unauthorized")
             # Make sure we have at least one hsm_key_version
             if not org.hsm_key_versions:
                 logger.error(
                     "organization %s has no hsm key version to rotate from",
                     organization_external_id.value,
                 )
-                raise HTTPException(
-                    status_code=409, detail="Organization has no key version"
-                )
+                raise NoKeyVersionError()
             # The relationship is ordered by version, so the last entry holds
             # the highest version number.
             current_version = org.hsm_key_versions[-1].version
@@ -164,17 +165,15 @@ class HsmKeyVersionService:
         another organization.
         """
         with self.__db.get_db_session(commit=True) as session:
-            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+            org = session.get_repository(OrganizationRepository).get_registered(
                 organization_external_id
             )
-            if not org:
-                raise HTTPException(status_code=404, detail="Organization not found")
             versions = [hkv for hkv in org.hsm_key_versions if hkv.id == version_id]
             if len(versions) != 1:
-                raise HTTPException(status_code=404, detail="KeyVersion not found")
+                raise KeyVersionNotFoundError()
             version = versions[0]
             if version.removed_at is not None:
-                raise HTTPException(403, "forbidden")
+                raise KeyVersionRemovedError()
             version.until_dt = until_dt
             if until_dt is not None:
                 gflog.emit(

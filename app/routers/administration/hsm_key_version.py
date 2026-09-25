@@ -1,8 +1,7 @@
-import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
@@ -12,7 +11,6 @@ from app.models.auth.context import AuthContext
 from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -28,20 +26,11 @@ def post_key_version(
     auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
     req: HsmKeyVersionRequest | None = None,
 ) -> JSONResponse:
-    try:
-        entry = hsm_key_version_service.increase_version_for_org(
-            auth_ctx.claims.organization_id,
-            req.from_dt if req else None,
-            req.until_dt if req else None,
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception(
-            "failed to create key version for organization_id %s",
-            auth_ctx.claims.organization_id,
-        )
-        raise HTTPException(status_code=500, detail="failed to create key version")
+    entry = hsm_key_version_service.increase_version_for_org(
+        auth_ctx.claims.organization_id,
+        req.from_dt if req else None,
+        req.until_dt if req else None,
+    )
 
     return JSONResponse(status_code=201, content=jsonable_encoder(entry.to_dict()))
 
@@ -78,16 +67,10 @@ def put_key_version(
     ],
     auth_ctx: Annotated[AuthContext, Depends(get_auth_ctx)],
 ) -> JSONResponse:
-    try:
-        entry = hsm_key_version_service.update_version_by_organization_id(
-            id,
-            auth_ctx.claims.organization_id,
-            req.until_dt,
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("failed to update key version %s", id)
-        raise HTTPException(status_code=500, detail="failed to update key version")
+    entry = hsm_key_version_service.update_version_by_organization_id(
+        id,
+        auth_ctx.claims.organization_id,
+        req.until_dt,
+    )
 
     return JSONResponse(status_code=200, content=jsonable_encoder(entry))

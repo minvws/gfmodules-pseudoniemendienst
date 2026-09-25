@@ -9,15 +9,13 @@ from starlette.responses import Response
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import DomainError, RecipientNotFoundError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import ReversiblePseudonymExchangeRequest
 from app.personal_id import PersonalId
-from app.services.authorization_service import (
-    MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION,
-    AuthorizationService,
-)
+from app.services.authorization_service import AuthorizationService
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.service import (
@@ -54,14 +52,12 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
             "content": {"application/jwe": {}},
         },
         400: {"description": "The personal ID is malformed."},
-        401: {
-            "description": (
-                "The calling organization is unknown or is not allowed to request "
-                "reversible pseudonyms."
-            )
-        },
         403: {
-            "description": "Insufficient scope. The authorization token requires the `prs:pseudonym` scope."
+            "description": (
+                "Insufficient scope (the token requires `prs:pseudonym`), the "
+                "calling organization is not registered, or it is not allowed to "
+                "request reversible pseudonyms."
+            )
         },
         404: {
             "description": (
@@ -70,7 +66,8 @@ def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
                 "scope, or has no active HSM key version."
             )
         },
-        500: {"description": "Service temporarily unavailable."},
+        500: {"description": "The pseudonym could not be produced."},
+        503: {"description": "The HSM could not be reached; retry later."},
     },
     description="""
 Exchange a personal ID for a reversible pseudonym bound to the recipient
@@ -109,11 +106,11 @@ def exchange_reversible_pseudonym(
     namens_oin = str(auth.claims.organization_id)
     doel_oin = str(req.recipientOrganization)
 
-    def deny(reason: str, error: HTTPException) -> HTTPException:
+    def deny(reason: str, error: DomainError) -> None:
         gflog.emit(
             logger,
             Log.AUTHORIZATION_DENIED,
-            f"Authorization denied ({reason}): {error.detail}",
+            f"Authorization denied ({reason}): {error.message}",
             fields={
                 "handelende_oin": handelende_oin,
                 "namens_oin": namens_oin,
@@ -121,22 +118,23 @@ def exchange_reversible_pseudonym(
                 "requested_operation": _OPERATION,
             },
         )
-        return error
 
     personal_id_type = PersonalIdType.REVERSIBLE_PSEUDONYM
     try:
         authorization_service.validate_allowed_to_request(
             auth.claims.organization_id, personal_id_type
         )
-    except HTTPException as e:
-        raise deny("sender_may_not_request_reversible_pseudonym", e)
+    except DomainError as e:
+        deny("sender_may_not_request_reversible_pseudonym", e)
+        raise
 
     try:
         authorization_service.validate_allowed_to_receive(
             req.recipientOrganization, personal_id_type
         )
-    except HTTPException as e:
-        raise deny("recipient_may_not_receive_reversible_pseudonym", e)
+    except DomainError as e:
+        deny("recipient_may_not_receive_reversible_pseudonym", e)
+        raise
 
     try:
         personal_id = _parse_personal_id(req.personalId)
@@ -180,10 +178,7 @@ def exchange_reversible_pseudonym(
         if e.error_type == "no_active_key_version":
             # Must be the same message as for when we don't find the server, so we cannot
             # differentiate between the two cases and leak information about the recipient organization.
-            raise HTTPException(
-                status_code=404,
-                detail=MSG_UNABLE_TO_FIND_RECIPIENT_ORGANIZATION,
-            )
+            raise RecipientNotFoundError()
         status = 503 if e.error_type == "hsm_unreachable" else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 

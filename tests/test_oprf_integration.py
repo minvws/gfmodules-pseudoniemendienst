@@ -17,6 +17,7 @@ from starlette.testclient import TestClient
 
 from app import container
 from app.db.models import OrganizationEntity
+from app.exceptions import RecipientNotFoundError
 from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.oprf.oprf_service import OprfEvaluationError
@@ -399,3 +400,39 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
 
     assert eval_response.status_code == 400
     assert eval_response.json() == {"detail": "Unable to evaluate blind"}
+
+
+def test_domain_error_from_evaluation_keeps_its_status_and_is_audited_as_refusal(
+    app: FastAPI,
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    valid_headers: dict[str, str],
+) -> None:
+    """The evaluator looks the recipient up again; a domain error raised there
+    must not be re-wrapped into a 400 evaluation failure."""
+
+    class RefusingOprfService:
+        def eval_blind(self, req: object, pub_key_jwk: object) -> str:
+            raise RecipientNotFoundError()
+
+    app.dependency_overrides[container.get_oprf_service] = lambda: RefusingOprfService()
+    try:
+        with capture_records("app.routers.oprf") as captured:
+            response = client.post(
+                "/oprf/eval",
+                json={
+                    "encryptedPersonalId": "Zm9v",
+                    "recipientOrganization": oprf_context.recipient_organization,
+                    "recipientScope": oprf_context.recipient_scope,
+                },
+                headers=valid_headers,
+            )
+    finally:
+        app.dependency_overrides.pop(container.get_oprf_service, None)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "detail": "Unable to find requested recipient organization"
+    }
+    assert len(captured.for_event(Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY)) == 1
+    assert not captured.for_event(Log.OPRF_EVAL_FAILED)

@@ -11,10 +11,7 @@ from app.models.auth.context import AuthContext
 from app.models.organization_public_key import (
     OrganizationPublicKeyRequest,
 )
-from app.services.organization_public_key_service import (
-    AlreadyExistsError,
-    OrganizationPublicKeyService,
-)
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 logger = logging.getLogger(__name__)
 
@@ -34,31 +31,11 @@ def post_key(
         Depends(container.get_organization_public_key_service),
     ],
 ) -> JSONResponse:
-    # Create the key entry
-    try:
-        created_key = organization_public_key_service.create(
-            auth_ctx.claims.organization_id,
-            req.domains,
-            req.jws,
-        )
-    except AlreadyExistsError:
-        logger.warning(
-            "key already exists for org_id=%s scope=%r",
-            auth_ctx.claims.organization_id,
-            req.domains,
-        )
-        raise HTTPException(
-            status_code=409, detail="key for this org/scope already exists"
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception(
-            "failed to create key entry for org_id=%s scope=%r",
-            auth_ctx.claims.organization_id,
-            req.domains,
-        )
-        raise HTTPException(status_code=500, detail="failed to create key entry")
+    created_key = organization_public_key_service.create(
+        auth_ctx.claims.organization_id,
+        req.domains,
+        req.jws,
+    )
 
     return JSONResponse(status_code=201, content=created_key)
 
@@ -96,27 +73,12 @@ def put_key(
         Depends(container.get_organization_public_key_service),
     ],
 ) -> JSONResponse:
-    try:
-        updated = organization_public_key_service.update(
-            id,
-            auth_ctx.claims.organization_id,
-            req.domains,
-            req.jws,
-        )
-    except HTTPException:
-        raise
-    except AlreadyExistsError:
-        logger.warning(
-            "key already exists for org_id=%s scope=%r",
-            auth_ctx.claims.organization_id,
-            req.domains,
-        )
-        raise HTTPException(
-            status_code=409, detail="key for this org/scope already exists"
-        )
-    except Exception:
-        logger.exception("failed to update key %s", id)
-        raise HTTPException(status_code=500, detail="failed to update key")
+    updated = organization_public_key_service.update(
+        id,
+        auth_ctx.claims.organization_id,
+        req.domains,
+        req.jws,
+    )
 
     return JSONResponse(status_code=200, content=updated)
 

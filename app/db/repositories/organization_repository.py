@@ -2,6 +2,7 @@ from sqlalchemy import and_, select
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repositories.repository_base import RepositoryBase
+from app.exceptions import OrganizationNotRegisteredError
 from app.models.oin import Oin
 
 
@@ -18,3 +19,13 @@ class OrganizationRepository(RepositoryBase):
             )
         )
         return self.db_session.execute(stmt).scalar()
+
+    def get_registered(self, external_id: Oin) -> OrganizationEntity:
+        """
+        The organization the caller acts for. The proxy verified its identity,
+        so an organization that is missing here is one the PRS does not serve.
+        """
+        org = self.get_one_by_external_id(external_id)
+        if org is None:
+            raise OrganizationNotRegisteredError()
+        return org

@@ -9,6 +9,7 @@ from starlette.responses import JSONResponse
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import DomainError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
@@ -69,19 +70,28 @@ def post_eval(
         organization_public_key = organization_public_key_service.get_by_org_and_domain(
             recipient_oin, req.recipientScope
         )
-    except HTTPException as e:
+    except DomainError as e:
         # PRS-OPRF-004: the target organization is unknown, may not receive
         # OPRF pseudonyms, or has no public key registered for the scope.
         gflog.emit(
             logger,
             Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
-            f"OPRF refused: {e.detail}",
+            f"OPRF refused: {e.message}",
             fields=audit_oins,
         )
         raise
 
     try:
         result = oprf_service.eval_blind(req, JWK(**organization_public_key.jwk))
+    except DomainError as e:
+        # PRS-OPRF-004, raised past the checks above (e.g. by the evaluator).
+        gflog.emit(
+            logger,
+            Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
+            f"OPRF refused: {e.message}",
+            fields=audit_oins,
+        )
+        raise
     except ValueError as e:
         # PRS-OPRF-003
         gflog.emit(
