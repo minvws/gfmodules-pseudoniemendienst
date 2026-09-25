@@ -35,9 +35,11 @@ class Log(_Base):
 
     # Pseudonym creation events (PRS-PSE), see
     # https://github.com/minvws/gfmodules-coordination-private/issues/1036
-    # PRS-PSE-002/003 (irreversible pseudonym created, dual-version) are not defined
-    # here: irreversible pseudonyms are exchanged through the OPRF, which has its own
-    # events below. Neither the personal ID nor the pseudonym is ever logged.
+    # PRS-PSE-002/003 (irreversible pseudonym created, dual-version) belong to the
+    # server-side irreversible pseudonym endpoint the technical design foresees
+    # next to OPRF; that endpoint does not exist yet. Irreversible pseudonyms are
+    # exchanged through OPRF today, which has its own events below. Neither the
+    # personal ID nor the pseudonym is ever logged.
     PSEUDONYM_REVERSIBLE_CREATED = LogEvent(  # PRS-PSE-001
         "220400",
         logging.INFO,

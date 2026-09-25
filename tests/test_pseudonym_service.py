@@ -26,7 +26,7 @@ class SampleArgs(TypedDict):
 @pytest.fixture
 def sample_args() -> SampleArgs:
     return {
-        "personal_id": PersonalId.from_str("nl:bsn:123456789"),
+        "personal_id": PersonalId.from_str("nl:bsn:950000012"),
         "recipient_organization": "org1",
         "recipient_scope": "nvi",
     }
@@ -42,12 +42,12 @@ def test_irp_is_deterministic(
 
 def test_irp_changes_with_personal_id(service: PseudonymService) -> None:
     args1: SampleArgs = {
-        "personal_id": PersonalId.from_str("nl:bsn:123456789"),
+        "personal_id": PersonalId.from_str("nl:bsn:950000012"),
         "recipient_organization": "org1",
         "recipient_scope": "nvi",
     }
     args2: SampleArgs = {
-        "personal_id": PersonalId.from_str("nl:bsn:987654321"),
+        "personal_id": PersonalId.from_str("nl:bsn:950000024"),
         "recipient_organization": "org1",
         "recipient_scope": "nvi",
     }
@@ -58,7 +58,7 @@ def test_irp_changes_with_personal_id(service: PseudonymService) -> None:
 
 
 def test_irp_changes_with_org_or_scope(service: PseudonymService) -> None:
-    pid = PersonalId.from_str("nl:bsn:123456789")
+    pid = PersonalId.from_str("nl:bsn:950000012")
 
     p_org1 = service.generate_irreversible_pseudonym(pid, "org1", "nvi")
     p_org2 = service.generate_irreversible_pseudonym(pid, "org2", "nvi")
@@ -71,17 +71,17 @@ def test_irp_changes_with_org_or_scope(service: PseudonymService) -> None:
 def test_pseudonym_service_exchange() -> None:
     svc = PseudonymService(b"super_secret_hmac_key_for_testing_purposes_only")
     pseudonym = svc.generate_irreversible_pseudonym(
-        personal_id=PersonalId("NL", "bsn", "12345678901"),
+        personal_id=PersonalId("NL", "bsn", "950000012"),
         recipient_organization="ura:12345",
         recipient_scope="nvi",
     )
     assert isinstance(pseudonym, str)
     assert len(pseudonym) == 44
-    assert pseudonym == "suEcDbvslyhp6UwexSCUuySngPGXsF5kNF-R2izFnzA="
+    assert pseudonym == "xbCDtTfwKUM_NdjZvFfNoOcd4zR9OPvt4H3c9BVVMGM="
 
     # Consistency check
     pseudonym2 = svc.generate_irreversible_pseudonym(
-        personal_id=PersonalId("NL", "bsn", "12345678901"),
+        personal_id=PersonalId("NL", "bsn", "950000012"),
         recipient_organization="ura:12345",
         recipient_scope="nvi",
     )
@@ -89,7 +89,7 @@ def test_pseudonym_service_exchange() -> None:
 
     # Different input should yield different pseudonym
     pseudonym3 = svc.generate_irreversible_pseudonym(
-        personal_id=PersonalId("NL", "bsn", "12345678901"),
+        personal_id=PersonalId("NL", "bsn", "950000012"),
         recipient_organization="ura:54321",
         recipient_scope="nvi",
     )
@@ -98,7 +98,7 @@ def test_pseudonym_service_exchange() -> None:
     # Different HMAC key should yield different pseudonym
     svc = PseudonymService(b"another_key_will_hmac_differently")
     pseudonym4 = svc.generate_irreversible_pseudonym(
-        personal_id=PersonalId("NL", "bsn", "12345678901"),
+        personal_id=PersonalId("NL", "bsn", "950000012"),
         recipient_organization="ura:12345",
         recipient_scope="nvi",
     )

@@ -331,12 +331,16 @@ def test_recipient_without_active_key_version_is_not_found(
 
 
 @pytest.mark.parametrize(
-    "personal_id",
+    "personal_id,kind",
     [
-        "950000012",
-        "NL:passport:950000012",
-        "N:bsn:950000012",
-        {"landCode": "NL", "value": BSN},
+        ("950000012", "formaat"),
+        ("NL:passport:950000012", "formaat"),
+        ("N:bsn:950000012", "formaat"),
+        ({"landCode": "NL", "value": BSN}, "formaat"),
+        ("NL:bsn:95000001a", "formaat"),
+        ("NL:bsn:95000001", "lengte"),
+        ("NL:bsn:950000013", "elfproef"),
+        ({"landCode": "NL", "type": "bsn", "value": "123456789"}, "elfproef"),
     ],
 )
 def test_malformed_personal_id_is_rejected_and_audited_without_the_value(
@@ -346,6 +350,7 @@ def test_malformed_personal_id_is_rejected_and_audited_without_the_value(
     make_recipient: MakeRecipient,
     record_logs: RecordLogs,
     personal_id: Any,
+    kind: str,
 ) -> None:
     make_recipient()
     records = record_logs(LOGGER)
@@ -359,9 +364,15 @@ def test_malformed_personal_id_is_rejected_and_audited_without_the_value(
 
     events = _events(records, "220404")
     assert len(events) == 1
-    assert events[0].validation_error == "format"  # type: ignore[attr-defined]
+    assert events[0].validation_error == kind  # type: ignore[attr-defined]
+    number = (
+        personal_id["value"]
+        if isinstance(personal_id, dict)
+        else personal_id.split(":")[-1]
+    )
     for record in records:
         assert BSN not in _dump(record)
+        assert number not in _dump(record)
 
 
 def test_personal_id_value_never_appears_in_logs_on_success(

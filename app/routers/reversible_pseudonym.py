@@ -14,7 +14,7 @@ from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import ReversiblePseudonymExchangeRequest
-from app.personal_id import PersonalId
+from app.personal_id import PersonalId, PersonalIdValidationError
 from app.services.authorization_service import AuthorizationService
 from app.services.oprf.jwe_token import BlindJwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -138,7 +138,8 @@ def exchange_reversible_pseudonym(
 
     try:
         personal_id = _parse_personal_id(req.personalId)
-    except ValueError:
+    except PersonalIdValidationError as e:
+        # PRS-PSE-005: only the kind of failure, never the value.
         gflog.emit(
             logger,
             Log.PERSONAL_ID_VALIDATION_FAILED,
@@ -146,7 +147,7 @@ def exchange_reversible_pseudonym(
             fields={
                 "handelende_oin": handelende_oin,
                 "namens_oin": namens_oin,
-                "validation_error": "format",
+                "validation_error": e.kind,
             },
         )
         raise HTTPException(status_code=400, detail="Invalid personal ID")
