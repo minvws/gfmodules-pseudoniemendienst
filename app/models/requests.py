@@ -230,6 +230,34 @@ class ReversiblePseudonymExchangeRequest(BaseModel):
     )
 
 
+class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "personalId": "NL:bsn:950000012",
+                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientScope": "nvi",
+                },
+                {
+                    "personalId": "pseudonym:reversible:AQAB....",
+                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientScope": "nvi",
+                },
+            ]
+        },
+    )
+
+    personalId: str | dict[str, str] = Field(
+        ...,
+        description=(
+            "Personal ID as `<landCode>:<type>:<value>` or as an object with "
+            "`landCode`, `type` and `value`; or a reversible pseudonym "
+            "(`pseudonym:reversible:<...>`) issued to the calling organization."
+        ),
+    )
+
+
 class InputRequest(BaseModel):
     personalId: Any
 
