@@ -173,7 +173,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
         ),
         patch(
             "app.services.hsm.client.requests.post",
-            side_effect=_fake_hsm(lambda label: "-rp-" not in label),
+            side_effect=_fake_hsm(lambda label: "-oprf-" in label),
         ) as post,
     ):
         cleaned = service.cleanup_expired_keys()
@@ -200,7 +200,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
         assert removed_version.removed_at is not None
 
 
-def test_cleanup_destroys_reversible_pseudonym_keys_of_the_version(
+def test_cleanup_destroys_every_pseudonym_key_of_the_version(
     database: Database,
 ) -> None:
     now = datetime.now(timezone.utc)
@@ -221,6 +221,7 @@ def test_cleanup_destroys_reversible_pseudonym_keys_of_the_version(
     assert cleaned == 1
     assert _destroyed_labels(post) == {
         f"oin-{TEST_OIN}-oprf-v1",
+        f"oin-{TEST_OIN}-irp-v1-hmac",
         f"oin-{TEST_OIN}-rp-v1-aes",
         f"oin-{TEST_OIN}-rp-v1-hmac",
     }
