@@ -38,6 +38,8 @@ def test_emit_attaches_event_id_and_streams() -> None:
     [
         (Log.AUTHORIZATION_DENIED, "200402", logging.WARNING),
         (Log.PSEUDONYM_REVERSIBLE_CREATED, "220400", logging.INFO),
+        (Log.PSEUDONYM_IRREVERSIBLE_CREATED, "220401", logging.INFO),
+        (Log.PSEUDONYM_IRREVERSIBLE_DUAL_CREATED, "220402", logging.INFO),
         (Log.PSEUDONYM_CREATE_FAILED, "220403", logging.ERROR),
         (Log.PERSONAL_ID_VALIDATION_FAILED, "220404", logging.WARNING),
         (Log.OPRF_EVAL_OK, "210400", logging.INFO),
