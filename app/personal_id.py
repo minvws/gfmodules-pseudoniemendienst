@@ -1,22 +1,57 @@
 import json
-from typing import Any
+from typing import Any, Literal
 
 ALLOWED_ID_TYPES = {"bsn"}
+BSN_LENGTH = 9
+
+ValidationErrorKind = Literal["formaat", "lengte", "elfproef"]
+
+
+class PersonalIdValidationError(ValueError):
+    """
+    A personal ID that does not validate. ``kind`` is the PRS-PSE-005
+    ``validation_error`` value: the shape of the input (formaat), the number of
+    digits (lengte) or the BSN check digit test (elfproef). The offending value
+    is deliberately not part of the message, so it can never end up in a log.
+    """
+
+    def __init__(self, kind: ValidationErrorKind, message: str) -> None:
+        super().__init__(message)
+        self.kind: ValidationErrorKind = kind
+
+
+def _validate_bsn(number: str) -> None:
+    """A BSN is nine digits that satisfy the elfproef (Dutch 11-test)."""
+    if not number.isdigit():
+        raise PersonalIdValidationError("formaat", "BSN must consist of digits")
+    if len(number) != BSN_LENGTH:
+        raise PersonalIdValidationError("lengte", "BSN must be 9 digits")
+    digits = [int(c) for c in number]
+    weighted = sum(d * (BSN_LENGTH - i) for i, d in enumerate(digits[:-1]))
+    if (weighted - digits[-1]) % 11 != 0:
+        raise PersonalIdValidationError("elfproef", "BSN fails the elfproef")
 
 
 class PersonalId:
     def __init__(self, country_code: str, id_type: str, id_number: str) -> None:
         if not country_code or len(country_code) != 2 or not country_code.isalpha():
-            raise ValueError("country_code must be a 2-letter ISO country code")
+            raise PersonalIdValidationError(
+                "formaat", "country_code must be a 2-letter ISO country code"
+            )
 
         if id_type.lower() not in ALLOWED_ID_TYPES:
-            raise ValueError(
-                f"id_type must be one of: {', '.join(sorted(ALLOWED_ID_TYPES))}"
+            raise PersonalIdValidationError(
+                "formaat",
+                f"id_type must be one of: {', '.join(sorted(ALLOWED_ID_TYPES))}",
             )
+
+        id_number = id_number.strip()
+        if id_type.lower() == "bsn":
+            _validate_bsn(id_number)
 
         self.__country_code = country_code.upper()
         self.__id_type = id_type.lower()
-        self.__id_number = id_number.strip()
+        self.__id_number = id_number
 
     def __eq__(self, other: object) -> bool:
         """
@@ -68,7 +103,7 @@ class PersonalId:
         """
         parts = s.split(":")
         if len(parts) != 3:
-            raise ValueError("Invalid personal ID format")
+            raise PersonalIdValidationError("formaat", "Invalid personal ID format")
 
         return PersonalId(parts[0], parts[1], parts[2])
 
@@ -80,7 +115,9 @@ class PersonalId:
         try:
             return PersonalId(d["landCode"], d["type"], d["value"])
         except KeyError as e:
-            raise ValueError(f"Missing key in personal ID dictionary: {e}")
+            raise PersonalIdValidationError(
+                "formaat", f"Missing key in personal ID dictionary: {e}"
+            )
 
 
 class PersonalIdJSONEncoder(json.JSONEncoder):

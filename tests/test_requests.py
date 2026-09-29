@@ -65,7 +65,7 @@ def test_blind_request_invalid_prefixed_recipient_organization_throws_oin_valida
 
 def test_rid_exchange_request_recipient_organization_is_parsed_to_oin() -> None:
     request = RidExchangeRequest(
-        personalId={"landCode": "NL", "type": "bsn", "value": "9500009012"},
+        personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000002000"),
         recipientScope="scope",
         ridUsage="irp",
@@ -79,7 +79,7 @@ def test_rid_exchange_request_invalid_recipient_organization_throws_validation_e
 ):
     try:
         RidExchangeRequest(
-            personalId={"landCode": "NL", "type": "bsn", "value": "9500009012"},
+            personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
             recipientOrganization="bad-oin",  # type: ignore[arg-type]
             recipientScope="scope",
             ridUsage="irp",
@@ -91,7 +91,7 @@ def test_rid_exchange_request_invalid_recipient_organization_throws_validation_e
 
 def test_reversible_pseudonym_request_recipient_organization_is_parsed_to_oin() -> None:
     request = ReversiblePseudonymExchangeRequest(
-        personalId={"landCode": "NL", "type": "bsn", "value": "9500009012"},
+        personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
         recipientScope="scope",
     )
@@ -122,7 +122,7 @@ def test_reversible_pseudonym_request_invalid_recipient_organization_throws_vali
 ):
     with pytest.raises(ValidationError) as e:
         ReversiblePseudonymExchangeRequest(
-            personalId={"landCode": "NL", "type": "bsn", "value": "9500009012"},
+            personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
             recipientOrganization="bad-oin",  # type: ignore[arg-type]
             recipientScope="scope",
         )
@@ -133,7 +133,7 @@ def test_reversible_pseudonym_request_invalid_recipient_organization_throws_vali
 def test_reversible_pseudonym_request_rejects_invalid_scope(scope: str) -> None:
     with pytest.raises(ValidationError):
         ReversiblePseudonymExchangeRequest(
-            personalId="NL:bsn:9500009012",
+            personalId="NL:bsn:950000012",
             recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
             recipientScope=scope,
         )
