@@ -6,6 +6,7 @@ from app.config import ConfigOprf
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.irreversible.keys import IrreversibleKeyLabel
 from app.services.oprf.evaluators import OprfHsmKeyLabel
 from app.services.reversible.keys import reversible_key_labels
 
@@ -14,8 +15,9 @@ logger = logging.getLogger(__name__)
 
 class HsmKeyCleanupService:
     """
-    Destroys the HSM keys of expired key versions (the OPRF secret and the
-    reversible pseudonym AES/HMAC keys) and marks the version as removed.
+    Destroys the HSM keys of expired key versions (the OPRF secret, the
+    irreversible pseudonym secret and the reversible pseudonym AES/HMAC keys)
+    and marks the version as removed.
     Keys are created on first use, so missing ones are skipped.
     """
 
@@ -42,7 +44,10 @@ class HsmKeyCleanupService:
         for version in expired:
             try:
                 oin = version.organization.external_id
-                labels = [str(OprfHsmKeyLabel(oin, version.version))] + [
+                labels = [
+                    str(OprfHsmKeyLabel(oin, version.version)),
+                    str(IrreversibleKeyLabel(oin, version.version)),
+                ] + [
                     str(label) for label in reversible_key_labels(oin, version.version)
                 ]
             except ValueError:
