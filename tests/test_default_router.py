@@ -5,6 +5,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_config
+from app.features import enabled_features
+
 VERSION_JSON_CONTENT = '{"version": "v0.0.0", "git_ref": "0000000000000000000000000"}'
 
 
@@ -70,3 +73,17 @@ def test_version_json_endpoint_returns_404_when_version_file_missing(
     response = client.get("/version.json")
 
     assert response.status_code == 404
+
+
+def test_version_json_endpoint_includes_enabled_features(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _mock_open_version_json(monkeypatch)
+
+    response = client.get("/version.json")
+
+    assert response.status_code == 200
+    features = response.json()["features"]
+    assert {"id", "title", "description"} == set(features[0])
+    expected = [feature.id for feature in enabled_features(get_config())]
+    assert [feature["id"] for feature in features] == expected
