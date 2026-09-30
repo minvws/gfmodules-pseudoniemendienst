@@ -32,7 +32,18 @@ Public, unauthenticated endpoints.
 Service banner with the version and git reference from `version.json`, as plain text.
 
 #### `GET /version.json`
-The contents of `version.json`, or `404` when the file is absent.
+The contents of `version.json`, or `404` when the file is absent. A `features` list is added with the features enabled by the configuration of this environment (see `app/features.py`), for the status page:
+
+```json
+{
+  "version": "v0.2.0",
+  "git_ref": "0fe1369...",
+  "features": [
+    {"id": "oprf", "title": "OPRF", "description": "Pseudonyms via a blinded OPRF evaluation"},
+    {"id": "reversible_pseudonym", "title": "Reversible pseudonym", "description": "..."}
+  ]
+}
+```
 
 #### `GET /health`
 Health of the service and its components. Returns `200` when everything is healthy, `503` when a component is not:
