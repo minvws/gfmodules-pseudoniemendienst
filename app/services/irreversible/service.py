@@ -34,6 +34,10 @@ class IrreversiblePseudonymError(ValueError):
         self.error_type = error_type
 
 
+def _encode(digest: bytes) -> str:
+    return base64.urlsafe_b64encode(digest).decode("ascii")
+
+
 @dataclass(frozen=True)
 class IrreversiblePseudonym:
     # base64url encoded pseudonym for the latest active key version, without
@@ -84,14 +88,12 @@ class IrreversiblePseudonymService:
                 "crypto_failure", "irreversible pseudonym computation failed"
             ) from e
 
-        latest = max(digests)
-        encoded = {
-            v: base64.urlsafe_b64encode(d).decode("ascii") for v, d in digests.items()
-        }
+        # digests is ordered by version, so the last one is the latest
+        *older, (latest, digest) = digests.items()
         return IrreversiblePseudonym(
-            value=encoded[latest],
+            value=_encode(digest),
             version=latest,
-            older={v: p for v, p in encoded.items() if v != latest},
+            older={version: _encode(d) for version, d in older},
         )
 
     @staticmethod
