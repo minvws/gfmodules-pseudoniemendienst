@@ -14,15 +14,14 @@ import base64
 import logging
 from dataclasses import dataclass
 
-from app.models.oin import RECIPIENT_ORGANIZATION_PREFIX, Oin
+from app.models.oin import Oin
 from app.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.irreversible.keys import IrreversibleKeyOperations
+from app.services.pseudonym_subject import pseudonym_subject
 
 logger = logging.getLogger(__name__)
-
-DELIMITER = "|"
 
 
 class IrreversiblePseudonymError(ValueError):
@@ -99,12 +98,7 @@ class IrreversiblePseudonymService:
     def _subject(
         personal_id: PersonalId, recipient: Oin, recipient_scope: str
     ) -> bytes:
-        if DELIMITER in recipient_scope:
-            raise IrreversiblePseudonymError(
-                "crypto_failure", "recipient scope must not contain '|'"
-            )
-        return (
-            f"{personal_id.as_str()}{DELIMITER}"
-            f"{RECIPIENT_ORGANIZATION_PREFIX}{recipient.value}{DELIMITER}"
-            f"{recipient_scope}"
-        ).encode()
+        try:
+            return pseudonym_subject(personal_id, recipient, recipient_scope)
+        except ValueError as e:
+            raise IrreversiblePseudonymError("crypto_failure", str(e)) from e
