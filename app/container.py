@@ -10,6 +10,12 @@ from app.services.authorization_service import AuthorizationService
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.irreversible.keys import (
+    HsmIrreversibleKeyOperations,
+    IrreversibleKeyOperations,
+    LocalIrreversibleKeyOperations,
+)
+from app.services.irreversible.service import IrreversiblePseudonymService
 from app.services.oprf.evaluators import (
     HsmOprfEvaluator,
     LocalOprfEvaluator,
@@ -89,11 +95,14 @@ def container_config(binder: inject.Binder) -> None:
 
     oprf_evaluator: OprfEvaluator
     reversible_keys: ReversibleKeyOperations
+    irreversible_keys: IrreversibleKeyOperations
     if config.oprf.hsm_url:
         oprf_evaluator = HsmOprfEvaluator(config.oprf, hsm_key_version_service)
         reversible_keys = HsmReversibleKeyOperations(HsmClient(config.oprf))
+        irreversible_keys = HsmIrreversibleKeyOperations(HsmClient(config.oprf))
     else:
         reversible_keys = LocalReversibleKeyOperations(master_key)
+        irreversible_keys = LocalIrreversibleKeyOperations(master_key)
         try:
             with open(config.oprf.server_key_file, "r") as f:
                 key = f.read().strip()
@@ -114,6 +123,11 @@ def container_config(binder: inject.Binder) -> None:
         reversible_keys, hsm_key_version_service
     )
     binder.bind(ReversiblePseudonymService, reversible_pseudonym_service)
+
+    irreversible_pseudonym_service = IrreversiblePseudonymService(
+        irreversible_keys, hsm_key_version_service
+    )
+    binder.bind(IrreversiblePseudonymService, irreversible_pseudonym_service)
 
     # This should be done through an HSM
     pseudonym_service = PseudonymService(master_key)
@@ -156,6 +170,10 @@ def get_authorization_service() -> AuthorizationService:
 
 def get_reversible_pseudonym_service() -> ReversiblePseudonymService:
     return inject.instance(ReversiblePseudonymService)
+
+
+def get_irreversible_pseudonym_service() -> IrreversiblePseudonymService:
+    return inject.instance(IrreversiblePseudonymService)
 
 
 def get_oprf_service() -> OprfService:

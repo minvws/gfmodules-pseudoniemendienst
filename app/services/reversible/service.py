@@ -14,10 +14,15 @@ import hmac
 import logging
 from dataclasses import dataclass
 
-from app.models.oin import RECIPIENT_ORGANIZATION_PREFIX, Oin
+from app.models.oin import Oin
 from app.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.pseudonym_subject import (
+    DELIMITER,
+    pseudonym_subject,
+    recipient_organization,
+)
 from app.services.reversible.keys import ReversibleKeyOperations
 
 logger = logging.getLogger(__name__)
@@ -27,7 +32,6 @@ IV_LENGTH = 16
 AES_BLOCK = 16
 _HEADER_LENGTH = 1 + 2
 _MIN_LENGTH = _HEADER_LENGTH + AES_BLOCK + IV_LENGTH
-DELIMITER = "|"
 
 
 class ReversiblePseudonymError(ValueError):
@@ -53,10 +57,6 @@ class ReversedPseudonym:
     recipient_organization: str
     recipient_scope: str
     version: int
-
-
-def _recipient_organization(recipient: Oin) -> str:
-    return RECIPIENT_ORGANIZATION_PREFIX + recipient.value
 
 
 class ReversiblePseudonymService:
@@ -131,7 +131,7 @@ class ReversiblePseudonymService:
             )
 
         parts = subject.decode("utf-8").split(DELIMITER)
-        if len(parts) != 3 or parts[1] != _recipient_organization(recipient):
+        if len(parts) != 3 or parts[1] != recipient_organization(recipient):
             raise ReversiblePseudonymError(
                 "invalid_pseudonym", "pseudonym was not issued for this organization"
             )
@@ -143,16 +143,14 @@ class ReversiblePseudonymService:
             version=version,
         )
 
+    @staticmethod
     def _subject(
-        self, personal_id: PersonalId, recipient: Oin, recipient_scope: str
+        personal_id: PersonalId, recipient: Oin, recipient_scope: str
     ) -> bytes:
-        if DELIMITER in recipient_scope:
-            raise ReversiblePseudonymError(
-                "crypto_failure", "recipient scope must not contain '|'"
-            )
-        return (
-            f"{personal_id.as_str()}{DELIMITER}{_recipient_organization(recipient)}{DELIMITER}{recipient_scope}"
-        ).encode()
+        try:
+            return pseudonym_subject(personal_id, recipient, recipient_scope)
+        except ValueError as e:
+            raise ReversiblePseudonymError("crypto_failure", str(e)) from e
 
     def _derive_iv(self, recipient: Oin, version: int, subject: bytes) -> bytes:
         inner = self._keys.hmac(recipient, version, subject)

@@ -3,9 +3,15 @@ import logging
 import gfmodules.logging as gflog
 
 from app.config import ConfigOprf
-from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
+from app.logging.events import (
+    SLEUTELTYPE_IRREVERSIBLE_KEY,
+    SLEUTELTYPE_OPRF_SECRET,
+    SLEUTELTYPE_REVERSIBLE_KEY,
+    Log,
+)
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.irreversible.keys import IrreversibleKeyLabel
 from app.services.oprf.evaluators import OprfHsmKeyLabel
 from app.services.reversible.keys import reversible_key_labels
 
@@ -14,8 +20,9 @@ logger = logging.getLogger(__name__)
 
 class HsmKeyCleanupService:
     """
-    Destroys the HSM keys of expired key versions (the OPRF secret and the
-    reversible pseudonym AES/HMAC keys) and marks the version as removed.
+    Destroys the HSM keys of expired key versions (the OPRF secret, the
+    irreversible pseudonym secret and the reversible pseudonym AES/HMAC keys)
+    and marks the version as removed.
     Keys are created on first use, so missing ones are skipped.
     """
 
@@ -42,8 +49,19 @@ class HsmKeyCleanupService:
         for version in expired:
             try:
                 oin = version.organization.external_id
-                labels = [str(OprfHsmKeyLabel(oin, version.version))] + [
-                    str(label) for label in reversible_key_labels(oin, version.version)
+                # (label, sleuteltype) of every key the version may have
+                labels = [
+                    (
+                        str(OprfHsmKeyLabel(oin, version.version)),
+                        SLEUTELTYPE_OPRF_SECRET,
+                    ),
+                    (
+                        str(IrreversibleKeyLabel(oin, version.version)),
+                        SLEUTELTYPE_IRREVERSIBLE_KEY,
+                    ),
+                ] + [
+                    (str(label), SLEUTELTYPE_REVERSIBLE_KEY)
+                    for label in reversible_key_labels(oin, version.version)
                 ]
             except ValueError:
                 logger.exception(
@@ -52,10 +70,26 @@ class HsmKeyCleanupService:
                 )
                 continue
 
+            # Emit PRS-KEY-004 per destroyed key type, so a retry after a
+            # failure does not log it twice.
+            destroyed_types: set[str] = set()
             try:
-                for label in labels:
-                    if self._destroy_if_present(label):
-                        logger.info("removed expired HSM key %r", label)
+                for label, sleuteltype in labels:
+                    if not self._destroy_if_present(label):
+                        continue
+                    logger.info("removed expired HSM key %r", label)
+                    if sleuteltype not in destroyed_types:
+                        destroyed_types.add(sleuteltype)
+                        gflog.emit(
+                            logger,
+                            Log.KEY_VERSION_DESTROYED,
+                            "expired HSM key version destroyed",
+                            fields={
+                                "sleuteltype": sleuteltype,
+                                "organisatie_oin": oin.value,
+                                "vernietigde_versie": version.version,
+                            },
+                        )
             except Exception as e:  # noqa: BLE001 - any HSM failure must not stop the run
                 # Leave the version untouched so the next run retries it.
                 gflog.emit(
@@ -72,16 +106,6 @@ class HsmKeyCleanupService:
 
             self.__version_service.mark_removed(version.id)
             cleaned += 1
-            gflog.emit(
-                logger,
-                Log.KEY_VERSION_DESTROYED,
-                "expired HSM key version destroyed",
-                fields={
-                    "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
-                    "organisatie_oin": oin.value,
-                    "vernietigde_versie": version.version,
-                },
-            )
 
         if cleaned:
             logger.info("cleaned up %d expired HSM key version(s)", cleaned)
