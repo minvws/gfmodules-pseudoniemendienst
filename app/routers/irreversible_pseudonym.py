@@ -72,6 +72,13 @@ _REVERSIBLE_PREFIX = "pseudonym:reversible:"
                 "scope, or has no active HSM key version."
             )
         },
+        410: {
+            "description": (
+                "The reversible pseudonym was issued under a key version of the "
+                "calling organization that has since been destroyed, so it can "
+                "no longer be reversed."
+            )
+        },
         500: {"description": "The pseudonym could not be produced."},
         503: {"description": "The HSM could not be reached; retry later."},
     },
@@ -175,6 +182,10 @@ def exchange_irreversible_pseudonym(
             if e.error_type == "hsm_unreachable":
                 raise HTTPException(
                     status_code=503, detail="Pseudonym exchange failed"
+                ) from e
+            if e.error_type == "version_destroyed":
+                raise HTTPException(
+                    status_code=410, detail="Pseudonym key version no longer available"
                 ) from e
             raise HTTPException(status_code=400, detail="Invalid pseudonym") from e
         personal_id = reversed_pseudonym.personal_id
