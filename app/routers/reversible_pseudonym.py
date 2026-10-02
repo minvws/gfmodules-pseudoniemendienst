@@ -31,12 +31,6 @@ _OPERATION = "exchange:reversible-pseudonym"
 _SUBJECT_PREFIX = "pseudonym:reversible:"
 
 
-def _parse_personal_id(raw: str | dict[str, str]) -> PersonalId:
-    if isinstance(raw, str):
-        return PersonalId.from_str(raw)
-    return PersonalId.from_dict(raw)
-
-
 @router.post(
     _ENDPOINT,
     summary="Exchange a personal ID for a reversible pseudonym",
@@ -137,7 +131,7 @@ def exchange_reversible_pseudonym(
         raise
 
     try:
-        personal_id = _parse_personal_id(req.personalId)
+        personal_id = PersonalId.parse(req.personalId)
     except PersonalIdValidationError as e:
         # PRS-PSE-005: only the kind of failure, never the value.
         gflog.emit(

@@ -112,3 +112,21 @@ def test_format_failures_report_formaat() -> None:
     with pytest.raises(PersonalIdValidationError) as e:
         PersonalId("NL", "passport", "950000012")
     assert e.value.kind == "formaat"
+
+
+def test_parse_accepts_string_and_dict() -> None:
+    expected = PersonalId("NL", "bsn", "950000012")
+
+    assert PersonalId.parse("NL:bsn:950000012") == expected
+    assert (
+        PersonalId.parse({"landCode": "NL", "type": "bsn", "value": "950000012"})
+        == expected
+    )
+
+
+@pytest.mark.parametrize("raw", ["NL:bsn", {"landCode": "NL", "type": "bsn"}])
+def test_parse_rejects_malformed_input(raw: str | dict[str, str]) -> None:
+    with pytest.raises(PersonalIdValidationError) as e:
+        PersonalId.parse(raw)
+
+    assert e.value.kind == "formaat"

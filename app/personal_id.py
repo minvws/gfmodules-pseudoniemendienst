@@ -119,6 +119,16 @@ class PersonalId:
                 "formaat", f"Missing key in personal ID dictionary: {e}"
             )
 
+    @classmethod
+    def parse(cls, raw: str | dict[str, str]) -> "PersonalId":
+        """
+        Creates a PersonalId instance from either request form: the
+        "landCode:type:value" string or the {landCode, type, value} dictionary
+        """
+        if isinstance(raw, str):
+            return cls.from_str(raw)
+        return cls.from_dict(raw)
+
 
 class PersonalIdJSONEncoder(json.JSONEncoder):
     def default(self, obj: Any) -> Any:
