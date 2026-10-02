@@ -212,6 +212,43 @@ def test_reversible_pseudonym_of_another_organization_is_refused(
     assert _events(records, "220401") == []
 
 
+def test_reversible_pseudonym_with_destroyed_key_version_is_gone(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    database: Database,
+    make_organization: MakeOrganization,
+    make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
+) -> None:
+    """The caller's own pseudonym was valid, but the key version it was issued
+    under has since been destroyed by the HSM key cleanup."""
+    make_organization(
+        SENDER_OIN,
+        request=[PersonalIdType.IRREVERSIBLE_PSEUDONYM],
+        receive=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+    )
+    make_recipient()
+    reversible = container.get_reversible_pseudonym_service().generate(
+        PersonalId.from_str(f"NL:bsn:{BSN}"), SENDER_OIN, "own-scope"
+    )
+    versions = HsmKeyVersionService(database)
+    for version in versions.get_versions_by_organization_id(SENDER_OIN):
+        versions.mark_removed(version.id)
+    records = record_logs(LOGGER)
+
+    response = client.post(
+        ENDPOINT,
+        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        headers=valid_headers,
+    )
+
+    assert response.status_code == 410
+    assert response.json() == {"detail": "Pseudonym key version no longer available"}
+    failed = _events(records, "220403")
+    assert len(failed) == 1
+    assert failed[0].error_type == "version_destroyed"  # type: ignore[attr-defined]
+
+
 def test_garbage_reversible_pseudonym_is_refused(
     client: TestClient,
     valid_headers: dict[str, str],
