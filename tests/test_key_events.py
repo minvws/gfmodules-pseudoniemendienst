@@ -317,17 +317,44 @@ def test_cleanup_emits_key_version_destroyed(
         cleaned = _cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 1
+    # The AES and HMAC reversible keys share one event.
+    events = _events(records, "250403")
+    assert sorted(r.sleuteltype for r in events) == [  # type: ignore[attr-defined]
+        "irreversible_pseudonym_key",
+        "oprf_secret",
+        "reversible_pseudonym_key",
+    ]
+    for record in events:
+        assert record.levelno == logging.WARNING
+        assert (
+            record.organisatie_oin  # type: ignore[attr-defined]
+            == persisted_organization.external_id.value
+        )
+        assert record.vernietigde_versie == 7  # type: ignore[attr-defined]
+    assert not _events(records, "250406")
+
+
+def test_cleanup_key_version_destroyed_names_the_destroyed_key_type(
+    record_logs: RecordLogs,
+    database: Database,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    """An organization that only used irreversible pseudonyms has only that
+    key, so the event must not claim an OPRF secret was destroyed."""
+    records = record_logs("app.services.hsm_key_cleanup_service")
+    _add_expired_version(database, persisted_organization, version=7)
+
+    def post(url: str, json: dict[str, str], **kwargs: object) -> MagicMock:
+        present = "-irp-" in json["label"]
+        return _hsm_response({"objects": [{"label": "x"}] if present else []})
+
+    with patch("app.services.hsm.client.requests.post", side_effect=post):
+        cleaned = _cleanup_service(database).cleanup_expired_keys()
+
+    assert cleaned == 1
     events = _events(records, "250403")
     assert len(events) == 1
-    record = events[0]
-    assert record.levelno == logging.WARNING
-    assert record.sleuteltype == "oprf_secret"  # type: ignore[attr-defined]
-    assert (
-        record.organisatie_oin  # type: ignore[attr-defined]
-        == persisted_organization.external_id.value
-    )
-    assert record.vernietigde_versie == 7  # type: ignore[attr-defined]
-    assert not _events(records, "250406")
+    assert events[0].sleuteltype == "irreversible_pseudonym_key"  # type: ignore[attr-defined]
 
 
 def test_cleanup_destroy_failure_emits_operation_failed(
