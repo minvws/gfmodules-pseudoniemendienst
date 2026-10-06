@@ -5,7 +5,7 @@ from typing import Any
 from jwcrypto import jwe, jwk
 
 
-class BlindJwe:
+class Jwe:
     @staticmethod
     def build(
         audience: str,

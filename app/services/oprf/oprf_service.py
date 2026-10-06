@@ -8,8 +8,8 @@ from jwcrypto import jwk
 from app.exceptions import DomainError, RecipientNotFoundError
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
+from app.services.jwe_token import Jwe
 from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
-from app.services.oprf.jwe_token import BlindJwe
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class OprfService:
             if version != latest
         }
 
-        jwe = BlindJwe.build(
+        jwe = Jwe.build(
             audience=str(req.recipientOrganization),
             scope=req.recipientScope,
             subject=subject,

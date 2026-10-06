@@ -20,7 +20,7 @@ from app.services.irreversible.service import (
     IrreversiblePseudonymError,
     IrreversiblePseudonymService,
 )
-from app.services.oprf.jwe_token import BlindJwe
+from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.service import (
     ReversiblePseudonymError,
@@ -231,7 +231,7 @@ def exchange_irreversible_pseudonym(
         extra_claims["extraVersions"] = {
             str(version): value for version, value in sorted(pseudonym.older)
         }
-    jwe = BlindJwe.build(
+    jwe = Jwe.build(
         audience=doel_oin,
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
