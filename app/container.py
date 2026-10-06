@@ -23,7 +23,6 @@ from app.services.oprf.evaluators import (
 )
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
-from app.services.pseudonym_service import PseudonymService
 from app.services.reversible.keys import (
     HsmReversibleKeyOperations,
     LocalReversibleKeyOperations,
@@ -128,10 +127,6 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(IrreversiblePseudonymService, irreversible_pseudonym_service)
 
-    # This should be done through an HSM
-    pseudonym_service = PseudonymService(master_key)
-    binder.bind(PseudonymService, pseudonym_service)
-
     if config.app.enable_saml_exchange_routes:
         if not config.saml_service.url:
             raise ValueError(
@@ -146,10 +141,6 @@ def container_config(binder: inject.Binder) -> None:
             ca_cert_file=config.saml_service.ca_cert_file,
         )
         binder.bind(SamlServiceClient, saml_service_client)
-
-
-def get_pseudonym_service() -> PseudonymService:
-    return inject.instance(PseudonymService)
 
 
 def get_organization_public_key_service() -> OrganizationPublicKeyService:
