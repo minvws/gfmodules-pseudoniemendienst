@@ -9,7 +9,7 @@ from starlette.responses import JSONResponse
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.exceptions import DomainError
+from app.exceptions import DomainError, PseudonymOperationError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
@@ -99,18 +99,15 @@ def post_eval(
             fields=audit_oins,
         )
         raise
-    except ValueError as e:
+    except PseudonymOperationError as e:
         # PRS-OPRF-003
         gflog.emit(
             logger,
             Log.OPRF_EVAL_FAILED,
             "OPRF evaluation failed",
-            fields={
-                **audit_oins,
-                "error_type": getattr(e, "error_type", "crypto_evaluation_failure"),
-            },
+            fields={**audit_oins, "error_type": e.error_type},
         )
-        if getattr(e, "error_type", None) == "hsm_unreachable":
+        if e.error_type == "hsm_unreachable":
             # Like the reversible exchange: the request may be retried later.
             raise HTTPException(
                 status_code=503, detail="Unable to evaluate blind"

@@ -85,13 +85,7 @@ class UnauthorizedRequestError(DomainError):
 
 class PseudonymOperationError(ValueError):
     """
-    A failed key operation. Deliberately not a DomainError: callers translate
-    error_type into either a mapped DomainError (a client refusal) or a plain
-    HTTPException (a server failure such as hsm_unreachable), so it must stay
-    outside the DomainError status code map. error_type is a PRS-PSE-004 value
-    such as hsm_unreachable, crypto_failure, invalid_pseudonym or
-    version_destroyed, or no_active_key_version when the recipient has no
-    active HSM key version.
+    A failed key operation.
     """
 
     def __init__(self, error_type: str, message: str) -> None:
