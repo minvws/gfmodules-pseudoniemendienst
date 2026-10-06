@@ -6,8 +6,9 @@ import gfmodules.logging as gflog
 import requests
 from gfmodules.logging import correlation_headers
 
-from app.config import ConfigOprf
+from app.config import ConfigHsm
 from app.logging.events import Log
+from app.services.http_client import retrying_session
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,10 @@ def _expected_error(response: requests.Response) -> Exception | None:
 class HsmClient:
     """Client for nl-rdo-hsm-api-service. Keys are addressed by label."""
 
-    def __init__(self, config: ConfigOprf, timeout: float = 10.0) -> None:
+    def __init__(self, config: ConfigHsm, timeout: float = 10.0) -> None:
         self._config = config
         self._timeout = timeout
+        self._session = retrying_session()
 
     def post(self, path: str, payload: dict[str, Any], operation: str) -> Any:
         """
@@ -62,7 +64,7 @@ class HsmClient:
         cfg = self._config
         url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}{path}"
         try:
-            response = requests.post(
+            response = self._session.post(
                 url,
                 json=payload,
                 headers=correlation_headers(),
@@ -122,10 +124,6 @@ class HsmClient:
             )
             raise ValueError(f"could not generate key {label!r} in HSM")
         return True
-
-    def label_exists(self, label: str, objtype: str = "SECRET_KEY") -> bool:
-        data = self.post("", {"label": label, "objtype": objtype}, "lookup")
-        return len(data["objects"] or []) > 0
 
     def generate_oprf_key(self, label: str) -> bool:
         return self._generate("/generate/oprf", {"label": label}, label)

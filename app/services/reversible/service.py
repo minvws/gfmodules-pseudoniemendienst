@@ -14,8 +14,9 @@ import hmac
 import logging
 from dataclasses import dataclass
 
+from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.pseudonym_subject import (
@@ -34,14 +35,8 @@ _HEADER_LENGTH = 1 + 2
 _MIN_LENGTH = _HEADER_LENGTH + AES_BLOCK + IV_LENGTH
 
 
-class ReversiblePseudonymError(ValueError):
-    """error_type is one of the PRS-PSE-004 values: hsm_unreachable,
-    crypto_failure, version_destroyed, invalid_pseudonym; or
-    no_active_key_version when the recipient has no active HSM key version."""
-
-    def __init__(self, error_type: str, message: str) -> None:
-        super().__init__(message)
-        self.error_type = error_type
+class ReversiblePseudonymError(PseudonymOperationError):
+    pass
 
 
 @dataclass(frozen=True)

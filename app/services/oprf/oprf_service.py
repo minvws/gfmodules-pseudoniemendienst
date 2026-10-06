@@ -5,27 +5,17 @@ from dataclasses import dataclass
 import pyoprf
 from jwcrypto import jwk
 
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.exceptions import DomainError, PseudonymOperationError, RecipientNotFoundError
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
+from app.services.jwe_token import Jwe
 from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
-from app.services.oprf.jwe_token import BlindJwe
 
 logger = logging.getLogger(__name__)
 
 
-class OprfEvaluationError(ValueError):
-    """
-    Raised when an OPRF evaluation fails. The error_type matches the audit
-    logging values used by this service, such as invalid_blinded_input and
-    crypto_evaluation_failure.
-    """
-
-    def __init__(
-        self, message: str, error_type: str = "crypto_evaluation_failure"
-    ) -> None:
-        super().__init__(message)
-        self.error_type = error_type
+class OprfEvaluationError(PseudonymOperationError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -60,8 +50,7 @@ class OprfService:
         except Exception as e:
             logger.exception("unable to decode blinded input")
             raise OprfEvaluationError(
-                f"unable to decode blinded input: {e}",
-                error_type="invalid_blinded_input",
+                "invalid_blinded_input", f"unable to decode blinded input: {e}"
             )
 
         try:
@@ -71,18 +60,16 @@ class OprfService:
             # status code; only unexpected failures become evaluation errors.
             raise
         except HSM_UNREACHABLE_ERRORS as e:
-            raise OprfEvaluationError(
-                f"HSM unreachable: {e}", error_type="hsm_unreachable"
-            ) from e
+            raise OprfEvaluationError("hsm_unreachable", f"HSM unreachable: {e}") from e
         except Exception as e:
             logger.exception("unable to evaluate blind")
             raise OprfEvaluationError(
-                f"unable to evaluate blind: {e}",
-                error_type=(
+                (
                     "invalid_blinded_input"
                     if isinstance(self.__evaluator, LocalOprfEvaluator)
                     else "crypto_evaluation_failure"
                 ),
+                f"unable to evaluate blind: {e}",
             )
 
         if not evals:
@@ -106,12 +93,12 @@ class OprfService:
             if version != latest
         }
 
-        jwe = BlindJwe.build(
+        jwe = Jwe.build(
             audience=str(req.recipientOrganization),
             scope=req.recipientScope,
             subject=subject,
             pub_key=pub_key,
-            extra_claims={"extra_versions": extra_versions},
+            extra_claims={"extraVersions": extra_versions},
         )
 
         logger.info(

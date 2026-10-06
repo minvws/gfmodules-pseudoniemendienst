@@ -31,7 +31,7 @@ from app import container
 from app.db.db import Database
 from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
@@ -43,6 +43,14 @@ BODY = {
     "recipientScope": SCOPE,
 }
 MakeRecipient = Callable[..., str]
+
+
+def _reversible_body(value: str) -> dict[str, str]:
+    return {
+        "reversiblePseudonym": value,
+        "recipientOrganization": RECIPIENT,
+        "recipientScope": SCOPE,
+    }
 
 
 @pytest.fixture
@@ -167,7 +175,7 @@ def test_reversible_pseudonym_of_the_caller_is_accepted_as_input(
     from_personal_id = client.post(ENDPOINT, json=BODY, headers=valid_headers)
     from_pseudonym = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        json=_reversible_body(reversible.value),
         headers=valid_headers,
     )
 
@@ -200,7 +208,7 @@ def test_reversible_pseudonym_of_another_organization_is_refused(
 
     response = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        json=_reversible_body(reversible.value),
         headers=valid_headers,
     )
 
@@ -238,7 +246,7 @@ def test_reversible_pseudonym_with_destroyed_key_version_is_gone(
 
     response = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        json=_reversible_body(reversible.value),
         headers=valid_headers,
     )
 
@@ -261,7 +269,7 @@ def test_garbage_reversible_pseudonym_is_refused(
 
     response = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": "pseudonym:reversible:not-a-pseudonym"},
+        json=_reversible_body("not-a-pseudonym"),
         headers=valid_headers,
     )
 

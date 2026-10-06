@@ -18,13 +18,17 @@ from app.exceptions import (
     DomainNotRegisteredError,
     InvalidAudienceError,
     InvalidJwsError,
+    InvalidPersonalIdError,
+    InvalidPseudonymError,
     KeyVersionNotFoundError,
     KeyVersionRemovedError,
     NoKeyVersionError,
     NotAllowedToRequestError,
     OrganizationNotRegisteredError,
+    PseudonymVersionDestroyedError,
     PublicKeyNotFoundError,
     RecipientNotFoundError,
+    UnauthorizedRequestError,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +48,10 @@ STATUS_CODES: dict[type[DomainError], int] = {
     # The version exists and belongs to the caller; its state forbids the change.
     KeyVersionRemovedError: 409,
     NoKeyVersionError: 409,
+    InvalidPersonalIdError: 400,
+    InvalidPseudonymError: 400,
+    PseudonymVersionDestroyedError: 410,
+    UnauthorizedRequestError: 403,
 }
 
 

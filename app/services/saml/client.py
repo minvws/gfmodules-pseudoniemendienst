@@ -3,6 +3,8 @@ from typing import Any
 
 import requests
 
+from app.services.http_client import retrying_session
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,10 +36,11 @@ class SamlServiceClient:
         # API setup in HsmClient.post.
         self.cert = (cert_file, key_file) if (cert_file and key_file) else None
         self.verify: str | bool = ca_cert_file or True
+        self._session = retrying_session()
 
     def decrypt(self, payload: Any) -> Any:
         try:
-            response = requests.post(
+            response = self._session.post(
                 f"{self.url}/saml/decrypt",
                 json=payload,
                 timeout=self.timeout,

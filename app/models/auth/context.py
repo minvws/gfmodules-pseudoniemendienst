@@ -13,13 +13,6 @@ class AuthenticationClaims:
 
 @dataclass(frozen=True)
 class AuthContext:
-    """
-    Authentication context extracted from the bearer token. This can be used in the route handlers
-    """
-
-    # List of claims from the token
     claims: AuthenticationClaims
-    # audience intended for
     audience: str
-    # authorization scopes granted by the token
     scope: list[AuthorizationScope]

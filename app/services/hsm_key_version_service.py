@@ -86,8 +86,9 @@ class HsmKeyVersionService:
 
         now = now_utc()
         with self.__db.get_db_session() as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(organization_external_id)
+            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+                organization_external_id
+            )
             if org is None:
                 raise RecipientNotFoundError()
             versions = [v.version for v in org.hsm_key_versions if _is_active(v, now)]

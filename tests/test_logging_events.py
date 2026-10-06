@@ -8,7 +8,7 @@ from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 from gfmodules.logging.testing import assert_catalogue_complete, capture_records
 from jwcrypto import jwk
 
-from app.config import ConfigOprf
+from app.config import ConfigHsm
 from app.logging.events import Log
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
@@ -133,14 +133,14 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     ]
     service = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            hsm_config=ConfigHsm(hsm_url="https://hsm.local"),
             hsm_key_version_service=hsm_key_version_service,
         )
     )
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.post",
             side_effect=RuntimeError("HSM unreachable"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

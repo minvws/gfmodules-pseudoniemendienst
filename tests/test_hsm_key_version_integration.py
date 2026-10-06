@@ -5,8 +5,9 @@ It registers an organization with a public key, creates key versions through
 the public ``/administration/key-versions`` endpoint and verifies that an OPRF evaluation
 returns a pseudonym carrying every active key version in the resulting JWE.
 
-The HSM itself is mocked: ``requests.post`` returns a deterministic evaluation
-per key version, so we can assert exactly which versions end up in the JWE.
+The HSM itself is mocked: ``requests.Session.post`` returns a deterministic
+evaluation per key version, so we can assert exactly which versions end up in
+the JWE.
 """
 
 import base64
@@ -22,7 +23,7 @@ from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
 from app import container
-from app.config import ConfigOprf
+from app.config import ConfigHsm
 from app.db.db import Database
 from app.db.models import OrganizationEntity, OrganizationPublicKeyEntity
 from app.db.session import DbSession
@@ -98,13 +99,13 @@ def test_new_key_version_is_added_to_jwe(
     # versions from the same database the endpoint writes to.
     hsm_oprf = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            hsm_config=ConfigHsm(hsm_url="https://hsm.local"),
             hsm_key_version_service=HsmKeyVersionService(database),
         )
     )
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
     try:
-        with patch("app.services.hsm.client.requests.post", side_effect=_fake_hsm_post):
+        with patch("requests.Session.post", side_effect=_fake_hsm_post):
             # We get a pseudonym back, carrying only version 1.
             eval_resp = _eval(
                 client, persisted_organization_2.external_id, valid_headers
@@ -114,7 +115,7 @@ def test_new_key_version_is_added_to_jwe(
             assert body["aud"] == "oin:" + persisted_organization_2.external_id.value
             assert body["scope"] == SCOPE
             assert body["subject"] == "pseudonym:eval:" + _eval_v("1")
-            assert body["extra_versions"] == {}
+            assert body["extraVersions"] == {}
 
             # Create version 2 of the HSM key.
             resp = client.post(
@@ -135,6 +136,6 @@ def test_new_key_version_is_added_to_jwe(
             assert eval_resp.status_code == 200
             body = _decrypt_jwe(eval_resp.json()["jwe"], private_key)
             assert body["subject"] == "pseudonym:eval:" + _eval_v("2")
-            assert body["extra_versions"] == {"1": _eval_v("1")}
+            assert body["extraVersions"] == {"1": _eval_v("1")}
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)

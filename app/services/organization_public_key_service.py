@@ -152,8 +152,9 @@ class OrganizationPublicKeyService:
     ) -> dict[str, Any]:
         jwk_dict = self._validate_and_extract(raw_jws, org_id).export(as_dict=True)
         with self.db.get_db_session(commit=True) as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(org_id)
+            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+                org_id
+            )
             if org is None:
                 # TODO GB: This can only happen when authorization is revoked but token is still valid.
                 # For consistency we need to decide how to handle this throughout all apps
@@ -188,8 +189,7 @@ class OrganizationPublicKeyService:
     ) -> dict[str, Any]:
         jwk_dict = self._validate_and_extract(raw_jws, org_id).export(as_dict=True)
         with self.db.get_db_session(commit=True) as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_registered(org_id)
+            org = session.get_repository(OrganizationRepository).get_registered(org_id)
             public_key_for_id = [pk for pk in org.public_keys if pk.id == id]
 
             domains_as_set = set(domains)
@@ -220,16 +220,16 @@ class OrganizationPublicKeyService:
 
     def get_by_org(self, org_id: Oin) -> list[dict[str, Any]]:
         with self.db.get_db_session() as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_registered(org_id)
+            org = session.get_repository(OrganizationRepository).get_registered(org_id)
             return [pk.to_dict() for pk in org.public_keys]
 
     def get_by_org_and_domain(
         self, org_id: Oin, domain: str
     ) -> OrganizationPublicKeyEntity:
         with self.db.get_db_session() as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(org_id)
+            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+                org_id
+            )
             if not org:
                 # The organization is the recipient of an exchange.
                 raise RecipientNotFoundError()
@@ -243,8 +243,9 @@ class OrganizationPublicKeyService:
     def delete(self, key_id: uuid.UUID, organization_id: Oin) -> None:
         """Deletes the key; raises when it does not exist for the organization."""
         with self.db.get_db_session(commit=True) as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_registered(organization_id)
+            org = session.get_repository(OrganizationRepository).get_registered(
+                organization_id
+            )
             deleted = session.get_repository(OrganizationPublicKeyRepository).delete(
                 key_id, org.id
             )

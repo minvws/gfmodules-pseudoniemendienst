@@ -5,7 +5,7 @@ from typing import Any
 from jwcrypto import jwe, jwk
 
 
-class BlindJwe:
+class Jwe:
     @staticmethod
     def build(
         audience: str,
@@ -14,9 +14,6 @@ class BlindJwe:
         pub_key: jwk.JWK,
         extra_claims: dict[str, Any] | None = None,
     ) -> str:
-        """
-        Build a JWT token
-        """
         if extra_claims is None:
             extra_claims = {}
         now = int(time.time())

@@ -5,7 +5,7 @@ The subject both the reversible and the irreversible pseudonym are computed over
 """
 
 from app.models.oin import RECIPIENT_ORGANIZATION_PREFIX, Oin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 
 DELIMITER = "|"
 

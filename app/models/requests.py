@@ -2,13 +2,12 @@ import base64
 import binascii
 import logging
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.oin import RecipientOrganizationOin
-from app.personal_id import PersonalId
-from app.rid import RidUsage
+from app.models.personal_id import PersonalId
 from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
@@ -137,13 +136,6 @@ class HsmKeyVersionUpdateRequest(BaseModel):
         return self
 
 
-class RidReceiveRequest(BaseModel):
-    rid: str
-    recipientOrganization: RecipientOrganizationOin
-    recipientScope: str
-    pseudonymType: Literal["rp", "irp", "bsn"]
-
-
 class BlindRequest(BaseModel):
     encryptedPersonalId: str = Field(..., min_length=2)
     recipientOrganization: RecipientOrganizationOin
@@ -159,33 +151,6 @@ class BlindRequest(BaseModel):
             raise ValueError(f"must be base64url: {e}")
 
         return normalized
-
-
-class RidExchangeRequest(BaseModel):
-    personalId: Any
-    recipientOrganization: RecipientOrganizationOin
-    recipientScope: str
-    ridUsage: Any
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
-        pid = data.get("personalId")
-        if isinstance(pid, str):
-            data["personalId"] = PersonalId.from_str(pid)
-        if isinstance(pid, dict):
-            data["personalId"] = PersonalId.from_dict(pid)
-
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_rid_usage(cls, data: dict[str, Any]) -> dict[str, Any]:
-        ridUsage = data.get("ridUsage")
-        if isinstance(ridUsage, str):
-            data["ridUsage"] = RidUsage(ridUsage)
-
-        return data
 
 
 class ReversiblePseudonymExchangeRequest(BaseModel):
@@ -206,6 +171,11 @@ class ReversiblePseudonymExchangeRequest(BaseModel):
                     "recipientOrganization": "oin:00000099000000001000",
                     "recipientScope": "nvi",
                 },
+                {
+                    "reversiblePseudonym": "AQAB....",
+                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientScope": "nvi",
+                },
             ]
         },
     )
@@ -213,11 +183,20 @@ class ReversiblePseudonymExchangeRequest(BaseModel):
     # Kept as received: the endpoint parses it after the authorization checks,
     # so a malformed value is reported as a 400 with an audit event instead of
     # a validation error that echoes the input back.
-    personalId: str | dict[str, str] = Field(
-        ...,
+    personalId: str | dict[str, str] | None = Field(
+        default=None,
         description=(
             "Personal ID as `<landCode>:<type>:<value>` or as an object with "
-            "`landCode`, `type` and `value`."
+            "`landCode`, `type` and `value`. Exactly one of `personalId` or "
+            "`reversiblePseudonym` must be provided."
+        ),
+    )
+    reversiblePseudonym: str | None = Field(
+        default=None,
+        description=(
+            "A reversible pseudonym previously issued to the calling "
+            "organization, reversed before use. Exactly one of `personalId` "
+            "or `reversiblePseudonym` must be provided."
         ),
     )
     recipientOrganization: RecipientOrganizationOin
@@ -228,6 +207,14 @@ class ReversiblePseudonymExchangeRequest(BaseModel):
         pattern=r"^[^|]+$",
         description="Scope of the recipient organization the pseudonym is bound to.",
     )
+
+    @model_validator(mode="after")
+    def exactly_one_input(self) -> "ReversiblePseudonymExchangeRequest":
+        if (self.personalId is None) == (self.reversiblePseudonym is None):
+            raise ValueError(
+                "exactly one of personalId or reversiblePseudonym must be provided"
+            )
+        return self
 
 
 class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
@@ -240,21 +227,12 @@ class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
                     "recipientScope": "nvi",
                 },
                 {
-                    "personalId": "pseudonym:reversible:AQAB....",
+                    "reversiblePseudonym": "AQAB....",
                     "recipientOrganization": "oin:00000099000000001000",
                     "recipientScope": "nvi",
                 },
             ]
         },
-    )
-
-    personalId: str | dict[str, str] = Field(
-        ...,
-        description=(
-            "Personal ID as `<landCode>:<type>:<value>` or as an object with "
-            "`landCode`, `type` and `value`; or a reversible pseudonym "
-            "(`pseudonym:reversible:<...>`) issued to the calling organization."
-        ),
     )
 
 
@@ -265,10 +243,8 @@ class InputRequest(BaseModel):
     @classmethod
     def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
         pid = data.get("personalId")
-        if isinstance(pid, str):
-            data["personalId"] = PersonalId.from_str(pid)
-        if isinstance(pid, dict):
-            data["personalId"] = PersonalId.from_dict(pid)
+        if isinstance(pid, (str, dict)):
+            data["personalId"] = PersonalId.parse(pid)
 
         return data
 

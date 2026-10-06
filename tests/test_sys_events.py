@@ -13,7 +13,7 @@ from jwcrypto import jwk
 from sqlalchemy.exc import DatabaseError, OperationalError
 
 from app import container
-from app.config import ConfigOprf, get_config
+from app.config import ConfigHsm, get_config
 from app.db.db import Database
 from app.db.models import OrganizationEntity
 from app.logging.events import Log
@@ -158,7 +158,7 @@ def test_hsm_unreachable_emits_sys_event(
 
     service = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            hsm_config=ConfigHsm(hsm_url="https://hsm.local"),
             hsm_key_version_service=hsm_key_version_service,
         )
     )
@@ -167,7 +167,7 @@ def test_hsm_unreachable_emits_sys_event(
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.post",
             side_effect=requests.exceptions.ConnectionError("connection refused"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

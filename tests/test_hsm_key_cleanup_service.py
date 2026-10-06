@@ -9,7 +9,7 @@ from uuid import UUID
 import pytest
 import requests
 
-from app.config import ConfigOprf
+from app.config import ConfigHsm
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.db.repositories.organization_repository import OrganizationRepository
@@ -59,8 +59,8 @@ def _add(
     return version, org
 
 
-def _hsm_config() -> ConfigOprf:
-    return ConfigOprf(
+def _hsm_config() -> ConfigHsm:
+    return ConfigHsm(
         hsm_url="https://hsm.local", hsm_module="softhsm", hsm_slot="SoftHSMLabel"
     )
 
@@ -69,27 +69,28 @@ DESTROY_URL = "https://hsm.local/hsm/softhsm/SoftHSMLabel/destroy"
 
 
 def _fake_hsm(existing: Callable[[str], bool]) -> Callable[..., MagicMock]:
-    """A fake HSM API: the object search reports a label as present when
-    ``existing`` says so, and destroy always succeeds."""
+    """A fake HSM API: destroy succeeds for a label when ``existing`` says it
+    is present, and otherwise answers the way the real HSM API answers a
+    destroy of an unknown label (a 422 with a "No such key" description)."""
 
     def _post(url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
         resp = MagicMock()
-        if url == DESTROY_URL:
-            resp.json.return_value = {"result": "ok"}
+        if url == DESTROY_URL and not existing(json["label"]):
+            resp.status_code = 422
+            resp.raise_for_status.side_effect = requests.HTTPError("422")
+            resp.json.return_value = {"error_description": "No such key"}
         else:
-            resp.json.return_value = {
-                "objects": ["obj"] if existing(json["label"]) else []
-            }
+            resp.json.return_value = {"result": "ok"}
         return resp
 
     return _post
 
 
-def _destroyed_labels(post: MagicMock) -> set[str]:
+def _destroyed_labels(post: MagicMock, existing: Callable[[str], bool]) -> set[str]:
     return {
         call.kwargs["json"]["label"]
         for call in post.call_args_list
-        if call.args[0] == DESTROY_URL
+        if call.args[0] == DESTROY_URL and existing(call.kwargs["json"]["label"])
     }
 
 
@@ -165,23 +166,23 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
         HsmKeyVersionService(database),
     )
 
+    def existing(label: str) -> bool:
+        return "-oprf-" in label
+
     with (
         # Keep the service's notion of "now" fixed to the test timestamp.
         patch(
             "app.services.hsm_key_version_service.datetime",
             SimpleNamespace(now=lambda tz=None: now),
         ),
-        patch(
-            "app.services.hsm.client.requests.post",
-            side_effect=_fake_hsm(lambda label: "-oprf-" in label),
-        ) as post,
+        patch("requests.Session.post", side_effect=_fake_hsm(existing)) as post,
     ):
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == expected_cleaned
 
     # The right keys are destroyed in the HSM, by their stored label.
-    assert _destroyed_labels(post) == expected_labels
+    assert _destroyed_labels(post, existing) == expected_labels
 
     version_service = HsmKeyVersionService(database)
     for oin, id in organization_ids.items():
@@ -213,13 +214,11 @@ def test_cleanup_destroys_every_pseudonym_key_of_the_version(
     )
     service = HsmKeyCleanupService(_hsm_config(), HsmKeyVersionService(database))
 
-    with patch(
-        "app.services.hsm.client.requests.post", side_effect=_fake_hsm(lambda _: True)
-    ) as post:
+    with patch("requests.Session.post", side_effect=_fake_hsm(lambda _: True)) as post:
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == 1
-    assert _destroyed_labels(post) == {
+    assert _destroyed_labels(post, lambda _: True) == {
         f"oin-{TEST_OIN}-oprf-v1",
         f"oin-{TEST_OIN}-irp-v1-hmac",
         f"oin-{TEST_OIN}-rp-v1-aes",
@@ -241,13 +240,11 @@ def test_cleanup_marks_version_removed_when_no_keys_were_ever_created(
     )
     service = HsmKeyCleanupService(_hsm_config(), HsmKeyVersionService(database))
 
-    with patch(
-        "app.services.hsm.client.requests.post", side_effect=_fake_hsm(lambda _: False)
-    ) as post:
+    with patch("requests.Session.post", side_effect=_fake_hsm(lambda _: False)) as post:
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == 1
-    assert _destroyed_labels(post) == set()
+    assert _destroyed_labels(post, lambda _: False) == set()
     assert HsmKeyVersionService(database).get_expired_versions() == []
 
 
@@ -262,11 +259,11 @@ def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
     )
 
     service = HsmKeyCleanupService(
-        ConfigOprf(hsm_url=None),
+        ConfigHsm(hsm_url=None),
         HsmKeyVersionService(database),
     )
 
-    with patch("app.services.hsm.client.requests.post") as post:
+    with patch("requests.Session.post") as post:
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == 0
@@ -293,7 +290,7 @@ def test_cleanup_keeps_version_when_hsm_destroy_fails(database: Database) -> Non
     failing = MagicMock()
     failing.raise_for_status.side_effect = requests.HTTPError("boom")
 
-    with patch("app.services.hsm.client.requests.post", return_value=failing):
+    with patch("requests.Session.post", return_value=failing):
         cleaned = service.cleanup_expired_keys()
 
     # HSM removal failed, so the version is left for the next run to retry.
@@ -349,9 +346,9 @@ def test_cleanup_skips_for_empty_or_missing_hsm_url(
     database: Database, hsm_url: str | None
 ) -> None:
     service = HsmKeyCleanupService(
-        ConfigOprf(hsm_url=hsm_url),
+        ConfigHsm(hsm_url=hsm_url),
         HsmKeyVersionService(database),
     )
-    with patch("app.services.hsm.client.requests.post") as post:
+    with patch("requests.Session.post") as post:
         assert service.cleanup_expired_keys() == 0
     post.assert_not_called()

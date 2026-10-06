@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, Any
 
 import gfmodules.logging as gflog
-from fastapi import APIRouter, Body, Depends, Security
+from fastapi import APIRouter, Body, Depends, HTTPException, Security
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
@@ -60,7 +60,7 @@ def post_reversible_pseudonym(
                 "error_type": e.error_type,
             },
         )
-        return JSONResponse({"detail": "SAML exchange failed"}, status_code=502)
+        raise HTTPException(status_code=502, detail="SAML exchange failed") from e
 
     gflog.emit(
         logger,

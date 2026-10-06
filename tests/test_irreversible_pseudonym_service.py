@@ -9,9 +9,9 @@ import pytest
 import requests
 from test_reversible_pseudonym_service import FakeHsm, _with_fake_hsm
 
-from app.config import ConfigOprf
+from app.config import ConfigHsm
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm.client import HsmClient
 from app.services.irreversible.keys import (
     HsmIrreversibleKeyOperations,
@@ -60,7 +60,7 @@ def test_pseudonym_is_a_base64url_sha256_digest_and_deterministic(
 
     assert first == second
     assert first.version == 1
-    assert first.older == {}
+    assert first.older == ()
     assert len(base64.urlsafe_b64decode(first.value)) == hashlib.sha256().digest_size
 
 
@@ -119,8 +119,8 @@ def test_dual_version_during_grace_carries_the_older_pseudonym(
 
     assert dual.version == 2
     assert dual.value == new.value
-    assert dual.older == {1: old.value}
-    assert new.older == {}
+    assert dual.older == ((1, old.value),)
+    assert new.older == ()
 
 
 def test_irreversible_keys_are_separate_from_reversible_keys(
@@ -155,9 +155,7 @@ def test_scope_with_delimiter_is_refused(service: IrreversiblePseudonymService) 
 @pytest.fixture
 def hsm_service() -> IrreversiblePseudonymService:
     return IrreversiblePseudonymService(
-        HsmIrreversibleKeyOperations(
-            HsmClient(ConfigOprf(hsm_url="https://hsm.local"))
-        ),
+        HsmIrreversibleKeyOperations(HsmClient(ConfigHsm(hsm_url="https://hsm.local"))),
         _key_versions({OIN: [1]}),
     )
 

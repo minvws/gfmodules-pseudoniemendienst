@@ -53,9 +53,12 @@ ssl_key_file = server.key
 root_path =
 
 [oprf]
-# Local key fallback: file with base64 server key (used when hsm_url is not set)
+# Local key fallback: file with base64 server key (used when hsm.hsm_url is not set)
 server_key_file=secrets/oprf-server.key
-# HSM API: when set, evaluation is delegated to the HSM API instead of the local key
+
+[hsm]
+# Shared by OPRF, reversible and irreversible pseudonyms. When hsm_url is set,
+# all three are delegated to the HSM API instead of their local-key fallback.
 # hsm_url=https://localhost:8443
 # hsm_module=softhsm
 # hsm_slot=SoftHSMLabel

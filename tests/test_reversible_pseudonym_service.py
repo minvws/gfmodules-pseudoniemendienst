@@ -12,9 +12,9 @@ import requests
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from app.config import ConfigOprf
+from app.config import ConfigHsm
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm.client import HsmClient
 from app.services.reversible.keys import (
     HsmReversibleKeyOperations,
@@ -335,13 +335,11 @@ def fake_hsm() -> FakeHsm:
 
 @pytest.fixture
 def hsm_keys() -> ReversibleKeyOperations:
-    return HsmReversibleKeyOperations(
-        HsmClient(ConfigOprf(hsm_url="https://hsm.local"))
-    )
+    return HsmReversibleKeyOperations(HsmClient(ConfigHsm(hsm_url="https://hsm.local")))
 
 
 def _with_fake_hsm(fake: FakeHsm) -> Any:
-    return patch("app.services.hsm.client.requests.post", side_effect=fake.post)
+    return patch("requests.Session.post", side_effect=fake.post)
 
 
 def test_hsm_keys_are_created_once_and_pseudonym_matches_reference(
@@ -427,7 +425,7 @@ def test_hsm_unreachable_is_reported_as_such(
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.post",
             side_effect=requests.exceptions.ConnectionError("down"),
         ),
         pytest.raises(ReversiblePseudonymError) as e,
@@ -444,7 +442,7 @@ def test_hsm_error_is_reported_as_crypto_failure(
     failing.raise_for_status.side_effect = requests.HTTPError("boom")
 
     with (
-        patch("app.services.hsm.client.requests.post", return_value=failing),
+        patch("requests.Session.post", return_value=failing),
         pytest.raises(ReversiblePseudonymError) as e,
     ):
         service.generate(PID, recipient, SCOPE)
@@ -463,7 +461,7 @@ def test_local_and_hsm_operations_are_interchangeable(
 
     versions: Callable[[], MagicMock] = lambda: _key_versions({recipient: [1]})
     hsm_service = ReversiblePseudonymService(
-        HsmReversibleKeyOperations(HsmClient(ConfigOprf(hsm_url="https://hsm.local"))),
+        HsmReversibleKeyOperations(HsmClient(ConfigHsm(hsm_url="https://hsm.local"))),
         versions(),
     )
     with _with_fake_hsm(fake_hsm):

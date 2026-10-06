@@ -1,9 +1,7 @@
-import json
 import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
 import gfmodules.logging as gflog
@@ -22,15 +20,15 @@ from app.logging.events import Log
 from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.administration.key import router as key_router
+from app.routers.debug_oprf import router as debug_oprf_router
 from app.routers.default import router as default_router
 from app.routers.errors import install_domain_error_handler
-from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
 from app.routers.irreversible_pseudonym import router as irreversible_pseudonym_router
 from app.routers.oprf import router as oprf_router
 from app.routers.reversible_pseudonym import router as reversible_pseudonym_router
 from app.routers.saml_exchange import router as saml_exchange_router
-from app.routers.test_oprf import router as test_oprf_router
+from app.utils.version import load_version_json
 
 logger = logging.getLogger(__name__)
 
@@ -186,12 +184,12 @@ EXCHANGE_TAGS_METADATA = [
     {
         "name": "Exchange Services",
         "description": (
-            "Exchange a personal ID for a reversible pseudonym or reversible pseudonyms targeted at a "
-            "recipient organization/scope, and redeem a previously issued reversible pseudonyms for a "
-            "pseudonym (or the BSN, when permitted by both the reversible pseudonyms usage and the "
-            "organization's `max_key_usage`). Exchanges that involve a personal ID "
-            "require both the calling and the recipient organization to be "
-            "authorized for that personal ID type by a PRS administrator."
+            "Exchange a personal ID for a reversible or irreversible pseudonym "
+            "targeted at a recipient organization/scope. Instead of a personal "
+            "ID, a previously issued reversible pseudonym may be supplied and "
+            "is reversed first. Every exchange requires both the calling and "
+            "the recipient organization to be authorized for that personal ID "
+            "type by a PRS administrator."
         ),
     },
 ]
@@ -280,13 +278,10 @@ def create_fastapi_app() -> FastAPI:
 
 
 def _read_version() -> str:
-    path = Path(__file__).parent.parent / "version.json"
-    try:
-        with open(path, "r") as fh:
-            data = json.load(fh)
-            return str(data.get("version", "unknown"))
-    except (FileNotFoundError, json.JSONDecodeError):
+    data = load_version_json()
+    if data is None:
         return "unknown"
+    return str(data.get("version", "unknown"))
 
 
 @asynccontextmanager
@@ -367,13 +362,12 @@ def setup_fastapi() -> FastAPI:
         oprf_router,
     ]
     if config.app.enable_exchange_services_routes:
-        routers.append(exchange_router)
         routers.append(reversible_pseudonym_router)
         routers.append(irreversible_pseudonym_router)
     if config.app.enable_saml_exchange_routes:
         routers.append(saml_exchange_router)
     if config.app.enable_test_routes:
-        routers.append(test_oprf_router)
+        routers.append(debug_oprf_router)
 
     for router in routers:
         fastapi.include_router(router, dependencies=[Depends(get_auth_ctx)])

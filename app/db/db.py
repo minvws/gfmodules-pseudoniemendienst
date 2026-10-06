@@ -42,26 +42,7 @@ class Database:
         logger.info("generating tables...")
         Base.metadata.create_all(self.engine)
 
-    def truncate_tables(self) -> None:
-        logger.info("truncating all tables...")
-        try:
-            metadata = Base.metadata
-            metadata.reflect(bind=self.engine)
-            with Session(self.engine) as session:
-                for table in reversed(metadata.sorted_tables):
-                    session.execute(text(f"DELETE FROM {table.schema}.{table.name}"))
-                session.commit()
-            logger.info("all tables truncated successfully.")
-        except Exception:
-            logger.exception("error while truncating tables")
-            raise
-
     def health_error(self) -> str | None:
-        """
-        Check if the database is healthy
-
-        :return: None if the database is healthy, the error detail otherwise
-        """
         try:
             with Session(self.engine) as session:
                 session.execute(text("SELECT 1"))
@@ -71,11 +52,6 @@ class Database:
             return str(e)
 
     def is_healthy(self) -> bool:
-        """
-        Check if the database is healthy
-
-        :return: True if the database is healthy, False otherwise
-        """
         return self.health_error() is None
 
     def get_db_session(self, commit: bool = False) -> DbSession:

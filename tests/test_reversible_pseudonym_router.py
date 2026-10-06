@@ -5,12 +5,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from conftest import setup_org_and_key
+from conftest import personal_id_types, setup_org_and_key
 from fastapi.testclient import TestClient
 from jwcrypto import jwe, jwk
 
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
-from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
@@ -56,9 +55,7 @@ def _events(records: list[logging.LogRecord], event_id: str) -> list[logging.Log
 
 
 @pytest.fixture
-def make_organization(
-    db_session: DbSession, personal_id_type_repository: PersonalIdTypeRepository
-) -> MakeOrganization:
+def make_organization(db_session: DbSession) -> MakeOrganization:
     """Register an organization with the personal ID types it may request and
     receive (administrator-managed), and one active HSM key version."""
 
@@ -71,12 +68,8 @@ def make_organization(
         org = OrganizationEntity(
             external_id=oin,
             name=f"org-{oin.value}",
-            request_personal_id_types=list(
-                personal_id_type_repository.get_many(request or [])
-            ),
-            receive_personal_id_types=list(
-                personal_id_type_repository.get_many(receive or [])
-            ),
+            request_personal_id_types=personal_id_types(db_session, request or []),
+            receive_personal_id_types=personal_id_types(db_session, receive or []),
             hsm_key_versions=(
                 [HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))]
                 if active_key_version

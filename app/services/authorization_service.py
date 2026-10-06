@@ -20,8 +20,9 @@ class AuthorizationService:
         self, organization_id: Oin, personal_id_type: PersonalIdType
     ) -> None:
         with self.db.get_db_session() as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_registered(organization_id)
+            org = session.get_repository(OrganizationRepository).get_registered(
+                organization_id
+            )
             if not personal_id_type in [
                 rpit.name for rpit in org.request_personal_id_types
             ]:
@@ -31,8 +32,9 @@ class AuthorizationService:
         self, organization_id: Oin, personal_id_type: PersonalIdType
     ) -> None:
         with self.db.get_db_session() as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            org = org_repo.get_one_by_external_id(organization_id)
+            org = session.get_repository(OrganizationRepository).get_one_by_external_id(
+                organization_id
+            )
             if not org or not personal_id_type in [
                 rpit.name for rpit in org.receive_personal_id_types
             ]:

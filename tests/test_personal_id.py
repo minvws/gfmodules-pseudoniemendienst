@@ -1,6 +1,6 @@
 import pytest
 
-from app.personal_id import PersonalId, PersonalIdValidationError
+from app.models.personal_id import PersonalId, PersonalIdValidationError
 
 
 def test_personal_id() -> None:

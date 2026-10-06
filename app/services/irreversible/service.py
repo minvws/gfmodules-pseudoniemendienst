@@ -14,8 +14,9 @@ import base64
 import logging
 from dataclasses import dataclass
 
+from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.irreversible.keys import IrreversibleKeyOperations
@@ -24,14 +25,8 @@ from app.services.pseudonym_subject import pseudonym_subject
 logger = logging.getLogger(__name__)
 
 
-class IrreversiblePseudonymError(ValueError):
-    """error_type is one of the PRS-PSE-004 values: hsm_unreachable or
-    crypto_failure; or no_active_key_version when the recipient has no active
-    HSM key version."""
-
-    def __init__(self, error_type: str, message: str) -> None:
-        super().__init__(message)
-        self.error_type = error_type
+class IrreversiblePseudonymError(PseudonymOperationError):
+    pass
 
 
 def _encode(digest: bytes) -> str:
@@ -44,8 +39,9 @@ class IrreversiblePseudonym:
     # the "pseudonym:irreversible:" prefix
     value: str
     version: int
-    # pseudonyms for the older versions that are still active (grace period)
-    older: dict[int, str]
+    # pseudonyms for the older versions that are still active (grace period);
+    # a tuple, not a dict, so the frozen dataclass stays hashable
+    older: tuple[tuple[int, str], ...]
 
 
 class IrreversiblePseudonymService:
@@ -93,7 +89,7 @@ class IrreversiblePseudonymService:
         return IrreversiblePseudonym(
             value=_encode(digest),
             version=latest,
-            older={version: _encode(d) for version, d in older},
+            older=tuple((version, _encode(d)) for version, d in older),
         )
 
     @staticmethod

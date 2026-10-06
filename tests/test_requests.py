@@ -11,7 +11,6 @@ from app.models.requests import (
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
     ReversiblePseudonymExchangeRequest,
-    RidExchangeRequest,
 )
 
 
@@ -63,32 +62,6 @@ def test_blind_request_invalid_prefixed_recipient_organization_throws_oin_valida
         assert "Invalid OIN '00000099'." in str(e)
 
 
-def test_rid_exchange_request_recipient_organization_is_parsed_to_oin() -> None:
-    request = RidExchangeRequest(
-        personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
-        recipientOrganization=RecipientOrganizationOin("oin:00000099000000002000"),
-        recipientScope="scope",
-        ridUsage="irp",
-    )
-
-    assert request.recipientOrganization == Oin("00000099000000002000")
-
-
-def test_rid_exchange_request_invalid_recipient_organization_throws_validation_error() -> (
-    None
-):
-    try:
-        RidExchangeRequest(
-            personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
-            recipientOrganization="bad-oin",  # type: ignore[arg-type]
-            recipientScope="scope",
-            ridUsage="irp",
-        )
-        assert False, "Expected ValidationError for invalid organization OIN"
-    except ValidationError as e:
-        assert "Invalid recipient organization. Format: oin:<oin_number>" in str(e)
-
-
 def test_reversible_pseudonym_request_recipient_organization_is_parsed_to_oin() -> None:
     request = ReversiblePseudonymExchangeRequest(
         personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
@@ -137,6 +110,37 @@ def test_reversible_pseudonym_request_rejects_invalid_scope(scope: str) -> None:
             recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
             recipientScope=scope,
         )
+
+
+def test_reversible_pseudonym_request_accepts_reversible_pseudonym_input() -> None:
+    request = ReversiblePseudonymExchangeRequest(
+        reversiblePseudonym="AQAB....",
+        recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
+        recipientScope="scope",
+    )
+
+    assert request.personalId is None
+    assert request.reversiblePseudonym == "AQAB...."
+
+
+def test_reversible_pseudonym_request_rejects_neither_input_given() -> None:
+    with pytest.raises(ValidationError) as e:
+        ReversiblePseudonymExchangeRequest(
+            recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
+            recipientScope="scope",
+        )
+    assert "exactly one of personalId or reversiblePseudonym" in str(e.value)
+
+
+def test_reversible_pseudonym_request_rejects_both_inputs_given() -> None:
+    with pytest.raises(ValidationError) as e:
+        ReversiblePseudonymExchangeRequest(
+            personalId="NL:bsn:950000012",
+            reversiblePseudonym="AQAB....",
+            recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
+            recipientScope="scope",
+        )
+    assert "exactly one of personalId or reversiblePseudonym" in str(e.value)
 
 
 def test_register_request_with_key_id() -> None:
