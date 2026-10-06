@@ -10,7 +10,7 @@ from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
 from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.exceptions import RecipientNotFoundError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
@@ -19,6 +19,7 @@ from app.models.requests import (
     IrreversiblePseudonymExchangeRequest,
     IrreversiblePseudonymFromReversiblePseudonymRequest,
 )
+from app.routers.exchange_support import authorize_exchange
 from app.services.authorization_service import AuthorizationService
 from app.services.irreversible.service import (
     IrreversiblePseudonymError,
@@ -128,22 +129,14 @@ def exchange_irreversible_pseudonym(
         Depends(container.get_reversible_pseudonym_service),
     ],
 ) -> Response:
-    handelende_oin = str(auth.claims.client_organization_id)
-    namens_oin = str(auth.claims.organization_id)
-    doel_oin = str(req.recipientOrganization)
-    audit = {
-        "handelende_oin": handelende_oin,
-        "namens_oin": namens_oin,
-        "doel_oin": doel_oin,
-    }
-
-    def deny(reason: str, error: DomainError) -> None:
-        gflog.emit(
-            logger,
-            Log.AUTHORIZATION_DENIED,
-            f"Authorization denied ({reason}): {error.message}",
-            fields={**audit, "requested_operation": _OPERATION},
-        )
+    audit = authorize_exchange(
+        logger,
+        authorization_service,
+        auth,
+        req.recipientOrganization,
+        PersonalIdType.IRREVERSIBLE_PSEUDONYM,
+        _OPERATION,
+    )
 
     def failed(error_type: PseudonymErrorType, exc: Exception | None = None) -> None:
         # PRS-PSE-004
@@ -152,25 +145,8 @@ def exchange_irreversible_pseudonym(
             Log.PSEUDONYM_CREATE_FAILED,
             "Irreversible pseudonym creation failed",
             exc_info=exc,
-            fields={**audit, "error_type": error_type},
+            fields={**audit.fields(), "error_type": error_type},
         )
-
-    personal_id_type = PersonalIdType.IRREVERSIBLE_PSEUDONYM
-    try:
-        authorization_service.validate_allowed_to_request(
-            auth.claims.organization_id, personal_id_type
-        )
-    except DomainError as e:
-        deny("sender_may_not_request_irreversible_pseudonym", e)
-        raise
-
-    try:
-        authorization_service.validate_allowed_to_receive(
-            req.recipientOrganization, personal_id_type
-        )
-    except DomainError as e:
-        deny("recipient_may_not_receive_irreversible_pseudonym", e)
-        raise
 
     if isinstance(req, IrreversiblePseudonymFromReversiblePseudonymRequest):
         try:
@@ -199,8 +175,8 @@ def exchange_irreversible_pseudonym(
                 Log.PERSONAL_ID_VALIDATION_FAILED,
                 "Personal ID validation failed",
                 fields={
-                    "handelende_oin": handelende_oin,
-                    "namens_oin": namens_oin,
+                    "handelende_oin": audit.handelende_oin,
+                    "namens_oin": audit.namens_oin,
                     "validation_error": e.kind,
                 },
             )
@@ -232,7 +208,7 @@ def exchange_irreversible_pseudonym(
             str(version): value for version, value in sorted(pseudonym.older)
         }
     jwe = Jwe.build(
-        audience=doel_oin,
+        audience=audit.doel_oin,
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
         pub_key=JWK(**public_key.jwk),
@@ -246,7 +222,7 @@ def exchange_irreversible_pseudonym(
             Log.PSEUDONYM_IRREVERSIBLE_DUAL_CREATED,
             "Irreversible pseudonym created for old and current key version",
             fields={
-                **audit,
+                **audit.fields(),
                 "domein": req.recipientScope,
                 "sleutel_versie_oud": max(version for version, _ in pseudonym.older),
                 "sleutel_versie_actueel": pseudonym.version,
@@ -259,7 +235,7 @@ def exchange_irreversible_pseudonym(
             Log.PSEUDONYM_IRREVERSIBLE_CREATED,
             "Irreversible pseudonym created",
             fields={
-                **audit,
+                **audit.fields(),
                 "domein": req.recipientScope,
                 "sleutel_versie": pseudonym.version,
             },
