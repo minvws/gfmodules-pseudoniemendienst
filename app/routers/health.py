@@ -68,9 +68,9 @@ def health(
         "database": db.health_error(),
     }
     components = {name: ok_or_error(error is None) for name, error in errors.items()}
-    healthy = ok_or_error(all(value == "ok" for value in components.values()))
-    content = {"status": healthy, "components": components}
-    if healthy == "ok":
+    is_healthy = all(error is None for error in errors.values())
+    content = {"status": ok_or_error(is_healthy), "components": components}
+    if is_healthy:
         return JSONResponse(content=content)
 
     for name, error in errors.items():
