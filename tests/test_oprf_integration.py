@@ -332,9 +332,10 @@ def test_oprf_eval_unknown_recipient_emits_refused_event(
     )
 
     assert response.status_code == 404
-    events = _events(oprf_event_records, "210403")
+    events = _events(oprf_event_records, "200402")
     assert len(events) == 1
     assert events[0].doel_oin == "oin:00000099000000003000"  # type: ignore[attr-defined]
+    assert not _events(oprf_event_records, "210403")
 
 
 def test_oprf_eval_sender_not_allowed_to_request_is_refused_and_audited(
