@@ -1,5 +1,4 @@
-import json
-from typing import Any, Literal
+from typing import Literal
 
 ALLOWED_ID_TYPES = {"bsn"}
 BSN_LENGTH = 9
@@ -128,10 +127,3 @@ class PersonalId:
         if isinstance(raw, str):
             return cls.from_str(raw)
         return cls.from_dict(raw)
-
-
-class PersonalIdJSONEncoder(json.JSONEncoder):
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, PersonalId):
-            return obj.as_dict()
-        return super().default(obj)

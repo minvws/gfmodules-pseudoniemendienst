@@ -11,7 +11,6 @@ from jwcrypto import jwk
 from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
-from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests import BlindRequest
@@ -37,11 +36,10 @@ TEST_OIN_79000 = Oin("00000000012345679000")
 
 def add_hsm_key_version(
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     external_id: Oin,
     **kwargs: object,
 ) -> OrganizationEntity:
-    org = create_organization(db_session, personal_id_type_repository, external_id)
+    org = create_organization(db_session, external_id)
     org.hsm_key_versions.append(HsmKeyVersionEntity(**kwargs))
     db_session.commit()
     return org
@@ -50,13 +48,11 @@ def add_hsm_key_version(
 def test_get_active_versions_filters_by_date_and_removed(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
     now = datetime.now(timezone.utc)
     # active: started, no end date
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_111,
         version=1,
         from_dt=now - timedelta(days=1),
@@ -65,7 +61,6 @@ def test_get_active_versions_filters_by_date_and_removed(
     # active: within window
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_222,
         version=2,
         from_dt=now - timedelta(days=1),
@@ -74,7 +69,6 @@ def test_get_active_versions_filters_by_date_and_removed(
     # inactive: not started yet
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_333,
         version=3,
         from_dt=now + timedelta(days=1),
@@ -83,7 +77,6 @@ def test_get_active_versions_filters_by_date_and_removed(
     # inactive: already ended
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_444,
         version=4,
         from_dt=now - timedelta(days=2),
@@ -92,7 +85,6 @@ def test_get_active_versions_filters_by_date_and_removed(
     # inactive: removed
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_555,
         version=5,
         from_dt=now - timedelta(days=1),
@@ -125,12 +117,10 @@ def test_get_active_versions_filters_by_date_and_removed(
 def test_get_active_versions_excludes_version_ending_now(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
     now = datetime.now(timezone.utc)
     org = add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_111,
         version=1,
         from_dt=now - timedelta(hours=1),
@@ -153,7 +143,6 @@ def test_get_active_versions_excludes_version_ending_now(
 def test_get_active_version_numbers(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     persisted_organization: OrganizationEntity,
 ) -> None:
     now = datetime.now(timezone.utc)
@@ -179,19 +168,16 @@ def test_get_active_version_numbers(
 def test_eval_via_hsm_returns_entry_per_active_version(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
     now = datetime.now(timezone.utc)
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_78000,
         version=2,
         from_dt=now - timedelta(days=2),
     )
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_78000,
         version=7,
         from_dt=now - timedelta(days=1),
@@ -199,7 +185,6 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     # a removed version must be ignored
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_78000,
         version=9,
         from_dt=now - timedelta(days=1),
@@ -235,12 +220,10 @@ def test_eval_via_hsm_returns_entry_per_active_version(
 def test_eval_generates_keys_if_needed(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
     now = datetime.now(timezone.utc)
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_79000,
         version=2,
         from_dt=now - timedelta(days=2),
@@ -291,7 +274,6 @@ def test_eval_generates_keys_if_needed(
 def test_eval_blind_subject_is_latest_with_extra_versions(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
     from jwcrypto import jwe as jwelib
     from jwcrypto import jwk
@@ -301,14 +283,12 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     now = datetime.now(timezone.utc)
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_78000,
         version=2,
         from_dt=now - timedelta(days=2),
     )
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN_78000,
         version=7,
         from_dt=now - timedelta(days=1),
@@ -370,7 +350,6 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
 def test_eval_blind_jwe_contains_only_versions_active_at_date(
     database: Database,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
     from jwcrypto import jwe as jwelib
     from jwcrypto import jwk
@@ -381,7 +360,6 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # expired: ended yesterday -> excluded
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN,
         version=2,
         from_dt=now - timedelta(days=10),
@@ -390,7 +368,6 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # active: started, no end date
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN,
         version=3,
         from_dt=now - timedelta(days=5),
@@ -399,7 +376,6 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # active: within window
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN,
         version=5,
         from_dt=now - timedelta(days=2),
@@ -408,7 +384,6 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     # future: not started yet -> excluded
     add_hsm_key_version(
         db_session,
-        personal_id_type_repository,
         external_id=TEST_OIN,
         version=8,
         from_dt=now + timedelta(days=1),
