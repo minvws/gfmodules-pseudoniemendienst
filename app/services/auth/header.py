@@ -15,7 +15,7 @@ class AuthHeaderService:
 
         if audience not in self.expected_audiences:
             logger.error(
-                f"Invalid audience value {audience} value should be {self.expected_audiences}. Check config values in case incoming value is correct"
+                f"Invalid audience {audience!r}, expected one of {self.expected_audiences}. Check config values in case the incoming value is correct"
             )
             raise InvalidAudienceError()
 

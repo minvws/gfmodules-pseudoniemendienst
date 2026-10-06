@@ -160,7 +160,9 @@ class DbSession:
                 logger.warning("retrying operation due to OperationalError: %s", e)
                 error = e
             except DatabaseError as e:
-                logger.warning("retrying operation due to DatabaseError: %s", e)
+                logger.warning(
+                    "operation failed with a non-retryable DatabaseError: %s", e
+                )
                 raise
             except Exception as e:
                 logger.warning("generic Exception during operation: %s", e)
