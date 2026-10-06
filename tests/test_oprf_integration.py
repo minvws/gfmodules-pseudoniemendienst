@@ -439,7 +439,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
         app.dependency_overrides.pop(container.get_oprf_service, None)
 
     assert eval_response.status_code == 400
-    assert eval_response.json() == {"detail": "Unable to evaluate blind"}
+    assert eval_response.json() == {"detail": "Invalid blinded input"}
 
 
 @pytest.mark.parametrize(

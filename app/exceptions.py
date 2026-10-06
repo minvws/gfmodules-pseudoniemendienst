@@ -84,6 +84,22 @@ class UnauthorizedRequestError(DomainError):
     message = "Unauthorized request"
 
 
+class InvalidPersonalIdError(DomainError):
+    message = "Invalid personal ID"
+
+
+class InvalidPseudonymError(DomainError):
+    message = "Invalid pseudonym"
+
+
+class InvalidBlindedInputError(DomainError):
+    message = "Invalid blinded input"
+
+
+class PseudonymVersionDestroyedError(DomainError):
+    message = "Pseudonym key version no longer available"
+
+
 class PseudonymOperationError(ValueError):
     """
     A failed key operation.

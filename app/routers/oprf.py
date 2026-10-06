@@ -2,33 +2,25 @@ import logging
 from typing import Annotated
 
 import gfmodules.logging as gflog
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, Security
 from jwcrypto.jwk import JWK
 from starlette.responses import JSONResponse
 
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, PseudonymOperationError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
-from app.routers.exchange_support import authorize_exchange
+from app.routers.exchange_support import authorize_exchange, raise_pseudonym_error
 from app.services.authorization_service import AuthorizationService
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-EVAL_FAILURE_STATUS_CODES = {
-    PseudonymErrorType.INVALID_BLINDED_INPUT: 400,
-    PseudonymErrorType.HSM_OPERATION_FAILED: 502,
-    PseudonymErrorType.HSM_UNREACHABLE: 503,
-    PseudonymErrorType.HSM_TIMEOUT: 504,
-}
 
 
 @router.post(
@@ -97,17 +89,14 @@ def post_eval(
         )
         raise
     except PseudonymOperationError as e:
-        # PRS-OPRF-003
-        gflog.emit(
+        raise_pseudonym_error(
             logger,
+            audit,
+            e,
             Log.OPRF_EVAL_FAILED,
             "OPRF evaluation failed",
-            fields={**audit.fields(), "error_type": e.error_type},
+            "Unable to evaluate blind",
         )
-        raise HTTPException(
-            status_code=EVAL_FAILURE_STATUS_CODES[e.error_type],
-            detail="Unable to evaluate blind",
-        ) from e
 
     # PRS-OPRF-001
     gflog.emit(

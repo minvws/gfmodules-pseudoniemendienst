@@ -18,12 +18,16 @@ from app.exceptions import (
     DomainNotRegisteredError,
     ExchangeInputError,
     InvalidAudienceError,
+    InvalidBlindedInputError,
     InvalidJwsError,
+    InvalidPersonalIdError,
+    InvalidPseudonymError,
     KeyVersionNotFoundError,
     KeyVersionRemovedError,
     NoKeyVersionError,
     NotAllowedToRequestError,
     OrganizationNotRegisteredError,
+    PseudonymVersionDestroyedError,
     PublicKeyNotFoundError,
     RecipientNotFoundError,
     UnauthorizedRequestError,
@@ -48,6 +52,10 @@ STATUS_CODES: dict[type[DomainError], int] = {
     NoKeyVersionError: 409,
     UnauthorizedRequestError: 403,
     ExchangeInputError: 400,
+    InvalidPersonalIdError: 400,
+    InvalidPseudonymError: 400,
+    InvalidBlindedInputError: 400,
+    PseudonymVersionDestroyedError: 410,
 }
 
 
