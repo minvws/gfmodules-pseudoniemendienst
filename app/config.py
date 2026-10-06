@@ -1,5 +1,6 @@
 import configparser
 import os
+from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
@@ -28,6 +29,15 @@ class ConfigApp(BaseModel):
     enable_saml_exchange_routes: bool = Field(default=False)
 
 
+def _int_or_default(default: int) -> Callable[[Any, Any], int]:
+    def validate(cls: Any, v: Any) -> int:
+        if v in (None, "", " "):
+            return default
+        return int(v)
+
+    return validate
+
+
 class ConfigDatabase(BaseModel):
     # SecretStr so the DSN password never appears in reprs or logs
     dsn: SecretStr
@@ -43,23 +53,15 @@ class ConfigDatabase(BaseModel):
         split_comma_separated(float)
     )
 
-    @field_validator("pool_size", mode="before")
-    def validate_pool_size(cls, v: Any) -> int:
-        if v in (None, "", " "):
-            return 5
-        return int(v)
-
-    @field_validator("max_overflow", mode="before")
-    def validate_max_overflow(cls, v: Any) -> int:
-        if v in (None, "", " "):
-            return 10
-        return int(v)
-
-    @field_validator("pool_recycle", mode="before")
-    def validate_pool_recycle(cls, v: Any) -> int:
-        if v in (None, "", " "):
-            return 3600
-        return int(v)
+    _validate_pool_size = field_validator("pool_size", mode="before")(
+        _int_or_default(5)
+    )
+    _validate_max_overflow = field_validator("max_overflow", mode="before")(
+        _int_or_default(10)
+    )
+    _validate_pool_recycle = field_validator("pool_recycle", mode="before")(
+        _int_or_default(3600)
+    )
 
 
 class ConfigUvicorn(BaseModel):
