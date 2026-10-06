@@ -1,14 +1,10 @@
-import json
-import logging
-from pathlib import Path
-
 from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.config import get_config
 from app.features import enabled_features
+from app.utils.version import load_version_json
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # https://www.patorjk.com/software/taag/#p=display&f=Doom&t=Skeleton
@@ -30,15 +26,11 @@ ____________  _____
 def index() -> Response:
     content = LOGO
 
-    try:
-        with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
-            data = json.load(file)
-            content += "\nVersion: {}\nCommit: {}".format(
-                data["version"], data["git_ref"]
-            )
-    except (OSError, json.JSONDecodeError, KeyError) as e:
+    data = load_version_json()
+    if data and "version" in data and "git_ref" in data:
+        content += "\nVersion: {}\nCommit: {}".format(data["version"], data["git_ref"])
+    else:
         content += "\nNo version information found"
-        logger.info(f"version info could not be loaded: {e}")
 
     return PlainTextResponse(content)
 
@@ -53,11 +45,8 @@ def index() -> Response:
     tags=["Service Information"],
 )
 def version_json() -> Response:
-    try:
-        with open(Path(__file__).parent.parent.parent / "version.json", "r") as file:
-            content = json.load(file)
-    except (OSError, json.JSONDecodeError) as e:
-        logger.info(f"version info could not be loaded: {e}")
+    content = load_version_json()
+    if content is None:
         return Response(status_code=404)
 
     content["features"] = [
