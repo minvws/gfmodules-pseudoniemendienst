@@ -15,7 +15,7 @@ import logging
 from dataclasses import dataclass
 
 from app.models.oin import Oin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.pseudonym_subject import (

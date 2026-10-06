@@ -3,7 +3,7 @@ from typing import TypedDict
 
 import pytest
 
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.pseudonym_service import PseudonymService
 
 

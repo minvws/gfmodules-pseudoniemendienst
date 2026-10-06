@@ -31,7 +31,7 @@ from app import container
 from app.db.db import Database
 from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 

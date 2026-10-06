@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from app.config import ConfigOprf
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 from app.services.hsm.client import HsmClient
 from app.services.reversible.keys import (
     HsmReversibleKeyOperations,
