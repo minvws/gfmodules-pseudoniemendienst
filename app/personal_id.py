@@ -53,24 +53,15 @@ class PersonalId:
         self.__id_number = id_number
 
     def __eq__(self, other: object) -> bool:
-        """
-        Compares two PersonalId instances for equality
-        """
         if isinstance(other, self.__class__):
             return self.__dict__ == other.__dict__
         else:
             return False
 
     def as_str(self) -> str:
-        """
-        Returns the personal ID as a colon-separated string: "country_code:id_type:id_number"
-        """
         return f"{self.__country_code}:{self.__id_type}:{self.__id_number}"
 
     def as_dict(self) -> dict[str, str]:
-        """
-        Returns the personal ID as a dictionary with keys: landCode, type, value
-        """
         return {
             "landCode": self.__country_code,
             "type": self.__id_type,
@@ -78,28 +69,16 @@ class PersonalId:
         }
 
     def country_code(self) -> str:
-        """
-        Returns the country code of the personal ID
-        """
         return self.__country_code
 
     def id_type(self) -> str:
-        """
-        Returns the ID type of the personal ID
-        """
         return self.__id_type
 
     def id_number(self) -> str:
-        """
-        Returns the ID number of the personal ID
-        """
         return self.__id_number
 
     @classmethod
     def from_str(cls, s: str) -> "PersonalId":
-        """
-        Creates a PersonalId instance from a colon-separated string: "landCode:type:value"
-        """
         parts = s.split(":")
         if len(parts) != 3:
             raise PersonalIdValidationError("formaat", "Invalid personal ID format")
@@ -108,9 +87,6 @@ class PersonalId:
 
     @classmethod
     def from_dict(cls, d: dict[str, str]) -> "PersonalId":
-        """
-        Creates a PersonalId instance from a dictionary
-        """
         try:
             return PersonalId(d["landCode"], d["type"], d["value"])
         except KeyError as e:
@@ -120,10 +96,6 @@ class PersonalId:
 
     @classmethod
     def parse(cls, raw: str | dict[str, str]) -> "PersonalId":
-        """
-        Creates a PersonalId instance from either request form: the
-        "landCode:type:value" string or the {landCode, type, value} dictionary
-        """
         if isinstance(raw, str):
             return cls.from_str(raw)
         return cls.from_dict(raw)

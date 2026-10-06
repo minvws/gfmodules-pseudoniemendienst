@@ -11,18 +11,12 @@ logger = logging.getLogger(__name__)
 
 class OrganizationPublicKeyRepository(RepositoryBase):
     def get_by_id(self, key_id: uuid.UUID) -> OrganizationPublicKeyEntity | None:
-        """
-        Fetches the key entry by its unique ID.
-        """
         query = select(OrganizationPublicKeyEntity).where(
             OrganizationPublicKeyEntity.id == key_id
         )
         return self.db_session.execute(query).scalars().first()
 
     def delete(self, key_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
-        """
-        Deletes a key entry.
-        """
         query = delete(OrganizationPublicKeyEntity).where(
             OrganizationPublicKeyEntity.id == key_id
         )
