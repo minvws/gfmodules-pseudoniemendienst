@@ -113,7 +113,11 @@ def post_eval(
             raise HTTPException(
                 status_code=503, detail="Unable to evaluate blind"
             ) from e
-        raise HTTPException(status_code=400, detail="Unable to evaluate blind") from e
+        if e.error_type == "invalid_blinded_input":
+            raise HTTPException(
+                status_code=400, detail="Unable to evaluate blind"
+            ) from e
+        raise HTTPException(status_code=500, detail="Unable to evaluate blind") from e
 
     # PRS-OPRF-001
     gflog.emit(
