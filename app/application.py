@@ -26,6 +26,7 @@ from app.routers.default import router as default_router
 from app.routers.errors import install_domain_error_handler
 from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
+from app.routers.irreversible_pseudonym import router as irreversible_pseudonym_router
 from app.routers.oprf import router as oprf_router
 from app.routers.reversible_pseudonym import router as reversible_pseudonym_router
 from app.routers.saml_exchange import router as saml_exchange_router
@@ -368,6 +369,7 @@ def setup_fastapi() -> FastAPI:
     if config.app.enable_exchange_services_routes:
         routers.append(exchange_router)
         routers.append(reversible_pseudonym_router)
+        routers.append(irreversible_pseudonym_router)
     if config.app.enable_saml_exchange_routes:
         routers.append(saml_exchange_router)
     if config.app.enable_test_routes:

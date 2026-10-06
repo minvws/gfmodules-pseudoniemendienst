@@ -11,6 +11,7 @@ _Base = DefaultEventCatalogue
 SLEUTELTYPE_OPRF_SECRET = "oprf_secret"
 # PRS-KEY "sleuteltype" for the per-organisation reversible pseudonym AES/HMAC keys.
 SLEUTELTYPE_REVERSIBLE_KEY = "reversible_pseudonym_key"
+SLEUTELTYPE_IRREVERSIBLE_KEY = "irreversible_pseudonym_key"
 
 
 class Log(_Base):
@@ -35,11 +36,8 @@ class Log(_Base):
 
     # Pseudonym creation events (PRS-PSE), see
     # https://github.com/minvws/gfmodules-coordination-private/issues/1036
-    # PRS-PSE-002/003 (irreversible pseudonym created, dual-version) belong to the
-    # server-side irreversible pseudonym endpoint the technical design foresees
-    # next to OPRF; that endpoint does not exist yet. Irreversible pseudonyms are
-    # exchanged through OPRF today, which has its own events below. Neither the
-    # personal ID nor the pseudonym is ever logged.
+    # The OPRF exchange has its own events below. Neither the personal ID nor
+    # the pseudonym is ever logged.
     PSEUDONYM_REVERSIBLE_CREATED = LogEvent(  # PRS-PSE-001
         "220400",
         logging.INFO,
@@ -53,6 +51,43 @@ class Log(_Base):
                 "sleutel_versie",
             ),
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+        },
+    )
+    PSEUDONYM_IRREVERSIBLE_CREATED = LogEvent(  # PRS-PSE-002
+        "220401",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "handelende_oin",
+                "namens_oin",
+                "doel_oin",
+                "domein",
+                "sleutel_versie",
+            ),
+            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+        },
+    )
+    PSEUDONYM_IRREVERSIBLE_DUAL_CREATED = LogEvent(  # PRS-PSE-003
+        "220402",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "handelende_oin",
+                "namens_oin",
+                "doel_oin",
+                "domein",
+                "sleutel_versie_oud",
+                "sleutel_versie_actueel",
+            ),
+            _SIEM: (
+                "handelende_oin",
+                "namens_oin",
+                "doel_oin",
+                "sleutel_versie_oud",
+                "sleutel_versie_actueel",
+            ),
         },
     )
     PSEUDONYM_CREATE_FAILED = LogEvent(  # PRS-PSE-004
