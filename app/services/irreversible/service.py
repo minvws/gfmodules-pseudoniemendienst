@@ -45,7 +45,7 @@ class IrreversiblePseudonym:
     value: str
     version: int
     # pseudonyms for the older versions that are still active (grace period)
-    older: dict[int, str]
+    older: tuple[tuple[int, str], ...]
 
 
 class IrreversiblePseudonymService:
@@ -93,7 +93,7 @@ class IrreversiblePseudonymService:
         return IrreversiblePseudonym(
             value=_encode(digest),
             version=latest,
-            older={version: _encode(d) for version, d in older},
+            older=tuple((version, _encode(d)) for version, d in older),
         )
 
     @staticmethod

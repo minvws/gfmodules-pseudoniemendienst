@@ -229,7 +229,7 @@ def exchange_irreversible_pseudonym(
     extra_claims: dict[str, object] = {"keyVersion": pseudonym.version}
     if pseudonym.older:
         extra_claims["extraVersions"] = {
-            str(version): value for version, value in sorted(pseudonym.older.items())
+            str(version): value for version, value in sorted(pseudonym.older)
         }
     jwe = BlindJwe.build(
         audience=doel_oin,
@@ -248,7 +248,7 @@ def exchange_irreversible_pseudonym(
             fields={
                 **audit,
                 "domein": req.recipientScope,
-                "sleutel_versie_oud": max(pseudonym.older),
+                "sleutel_versie_oud": max(version for version, _ in pseudonym.older),
                 "sleutel_versie_actueel": pseudonym.version,
             },
         )
