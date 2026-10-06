@@ -5,8 +5,9 @@ It registers an organization with a public key, creates key versions through
 the public ``/administration/key-versions`` endpoint and verifies that an OPRF evaluation
 returns a pseudonym carrying every active key version in the resulting JWE.
 
-The HSM itself is mocked: ``requests.post`` returns a deterministic evaluation
-per key version, so we can assert exactly which versions end up in the JWE.
+The HSM itself is mocked: ``requests.Session.request`` returns a deterministic
+evaluation per key version, so we can assert exactly which versions end up in
+the JWE.
 """
 
 import base64
@@ -34,7 +35,9 @@ from app.services.oprf.oprf_service import OprfService
 SCOPE = "nvi"
 
 
-def _fake_hsm_post(url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
+def _fake_hsm_post(
+    method: str, url: str, json: dict[str, Any], **kwargs: Any
+) -> MagicMock:
     """Return a distinct evaluation per key version, derived from the label."""
 
     # Return slot info when asked
@@ -104,7 +107,7 @@ def test_new_key_version_is_added_to_jwe(
     )
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
     try:
-        with patch("app.services.hsm.client.requests.post", side_effect=_fake_hsm_post):
+        with patch("requests.Session.request", side_effect=_fake_hsm_post):
             # We get a pseudonym back, carrying only version 1.
             eval_resp = _eval(
                 client, persisted_organization_2.external_id, valid_headers

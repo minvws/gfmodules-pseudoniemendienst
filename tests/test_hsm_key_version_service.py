@@ -303,7 +303,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
-    def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
         # Return slot info when asked
         if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
             resp = MagicMock()
@@ -325,7 +325,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         recipientScope="scope",
     )
 
-    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
+    with patch("requests.Session.request", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 2, 7)
@@ -400,7 +400,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
-    def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
         # Return slot info when asked
         if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
             resp = MagicMock()
@@ -422,7 +422,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         recipientScope="scope",
     )
 
-    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
+    with patch("requests.Session.request", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 3, 5)

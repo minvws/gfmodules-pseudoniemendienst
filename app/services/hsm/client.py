@@ -4,10 +4,10 @@ from typing import Any
 
 import gfmodules.logging as gflog
 import requests
-from gfmodules.logging import correlation_headers
 
 from app.config import ConfigOprf
 from app.logging.events import Log
+from app.services.http_client import HttpService
 
 logger = logging.getLogger(__name__)
 
@@ -51,29 +51,21 @@ class HsmClient:
     """Client for nl-rdo-hsm-api-service. Keys are addressed by label."""
 
     def __init__(self, config: ConfigOprf, timeout: float = 10.0) -> None:
-        self._config = config
-        self._timeout = timeout
+        self._http = HttpService(
+            endpoint=f"{config.hsm_url}/hsm/{config.hsm_module}/{config.hsm_slot}",
+            timeout=timeout,
+            mtls_cert=config.hsm_cert_file,
+            mtls_key=config.hsm_key_file,
+            verify_ca=config.hsm_ca_cert_file or True,
+        )
 
     def post(self, path: str, payload: dict[str, Any], operation: str) -> Any:
         """
         POST to the HSM API. ``operation`` names the HSM operation in the
         PRS-KEY-007 event when the HSM refuses it.
         """
-        cfg = self._config
-        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}{path}"
         try:
-            response = requests.post(
-                url,
-                json=payload,
-                headers=correlation_headers(),
-                timeout=self._timeout,
-                verify=cfg.hsm_ca_cert_file or True,
-                cert=(
-                    (cfg.hsm_cert_file, cfg.hsm_key_file)
-                    if (cfg.hsm_cert_file and cfg.hsm_key_file)
-                    else None
-                ),
-            )
+            response = self._http.do_request("POST", path, json=payload)
         except HSM_UNREACHABLE_ERRORS as e:
             gflog.emit(
                 logger,
