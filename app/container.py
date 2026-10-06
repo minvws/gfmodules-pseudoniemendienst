@@ -30,7 +30,6 @@ from app.services.reversible.keys import (
     ReversibleKeyOperations,
 )
 from app.services.reversible.service import ReversiblePseudonymService
-from app.services.rid_service import RidService
 from app.services.saml.client import SamlServiceClient
 
 logger = logging.getLogger(__name__)
@@ -133,9 +132,6 @@ def container_config(binder: inject.Binder) -> None:
     pseudonym_service = PseudonymService(master_key)
     binder.bind(PseudonymService, pseudonym_service)
 
-    rid_service = RidService(master_key, b"RID:v1")
-    binder.bind(RidService, rid_service)
-
     if config.app.enable_saml_exchange_routes:
         if not config.saml_service.url:
             raise ValueError(
@@ -150,10 +146,6 @@ def container_config(binder: inject.Binder) -> None:
             ca_cert_file=config.saml_service.ca_cert_file,
         )
         binder.bind(SamlServiceClient, saml_service_client)
-
-
-def get_rid_service() -> RidService:
-    return inject.instance(RidService)
 
 
 def get_pseudonym_service() -> PseudonymService:
