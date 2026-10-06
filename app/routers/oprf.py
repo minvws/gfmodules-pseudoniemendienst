@@ -59,9 +59,18 @@ def post_eval(
         "doel_oin": str(recipient_oin),
     }
 
-    authorization_service.validate_allowed_to_request(
-        auth_ctx.claims.organization_id, personal_id_type
-    )
+    try:
+        authorization_service.validate_allowed_to_request(
+            auth_ctx.claims.organization_id, personal_id_type
+        )
+    except DomainError as e:
+        gflog.emit(
+            logger,
+            Log.AUTHORIZATION_DENIED,
+            f"Authorization denied (sender_may_not_request_oprf): {e.message}",
+            fields={**audit_oins, "requested_operation": "oprf:eval"},
+        )
+        raise
 
     try:
         authorization_service.validate_allowed_to_receive(
