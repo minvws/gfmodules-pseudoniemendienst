@@ -8,7 +8,7 @@ from app.logging.events import (
     SLEUTELTYPE_REVERSIBLE_KEY,
     Log,
 )
-from app.services.hsm.client import HsmClient
+from app.services.hsm.client import HsmClient, HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.irreversible.keys import IrreversibleKeyLabel
 from app.services.oprf.evaluators import OprfHsmKeyLabel
@@ -106,7 +106,8 @@ class HsmKeyCleanupService:
         return cleaned
 
     def _destroy_if_present(self, label: str) -> bool:
-        if not self.__client.label_exists(label):
+        try:
+            self.__client.destroy(label)
+        except HsmKeyNotFound:
             return False
-        self.__client.destroy(label)
         return True

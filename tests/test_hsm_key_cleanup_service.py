@@ -63,28 +63,29 @@ DESTROY_URL = "https://hsm.local/hsm/softhsm/SoftHSMLabel/destroy"
 
 
 def _fake_hsm(existing: Callable[[str], bool]) -> Callable[..., MagicMock]:
-    """A fake HSM API: the object search reports a label as present when
-    ``existing`` says so, and destroy always succeeds."""
-
     def _post(method: str, url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
         resp = MagicMock()
-        if url == DESTROY_URL:
-            resp.json.return_value = {"result": "ok"}
+        if url == DESTROY_URL and not existing(json["label"]):
+            resp.status_code = 422
+            resp.raise_for_status.side_effect = requests.HTTPError("422")
+            resp.json.return_value = {"error_description": "No such key"}
         else:
-            resp.json.return_value = {
-                "objects": ["obj"] if existing(json["label"]) else []
-            }
+            resp.json.return_value = {"result": "ok"}
         return resp
 
     return _post
 
 
-def _destroyed_labels(post: MagicMock) -> set[str]:
+def _attempted_labels(post: MagicMock) -> set[str]:
     return {
         call.kwargs["json"]["label"]
         for call in post.call_args_list
         if call.args[1] == DESTROY_URL
     }
+
+
+def _destroyed_labels(post: MagicMock, existing: Callable[[str], bool]) -> set[str]:
+    return {label for label in _attempted_labels(post) if existing(label)}
 
 
 @pytest.mark.parametrize(
@@ -159,23 +160,27 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
         HsmKeyVersionService(database),
     )
 
+    def existing(label: str) -> bool:
+        return "-oprf-" in label
+
     with (
         # Keep the service's notion of "now" fixed to the test timestamp.
         patch(
             "app.services.hsm_key_version_service.datetime",
             SimpleNamespace(now=lambda tz=None: now),
         ),
-        patch(
-            "requests.Session.request",
-            side_effect=_fake_hsm(lambda label: "-oprf-" in label),
-        ) as post,
+        patch("requests.Session.request", side_effect=_fake_hsm(existing)) as post,
     ):
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == expected_cleaned
 
     # The right keys are destroyed in the HSM, by their stored label.
-    assert _destroyed_labels(post) == expected_labels
+    assert _destroyed_labels(post, existing) == expected_labels
+    # Destroy is now attempted without a lookup first, so also check that no
+    # label of a version that is still active was even attempted.
+    attempted = _attempted_labels(post)
+    assert not any(f"oin-{TEST_OIN_ACTIVE}-" in label for label in attempted)
 
     version_service = HsmKeyVersionService(database)
     for oin, id in organization_ids.items():
@@ -213,7 +218,7 @@ def test_cleanup_destroys_every_pseudonym_key_of_the_version(
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == 1
-    assert _destroyed_labels(post) == {
+    assert _destroyed_labels(post, lambda _: True) == {
         f"oin-{TEST_OIN}-oprf-v1",
         f"oin-{TEST_OIN}-irp-v1-hmac",
         f"oin-{TEST_OIN}-rp-v1-aes",
@@ -241,7 +246,7 @@ def test_cleanup_marks_version_removed_when_no_keys_were_ever_created(
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == 1
-    assert _destroyed_labels(post) == set()
+    assert _destroyed_labels(post, lambda _: False) == set()
     assert HsmKeyVersionService(database).get_expired_versions() == []
 
 

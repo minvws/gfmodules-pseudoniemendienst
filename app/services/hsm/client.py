@@ -108,10 +108,6 @@ class HsmClient:
             raise ValueError(f"could not generate key {label!r} in HSM")
         return True
 
-    def label_exists(self, label: str, objtype: str = "SECRET_KEY") -> bool:
-        data = self.post("", {"label": label, "objtype": objtype}, "lookup")
-        return len(data["objects"] or []) > 0
-
     def generate_oprf_key(self, label: str) -> bool:
         return self._generate("/generate/oprf", {"label": label}, label)
 

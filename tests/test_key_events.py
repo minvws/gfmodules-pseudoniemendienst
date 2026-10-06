@@ -345,8 +345,9 @@ def test_cleanup_key_version_destroyed_names_the_destroyed_key_type(
     def post(
         method: str, url: str, json: dict[str, str], **kwargs: object
     ) -> MagicMock:
-        present = "-irp-" in json["label"]
-        return _hsm_response({"objects": [{"label": "x"}] if present else []})
+        if "-irp-" in json["label"]:
+            return _hsm_response({"result": "ok"})
+        return _hsm_response({"error_description": "No such key"}, 422)
 
     with patch("requests.Session.request", side_effect=post):
         cleaned = _cleanup_service(database).cleanup_expired_keys()
