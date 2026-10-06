@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from jwcrypto import jwe, jwk
@@ -17,6 +17,25 @@ router = APIRouter()
 
 class InputRequest(BaseModel):
     personalId: str
+
+
+def _decrypt_jwe(jwe_token: str, priv_key_pem: str) -> tuple[dict[str, Any], str, Any]:
+    token = jwe.JWE()
+    token.deserialize(jwe_token)
+    headers = token.jose_header
+
+    priv_key_kid = "unknown"
+    plain_data: Any = "unknown"
+    try:
+        priv_key = jwk.JWK.from_pem(priv_key_pem.encode("ascii"))
+        priv_key_kid = priv_key.thumbprint().rstrip("=")
+        token.decrypt(priv_key)
+        plaintext = token.payload.decode("utf-8")
+        plain_data = json.loads(plaintext)
+    except Exception as e:  # noqa: BLE001
+        plain_data = "Could not decrypt JWE: " + str(e)
+
+    return headers, priv_key_kid, plain_data
 
 
 @router.post(
@@ -63,25 +82,16 @@ def post_test_receiver(
     req: ReceiverRequest,
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
+    headers, priv_key_kid, plain_data = _decrypt_jwe(req.jwe, req.priv_key_pem)
 
-    token = jwe.JWE()
-    token.deserialize(req.jwe)
-    headers = token.jose_header
-
-    priv_key_kid = "unknown"
-    plain_data = "unknown"
     subject = "unknown"
     pseudonym = "unknown"
-    try:
-        priv_key = jwk.JWK.from_pem(req.priv_key_pem.encode("ascii"))
-        priv_key_kid = priv_key.thumbprint().rstrip("=")
-        token.decrypt(priv_key)
-        plaintext = token.payload.decode("utf-8")
-        plain_data = json.loads(plaintext)
-        subject = plain_data.get("subject", "").split(":")[-1]
-        pseudonym = oprf_service.finalize(req.blind_factor, subject)
-    except Exception as e:  # noqa: BLE001
-        plain_data = "Could not decrypt JWE: " + str(e)
+    if isinstance(plain_data, dict):
+        try:
+            subject = plain_data.get("subject", "").split(":")[-1]
+            pseudonym = oprf_service.finalize(req.blind_factor, subject)
+        except Exception as e:  # noqa: BLE001
+            plain_data = "Could not decrypt JWE: " + str(e)
 
     res = {
         "jwe_data": req.jwe,
@@ -111,20 +121,7 @@ check any mtls or organizational permissions.
 def post_test_jwe_decode(
     req: JweReceiverRequest,
 ) -> JSONResponse:
-
-    token = jwe.JWE()
-    token.deserialize(req.jwe)
-    headers = token.jose_header
-
-    priv_key_kid = "unknown"
-    try:
-        priv_key = jwk.JWK.from_pem(req.priv_key_pem.encode("ascii"))
-        priv_key_kid = priv_key.thumbprint().rstrip("=")
-        token.decrypt(priv_key)
-        plaintext = token.payload.decode("utf-8")
-        plain_data = json.loads(plaintext)
-    except Exception as e:  # noqa: BLE001
-        plain_data = "Could not decrypt JWE: " + str(e)
+    headers, priv_key_kid, plain_data = _decrypt_jwe(req.jwe, req.priv_key_pem)
 
     res = {
         "jwe_data": req.jwe,
