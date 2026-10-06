@@ -81,3 +81,9 @@ class UnauthorizedRequestError(DomainError):
     """Malformed/missing proxy-verified headers, or a missing OAuth scope."""
 
     message = "Unauthorized request"
+
+
+class PseudonymOperationError(ValueError):
+    def __init__(self, error_type: str, message: str) -> None:
+        super().__init__(message)
+        self.error_type = error_type

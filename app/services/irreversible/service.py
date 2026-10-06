@@ -14,6 +14,7 @@ import base64
 import logging
 from dataclasses import dataclass
 
+from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
@@ -24,14 +25,8 @@ from app.services.pseudonym_subject import pseudonym_subject
 logger = logging.getLogger(__name__)
 
 
-class IrreversiblePseudonymError(ValueError):
-    """error_type is one of the PRS-PSE-004 values: hsm_unreachable or
-    crypto_failure; or no_active_key_version when the recipient has no active
-    HSM key version."""
-
-    def __init__(self, error_type: str, message: str) -> None:
-        super().__init__(message)
-        self.error_type = error_type
+class IrreversiblePseudonymError(PseudonymOperationError):
+    pass
 
 
 def _encode(digest: bytes) -> str:
