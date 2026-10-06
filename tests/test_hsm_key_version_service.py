@@ -361,10 +361,11 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         == "pseudonym:eval:" + base64.urlsafe_b64encode(b"eval-v7").decode()
     )
     # Older versions are carried separately so newer clients can detect them.
-    assert body["extra_versions"] == {
+    assert body["extraVersions"] == {
         "1": base64.urlsafe_b64encode(b"eval-v1").decode(),
         "2": base64.urlsafe_b64encode(b"eval-v2").decode(),
     }
+    assert "extra_versions" not in body
 
 
 def test_eval_blind_jwe_contains_only_versions_active_at_date(
@@ -463,7 +464,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         body["subject"]
         == "pseudonym:eval:" + base64.urlsafe_b64encode(b"eval-v5").decode()
     )
-    assert body["extra_versions"] == {
+    assert body["extraVersions"] == {
         "1": base64.urlsafe_b64encode(b"eval-v1").decode(),
         "3": base64.urlsafe_b64encode(b"eval-v3").decode(),
     }

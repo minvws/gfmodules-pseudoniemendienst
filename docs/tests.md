@@ -71,7 +71,7 @@ Response:
       "version": "1.1",
       "iat": 1762769767,
       "exp": 1762770067,
-      "extra_versions": {}
+      "extraVersions": {}
     }
   },
   "eval_subject": "Ngb5jRWtUc_EtfPud1uPnjhHwvww1pt51wx_DBao_Uc=",
@@ -81,7 +81,7 @@ Response:
 
 At this point, the `final_pseudonym` (`NN4uU...`) can be used by the receiver as the pseudonym for the personal ID `NL:bsn:950000012`.
 
-The `subject` always holds the evaluation for the latest key version. The `extra_versions` claim is empty when only one key version is active; during key rotation it holds the older versions as `{"<version>": "<base64 eval>"}`, so a receiver can also finalize against an older key version.
+The `subject` always holds the evaluation for the latest key version. The `extraVersions` claim is empty when only one key version is active; during key rotation it holds the older versions as `{"<version>": "<base64 eval>"}`, so a receiver can also finalize against an older key version.
 
 
 

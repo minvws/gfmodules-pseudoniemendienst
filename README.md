@@ -358,7 +358,7 @@ To use this system:
          "version": "1.1",
          "iat": 1758616285,
          "exp": 1758616585,
-         "extra_versions": {}
+         "extraVersions": {}
        }
      },
      "eval_subject": "-Jpsoeik2058ip20b9Wd-vlwpjkjxRN4IoBrk8Ym2Bg=",
@@ -369,7 +369,7 @@ To use this system:
    The `final_pseudonym` is the actual pseudonym that can be stored by the receiver. Note that this pseudonym is deterministic
    for the same input, organization and scope. However, it is not possible to reverse this into a BSN.
 
-   The `subject` always carries the evaluation for the latest key version. The `extra_versions` claim is empty when only one
+   The `subject` always carries the evaluation for the latest key version. The `extraVersions` claim is empty when only one
    key version is active; during key rotation it holds the older versions as `{"<version>": "<base64 eval>"}`, so the receiver
    can also finalize against an older key version.
 

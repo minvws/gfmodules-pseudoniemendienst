@@ -6,7 +6,7 @@ key or, in production, against an HSM. When the HSM is used, the active key
 versions are looked up from the `hsm_key_version` table (per OIN, for the current
 date), the blind is evaluated against **every** active version, and the resulting
 JWE stays backwards compatible: the `subject` always carries the latest version,
-while older versions are added in a separate `extra_versions` claim.
+while older versions are added in a separate `extraVersions` claim.
 
 Expired key versions are removed from the HSM by a separate scheduled program;
 see [Expired HSM key cleanup](./hsm-key-cleanup.md).
@@ -65,8 +65,8 @@ sequenceDiagram
         OPRF->>OPRF: pyoprf.evaluate(server_key, blind)<br/>=> {1: eval bytes}
     end
 
-    Note over OPRF: subject = "pseudonym:eval:" + base64(latest version eval)<br/>extra_versions = {version: base64(eval)} for older versions
-    OPRF->>JWE: build(audience, scope, subject, pub_key,<br/>extra_claims={extra_versions})
+    Note over OPRF: subject = "pseudonym:eval:" + base64(latest version eval)<br/>extraVersions = {version: base64(eval)} for older versions
+    OPRF->>JWE: build(audience, scope, subject, pub_key,<br/>extra_claims={extraVersions})
     JWE-->>OPRF: compact JWE (encrypted to recipient)
     OPRF-->>Router: jwe string
 
