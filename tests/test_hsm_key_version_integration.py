@@ -114,7 +114,7 @@ def test_new_key_version_is_added_to_jwe(
             assert body["aud"] == "oin:" + persisted_organization_2.external_id.value
             assert body["scope"] == SCOPE
             assert body["subject"] == "pseudonym:eval:" + _eval_v("1")
-            assert body["extra_versions"] == {}
+            assert body["extraVersions"] == {}
 
             # Create version 2 of the HSM key.
             resp = client.post(
@@ -135,6 +135,6 @@ def test_new_key_version_is_added_to_jwe(
             assert eval_resp.status_code == 200
             body = _decrypt_jwe(eval_resp.json()["jwe"], private_key)
             assert body["subject"] == "pseudonym:eval:" + _eval_v("2")
-            assert body["extra_versions"] == {"1": _eval_v("1")}
+            assert body["extraVersions"] == {"1": _eval_v("1")}
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)

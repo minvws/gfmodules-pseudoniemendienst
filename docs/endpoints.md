@@ -167,7 +167,7 @@ Response:
 }
 ```
 
-The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key registered for `recipientScope` (or the `*` wildcard key), and its `kid` header names that key. The decrypted payload carries the evaluation for the latest key version as `subject` in the form `pseudonym:eval:<base64>`, plus `aud` (the recipient), `scope`, `iat` and `exp` (five minutes). When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extra_versions` claim (`{"<version>": "<base64 eval>"}`).
+The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key registered for `recipientScope` (or the `*` wildcard key), and its `kid` header names that key. The decrypted payload carries the evaluation for the latest key version as `subject` in the form `pseudonym:eval:<base64>`, plus `aud` (the recipient), `scope`, `iat` and `exp` (five minutes). When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extraVersions` claim (`{"<version>": "<base64 eval>"}`).
 
 Errors: `403` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, has no key registered for the scope, or has no active HSM key version, `400` when the blind cannot be evaluated, `503` when the HSM cannot be reached.
 

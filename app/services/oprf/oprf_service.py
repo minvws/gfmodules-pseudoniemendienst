@@ -111,7 +111,7 @@ class OprfService:
             scope=req.recipientScope,
             subject=subject,
             pub_key=pub_key,
-            extra_claims={"extra_versions": extra_versions},
+            extra_claims={"extraVersions": extra_versions},
         )
 
         logger.info(
