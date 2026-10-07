@@ -16,7 +16,7 @@ from app.services.organization_public_key_service import OrganizationPublicKeySe
 
 @dataclass(frozen=True)
 class OprfTestRouterContext:
-    personal_identifier: dict[str, str]
+    oprf_input: str
     recipient_organization: str
     recipient_scope: str
     private_key_pem: str
@@ -32,18 +32,13 @@ def oprf_test_router_context(
     persisted_organization: OrganizationEntity,
 ) -> OprfTestRouterContext:
     recipient_domain = "nvi"
-    personal_identifier = {
-        "landCode": "NL",
-        "type": "bsn",
-        "value": "950000012",
-    }
     private_key_pem = setup_org_and_key(
         organization_public_key_service=organization_public_key_service,
         organization=persisted_organization,
         domains=[recipient_domain],
     )
     return OprfTestRouterContext(
-        personal_identifier=personal_identifier,
+        oprf_input="could_be_personal_id_or_not",
         recipient_organization=f"oin:{persisted_organization.external_id.value}",
         recipient_scope=recipient_domain,
         private_key_pem=private_key_pem,
@@ -57,14 +52,13 @@ def test_test_oprf_client_and_receiver_roundtrip(
 ) -> None:
     client_response = client.post(
         "/test/oprf/client",
-        json={"personalId": oprf_test_router_context.personal_identifier},
+        json={"personalId": oprf_test_router_context.oprf_input},
         headers=valid_headers,
     )
     assert client_response.status_code == 200
 
     blinded_input = client_response.json()["blinded_input"]
     blind_factor = client_response.json()["blind_factor"]
-
     eval_response = client.post(
         "/oprf/eval",
         json={
@@ -108,11 +102,8 @@ def test_test_oprf_receiver_invalid_private_key(
         f"{oprf_test_router_context.recipient_scope}|v1"
     ).encode()
     hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
-    personal_id = json.dumps(
-        oprf_test_router_context.personal_identifier,
-        separators=(",", ":"),
-    )
-    derived_personal_id = hkdf.derive(personal_id.encode("utf-8"))
+    oprf_input = oprf_test_router_context.oprf_input
+    derived_personal_id = hkdf.derive(oprf_input.encode("utf-8"))
 
     _, blinded_input_raw = pyoprf.blind(derived_personal_id)
     blinded_input = base64.urlsafe_b64encode(blinded_input_raw).decode("ascii")
