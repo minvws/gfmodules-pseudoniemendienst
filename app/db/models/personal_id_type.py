@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 
 from sqlalchemy import INTEGER, DateTime, Enum
@@ -15,7 +14,7 @@ class PersonalIdTypeEntity(Base):
     __tablename__ = "personal_id_types"
     __table_args__ = ({"schema": "admin"},)
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[int] = mapped_column(
         INTEGER,
         primary_key=True,
     )
