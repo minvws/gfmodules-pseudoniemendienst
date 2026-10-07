@@ -19,15 +19,6 @@ class OrganizationPublicKeyRepository(RepositoryBase):
         )
         return self.db_session.execute(query).scalars().first()
 
-    def create(
-        self, organization_public_key: OrganizationPublicKeyEntity
-    ) -> OrganizationPublicKeyEntity:
-        """
-        Creates a new key entry.
-        """
-        self.db_session.add(organization_public_key)
-        return organization_public_key
-
     def delete(self, key_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
         """
         Deletes a key entry.

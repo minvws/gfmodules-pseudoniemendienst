@@ -3,11 +3,12 @@ import os
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import rsa
-from sqlalchemy import text
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
 
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
+from app.db.models.base import Base
 from app.db.models.personal_id_type import PersonalIdTypeEntity
-from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
 from app.models.oin import Oin
@@ -116,6 +117,15 @@ def app(database: Database) -> Generator[FastAPI, None, None]:
     inject.clear()
 
 
+def _truncate_tables(db: Database) -> None:
+    metadata = Base.metadata
+    metadata.reflect(bind=db.engine)
+    with Session(db.engine) as session:
+        for table in reversed(metadata.sorted_tables):
+            session.execute(text(f"DELETE FROM {table.schema}.{table.name}"))
+        session.commit()
+
+
 @pytest.fixture
 def database() -> Database:
     try:
@@ -129,7 +139,7 @@ def database() -> Database:
         )
         session.commit()
     db.generate_tables()
-    db.truncate_tables()
+    _truncate_tables(db)
     with db.get_db_session(commit=True) as session:
         for p in PersonalIdType:
             session.add(PersonalIdTypeEntity(name=p))
@@ -190,36 +200,33 @@ def valid_headers(
     }
 
 
-@pytest.fixture()
-def personal_id_type_repository(db_session: DbSession) -> PersonalIdTypeRepository:
-    return PersonalIdTypeRepository(db_session=db_session)
+def personal_id_types(
+    db_session: DbSession, names: list[PersonalIdType]
+) -> list[PersonalIdTypeEntity]:
+    stmt = select(PersonalIdTypeEntity).where(
+        PersonalIdTypeEntity.name.in_([str(n) for n in names])
+    )
+    return list(db_session.execute(stmt).scalars().all())
 
 
 @pytest.fixture()
 def persisted_organization_2(
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     valid_organization_id_2: Oin,
 ) -> OrganizationEntity:
-    return create_organization(
-        db_session, personal_id_type_repository, valid_organization_id_2
-    )
+    return create_organization(db_session, valid_organization_id_2)
 
 
 @pytest.fixture()
 def persisted_organization(
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     valid_organization_id: Oin,
 ) -> OrganizationEntity:
-    return create_organization(
-        db_session, personal_id_type_repository, valid_organization_id
-    )
+    return create_organization(db_session, valid_organization_id)
 
 
 def create_organization(
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     external_id: Oin,
 ) -> OrganizationEntity:
     org = (
@@ -229,7 +236,7 @@ def create_organization(
     )
     if org:
         return org
-    personal_ids = personal_id_type_repository.get_many([PersonalIdType.OPRF])
+    personal_ids = personal_id_types(db_session, [PersonalIdType.OPRF])
     assert len(personal_ids) == 1
     org = OrganizationEntity(
         external_id=external_id,

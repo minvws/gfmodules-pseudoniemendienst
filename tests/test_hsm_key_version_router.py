@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from conftest import personal_id_types
 from starlette.testclient import TestClient
 
 from app.db.db import Database
 from app.db.models import OrganizationEntity
-from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
@@ -51,11 +51,10 @@ def test_create_increments_version(
 def test_create_for_organization_without_versions_is_rejected(
     client: TestClient,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     valid_headers: dict[str, str],
     valid_organization_id: Oin,
 ) -> None:
-    personal_ids = personal_id_type_repository.get_many([PersonalIdType.OPRF])
+    personal_ids = personal_id_types(db_session, [PersonalIdType.OPRF])
     db_session.add(
         OrganizationEntity(
             external_id=valid_organization_id,

@@ -157,11 +157,6 @@ def remove_empty_values(section: dict[str, Any]) -> None:
             del section[key]
 
 
-def reset_config() -> None:
-    global _CONFIG
-    _CONFIG = None
-
-
 def set_config(config: Config) -> None:
     global _CONFIG
     _CONFIG = config

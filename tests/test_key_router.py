@@ -7,7 +7,6 @@ from jwcrypto.jws import JWS
 from starlette.testclient import TestClient
 
 from app.db.models import OrganizationEntity
-from app.db.repositories.personal_id_type_repository import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.models.oin import Oin
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -262,12 +261,10 @@ def test_delete_other_org_key_is_not_found(
     valid_headers: dict[str, str],
     persisted_organization: OrganizationEntity,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
     organization_public_key_service: OrganizationPublicKeyService,
 ) -> None:
     other_org = create_organization(
         db_session,
-        personal_id_type_repository,
         Oin("00000099000000001000"),
     )
     private_key, _ = generate_rsa_keypair()
@@ -361,11 +358,8 @@ def test_update_other_org_key_is_not_found(
     valid_headers: dict[str, str],
     persisted_organization: OrganizationEntity,
     db_session: DbSession,
-    personal_id_type_repository: PersonalIdTypeRepository,
 ) -> None:
-    other_org = create_organization(
-        db_session, personal_id_type_repository, Oin("00000099000000001000")
-    )
+    other_org = create_organization(db_session, Oin("00000099000000001000"))
     created, _ = _create_key(client, valid_headers, persisted_organization, ["nvi"])
     private_key, _ = generate_rsa_keypair()
 
