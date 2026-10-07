@@ -258,21 +258,6 @@ class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
     )
 
 
-class InputRequest(BaseModel):
-    personalId: Any
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
-        pid = data.get("personalId")
-        if isinstance(pid, str):
-            data["personalId"] = PersonalId.from_str(pid)
-        if isinstance(pid, dict):
-            data["personalId"] = PersonalId.from_dict(pid)
-
-        return data
-
-
 class JweReceiverRequest(BaseModel):
     jwe: str
     priv_key_pem: str

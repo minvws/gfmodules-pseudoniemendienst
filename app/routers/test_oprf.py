@@ -4,14 +4,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from jwcrypto import jwe, jwk
+from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from app import container
-from app.models.requests import InputRequest, JweReceiverRequest, ReceiverRequest
+from app.models.requests import JweReceiverRequest, ReceiverRequest
 from app.services.oprf.oprf_service import OprfService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class InputRequest(BaseModel):
+    personalId: str
 
 
 @router.post(
@@ -23,25 +28,8 @@ This endpoint is for testing purposes only. It simulates the client-side OPRF
 blinding process. Given a personal ID (e.g., BSN), it returns a blinded input
 and the blind factor used for blinding.
 
-It takes the form of:
-
-```json
-{
-    "personalId": {
-      "landCode": "NL",
-      "type": "bsn",
-      "value": "950000012"
-    }
-}
-```
-
-or as a string:
-
-```json
-{
-    "personalId": "NL:bsn:950000012"
-}
-```
+The personalId is not validated. Because the Pseudoniemendienst is not able to read
+the content of the blindedInput it does not validate the input.
 """,
 )
 def post_test_eval(
@@ -49,7 +37,7 @@ def post_test_eval(
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
 
-    res = oprf_service.blind_input(req.personalId.as_str())
+    res = oprf_service.blind_input(req.personalId)
     return JSONResponse(
         {
             "blinded_input": res["blinded_input"],
