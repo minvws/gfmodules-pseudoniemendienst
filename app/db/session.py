@@ -16,19 +16,6 @@ from app.db.models.base import Base
 from app.db.repositories import repository_base
 from app.logging.events import Log
 
-"""
-This module contains the DbSession class, which is a context manager that provides a session to interact with
-the database. It also provides methods to add and delete resources from the session, and to commit or rollback the
-current transaction.
-
-Usage:
-    with DbSession(engine=engine, commit=True) as session:
-        repo = session.get_repository(MyModelRepository)
-        repo.find_all()
-        session.add(MyModel())
-"""
-
-
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -43,9 +30,6 @@ class DbSession:
         self._commit = commit
 
     def __enter__(self) -> Self:
-        """
-        Create a new session when entering the context manager
-        """
         self.session = Session(self._engine, expire_on_commit=False)
         return self
 
@@ -55,9 +39,6 @@ class DbSession:
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> None:
-        """
-        Close the session when exiting the context manager
-        """
         if exc_type is None and exc_val is None and self._commit:
             self.session.commit()
         self.session.close()
@@ -65,86 +46,36 @@ class DbSession:
     def get_repository(
         self, repository_class: type["repository_base.TRepositoryBase_co"]
     ) -> "repository_base.TRepositoryBase_co":
-        """
-        Returns an instantiated repository for the given model class
-        """
         if issubclass(repository_class, repository_base.RepositoryBase):
             return repository_class(self)
         raise ValueError(f"No repository registered for model {repository_class}")
 
     def add(self, entry: Base) -> None:
-        """
-        Add a resource to the session, so it will be inserted/updated in the database on the next commit
-
-        :param entry:
-        :return:
-        """
         self._retry(self.session.add, entry)
 
     def delete(self, entry: Base) -> None:
-        """
-        Delete a resource from the session, so it will be deleted from the database on the next commit
-
-        :param entry:
-        :return:
-        """
         # database cascading will take care of the rest
         self._retry(self.session.delete, entry)
 
     def flush(self) -> None:
-        """
-        Flush pending changes to the database without committing the transaction
-
-        :return:
-        """
         self._retry(self.session.flush)
 
     def commit(self) -> None:
-        """
-        Commits any pending work in the session to the database
-
-        :return:
-        """
         self._retry(self.session.commit)
 
     def rollback(self) -> None:
-        """
-        Rollback the current transaction
-
-        :return:
-        """
         self._retry(self.session.rollback)
 
     def query(self, *entities: Any) -> Any:
-        """
-        Create a new query object
-
-        :param entities:
-        :return:
-        """
         return self._retry(self.session.query, *entities)
 
     def execute(self, stmt: Any) -> Result[Any]:
-        """
-        Execute a statement in the current session
-
-        :param stmt:
-        :return:
-        """
         return self._retry(self.session.execute, stmt)
 
     def begin(self) -> Any:
-        """
-        Begin a new transaction
-
-        :return:
-        """
         return self._retry(self.session.begin)
 
     def _retry(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-        """
-        Retry a function call in case of database errors
-        """
         backoff = get_config().database.retry_backoff
         attempt = 0
 

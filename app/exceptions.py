@@ -1,7 +1,3 @@
-"""
-Domain exceptions raised by the service layer.
-"""
-
 from app.enums.personal_id_type import PersonalIdType
 
 

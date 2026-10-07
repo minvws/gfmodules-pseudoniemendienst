@@ -43,11 +43,6 @@ class Database:
         Base.metadata.create_all(self.engine)
 
     def health_error(self) -> str | None:
-        """
-        Check if the database is healthy
-
-        :return: None if the database is healthy, the error detail otherwise
-        """
         try:
             with Session(self.engine) as session:
                 session.execute(text("SELECT 1"))
@@ -57,11 +52,6 @@ class Database:
             return str(e)
 
     def is_healthy(self) -> bool:
-        """
-        Check if the database is healthy
-
-        :return: True if the database is healthy, False otherwise
-        """
         return self.health_error() is None
 
     def get_db_session(self, commit: bool = False) -> DbSession:

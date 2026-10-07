@@ -7,7 +7,7 @@ from app.models.oin import Oin
 
 
 class OinType(TypeDecorator[Oin]):
-    """Map ``Organization.oin`` to the OIN value object and store it as text."""
+    """Maps a column to the OIN value object and stores it as text."""
 
     impl = String
     cache_ok = True
