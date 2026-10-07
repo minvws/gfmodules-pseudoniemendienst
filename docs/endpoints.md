@@ -62,7 +62,7 @@ These endpoints are under `/administration` and require the `prs:administration`
 #### `POST /administration/keys`
 Register a public key for one or more scopes (`domains`) of the calling organization. The PRS encrypts its OPRF responses for this organization to this key.
 
-The key is supplied as a self-signed JWS in compact serialization. Its protected header carries the public key as a `jwk` with a `kid`; this must be an RSA key of at least 2048 bits, because tokens for the organization are encrypted with `RSA-OAEP`, and its payload carries the calling organization's `oin` and an `iat`. The JWS must verify with the key in its own header, which proves possession of the private key.
+The key is supplied as a self-signed JWS in compact serialization. Its protected header carries the public key as a `jwk` with a `kid`; this must be an RSA key of at least 3072 bits, because tokens for the organization are encrypted with `RSA-OAEP`, and its payload carries the calling organization's `oin` and an `iat`. The JWS must verify with the key in its own header, which proves possession of the private key.
 
 ```json
 {
@@ -73,7 +73,7 @@ The key is supplied as a self-signed JWS in compact serialization. Its protected
 
 `domains` is the list of recipient scopes the key applies to. A `*` entry is a wildcard and matches any scope that has no key of its own.
 
-The JWS is rejected with `422` when it does not parse, the `jwk` is missing, contains private components, has no `kid` or is not an RSA key of at least 2048 bits, the signature does not verify, `iat` or `oin` is missing, `iat` is more than one hour old, or `oin` differs from the calling organization.
+The JWS is rejected with `422` when it does not parse, the `jwk` is missing, contains private components, has no `kid` or is not an RSA key of at least 3072 bits, the signature does not verify, `iat` or `oin` is missing, `iat` is more than one hour old, or `oin` differs from the calling organization.
 
 Returns `201` with the stored key, `409` if one of the domains is already registered to another key of the organization.
 

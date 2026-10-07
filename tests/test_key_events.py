@@ -410,7 +410,7 @@ def test_register_public_key_emits_registered(
     assert record.levelno == logging.INFO
     assert record.organisatie_oin == oin.value  # type: ignore[attr-defined]
     assert record.key_algoritme == "RSA"  # type: ignore[attr-defined]
-    assert record.key_lengte == 2048  # type: ignore[attr-defined]
+    assert record.key_lengte == 3072  # type: ignore[attr-defined]
     assert record.key_versie == response.json()["jwk"]["kid"]  # type: ignore[attr-defined]
     assert not _events(records, "250405")
 

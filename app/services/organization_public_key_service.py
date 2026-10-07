@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # Tokens for the organization are encrypted with RSA-OAEP, so only RSA keys of
 # at least this size can be registered.
-MIN_RSA_KEY_BITS = 2048
+MIN_RSA_KEY_BITS = 3072
 
 _CURVE_BITS = {
     "P-256": 256,

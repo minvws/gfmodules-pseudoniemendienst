@@ -70,10 +70,10 @@ NON_RSA_OR_WEAK_KEYS = [
         {"kty": "OKP", "crv": "Ed25519"}, "EdDSA", "'jwk' must be an RSA key", id="okp"
     ),
     pytest.param(
-        {"kty": "RSA", "size": 1024},
+        {"kty": "RSA", "size": 2048},
         "RS256",
-        "'jwk' must be an RSA key of at least 2048 bits",
-        id="rsa-1024",
+        "'jwk' must be an RSA key of at least 3072 bits",
+        id="rsa-2048",
     ),
 ]
 
