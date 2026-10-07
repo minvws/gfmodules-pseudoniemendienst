@@ -17,7 +17,8 @@ from starlette.testclient import TestClient
 
 from app import container
 from app.db.models import OrganizationEntity
-from app.exceptions import RecipientNotFoundError
+from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import NotAllowedToRequestError, RecipientNotFoundError
 from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.oprf.oprf_service import OprfEvaluationError
@@ -333,6 +334,41 @@ def test_oprf_eval_unknown_recipient_emits_refused_event(
     events = _events(oprf_event_records, "210403")
     assert len(events) == 1
     assert events[0].doel_oin == "oin:00000099000000003000"  # type: ignore[attr-defined]
+
+
+def test_oprf_eval_sender_not_allowed_to_request_is_refused_and_audited(
+    app: FastAPI,
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    valid_headers: dict[str, str],
+) -> None:
+    class RefusingAuthorizationService:
+        def validate_allowed_to_request(self, *args: object) -> None:
+            raise NotAllowedToRequestError(PersonalIdType.OPRF)
+
+    app.dependency_overrides[container.get_authorization_service] = lambda: (
+        RefusingAuthorizationService()
+    )
+    try:
+        with capture_records("app.routers.oprf") as captured:
+            response = client.post(
+                "/oprf/eval",
+                json={
+                    "encryptedPersonalId": "Zm9v",
+                    "recipientOrganization": oprf_context.recipient_organization,
+                    "recipientScope": oprf_context.recipient_scope,
+                },
+                headers=valid_headers,
+            )
+    finally:
+        app.dependency_overrides.pop(container.get_authorization_service, None)
+
+    assert response.status_code == 403
+    events = captured.for_event(Log.AUTHORIZATION_DENIED)
+    assert len(events) == 1
+    assert events[0].message["requested_operation"] == "oprf:eval"
+    assert events[0].message["doel_oin"] == oprf_context.recipient_organization
+    assert not captured.for_event(Log.OPRF_EVAL_OK)
 
 
 def test_oprf_eval_failure_emits_failed_event_with_error_type(
