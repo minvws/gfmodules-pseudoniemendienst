@@ -246,7 +246,7 @@ def create_organization(
 
 
 def generate_rsa_keypair() -> tuple[str, str]:
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)
     public_key = private_key.public_key()
 
     private_key_pem = private_key.private_bytes(

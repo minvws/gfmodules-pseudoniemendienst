@@ -57,6 +57,56 @@ def test_register_certificate_creates_key_for_authenticated_org(
     assert created["jwk"] == pub_jwk.export(as_dict=True)
 
 
+def _generate_keypair_pem(**params: str | int) -> str:
+    pem: bytes = JWK.generate(**params).export_to_pem(private_key=True, password=None)
+    return pem.decode()
+
+
+NON_RSA_OR_WEAK_KEYS = [
+    pytest.param(
+        {"kty": "EC", "crv": "P-256"}, "ES256", "'jwk' must be an RSA key", id="ec"
+    ),
+    pytest.param(
+        {"kty": "OKP", "crv": "Ed25519"}, "EdDSA", "'jwk' must be an RSA key", id="okp"
+    ),
+    pytest.param(
+        {"kty": "RSA", "size": 2048},
+        "RS256",
+        "'jwk' must be an RSA key of at least 3072 bits",
+        id="rsa-2048",
+    ),
+]
+
+
+@pytest.mark.parametrize("key_params,algorithm,detail", NON_RSA_OR_WEAK_KEYS)
+def test_register_certificate_rejects_non_rsa_or_weak_key(
+    key_params: dict[str, str | int],
+    algorithm: str,
+    detail: str,
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+    organization_public_key_service: OrganizationPublicKeyService,
+) -> None:
+    signed_jws = create_signed_jws(
+        _generate_keypair_pem(**key_params),
+        persisted_organization.external_id,
+        algorithm=algorithm,
+    )
+
+    response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": detail}
+    assert not organization_public_key_service.get_by_org(
+        persisted_organization.external_id
+    )
+
+
 def test_register_certificate_rejects_duplicate_scope_with_conflict(
     client: TestClient,
     valid_headers: dict[str, str],
@@ -347,6 +397,28 @@ def test_update_key_with_invalid_jws_is_unprocessable(
 
     assert response.status_code == 422
     assert response.json() == {"detail": "JWS invalid"}
+
+
+def test_update_key_to_non_rsa_key_is_unprocessable(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    persisted_organization: OrganizationEntity,
+) -> None:
+    created, _ = _create_key(client, valid_headers, persisted_organization, ["nvi"])
+    signed_jws = create_signed_jws(
+        _generate_keypair_pem(kty="EC", crv="P-256"),
+        persisted_organization.external_id,
+        algorithm="ES256",
+    )
+
+    response = client.put(
+        f"/administration/keys/{created['id']}",
+        json={"domains": ["nvi"], "jws": signed_jws},
+        headers=_auth_headers(valid_headers, persisted_organization.external_id),
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "'jwk' must be an RSA key"}
 
 
 def test_update_key_to_domain_of_other_key_is_conflict(

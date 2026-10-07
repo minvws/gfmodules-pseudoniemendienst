@@ -237,7 +237,7 @@ To use this system:
    from jwcrypto.jwk import JWK
    from jwcrypto.jwt import JWT
 
-   key = JWK.generate(kty="RSA", size=2048)
+   key = JWK.generate(kty="RSA", size=3072)
    key["kid"] = key.thumbprint()
    token = JWT(
        header={"alg": "RS256", "jwk": key.export_public(as_dict=True)},
