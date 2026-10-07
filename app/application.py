@@ -24,7 +24,6 @@ from app.routers.administration.hsm_key_version import router as hsm_key_version
 from app.routers.administration.key import router as key_router
 from app.routers.default import router as default_router
 from app.routers.errors import install_domain_error_handler
-from app.routers.exchange import router as exchange_router
 from app.routers.health import router as health_router
 from app.routers.irreversible_pseudonym import router as irreversible_pseudonym_router
 from app.routers.oprf import router as oprf_router
@@ -187,11 +186,11 @@ EXCHANGE_TAGS_METADATA = [
     {
         "name": "Exchange Services",
         "description": (
-            "Exchange a personal ID for a reversible pseudonym or reversible pseudonyms targeted at a "
-            "recipient organization/scope, and redeem a previously issued reversible pseudonyms for a "
-            "pseudonym (or the BSN, when permitted by both the reversible pseudonyms usage and the "
-            "organization's `max_key_usage`). Exchanges that involve a personal ID "
-            "require both the calling and the recipient organization to be "
+            "Exchange a personal ID for a reversible or irreversible pseudonym "
+            "targeted at a recipient organization/scope. Instead of a personal "
+            "ID, the irreversible exchange also takes a previously issued "
+            "reversible pseudonym, which is reversed first. Every exchange "
+            "requires both the calling and the recipient organization to be "
             "authorized for that personal ID type by a PRS administrator."
         ),
     },
@@ -368,7 +367,6 @@ def setup_fastapi() -> FastAPI:
         oprf_router,
     ]
     if config.app.enable_exchange_services_routes:
-        routers.append(exchange_router)
         routers.append(reversible_pseudonym_router)
         routers.append(irreversible_pseudonym_router)
     if config.app.enable_saml_exchange_routes:
