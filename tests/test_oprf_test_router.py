@@ -1,5 +1,4 @@
 import base64
-import json
 from dataclasses import dataclass
 
 import pyoprf
