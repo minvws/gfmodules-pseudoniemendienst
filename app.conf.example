@@ -3,7 +3,7 @@ loglevel=debug
 mtls_override_cert=
 # Enable the /test routes
 enable_test_routes=True
-# Enable the exchange service routes (/exchange/*, /receive)
+# Enable the exchange service routes (/exchange/*)
 enable_exchange_services_routes=True
 # Enable the mock SAML exchange routes (/saml-exchange/*); test environments only
 enable_saml_exchange_routes=False

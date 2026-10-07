@@ -210,8 +210,6 @@ The same two administrator-managed authorizations apply, for the `irreversible_p
 
 `POST /oprf/eval` also returns a pseudonym without the PRS seeing the personal ID. It uses a different key, so its pseudonyms do not match the ones from this endpoint.
 
-The former `/exchange/pseudonym`, `/exchange/rid` and `/receive` endpoints are not available.
-
 ## SAML Exchange Services
 
 These routes are only mounted when `enable_saml_exchange_routes` is set
