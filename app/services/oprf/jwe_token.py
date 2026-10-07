@@ -30,8 +30,6 @@ class BlindJwe:
             **extra_claims,
         }
 
-        # TODO GB: require JWK to be rsa
-
         protected_headers = {
             "kid": pub_key.key_id,
             "alg": "RSA-OAEP",

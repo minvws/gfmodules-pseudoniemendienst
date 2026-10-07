@@ -10,6 +10,7 @@ import pytest
 import requests
 from conftest import create_signed_jws, generate_rsa_keypair
 from gfmodules.logging import LogEvent, LoggingStreams
+from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
 from app.config import ConfigOprf
@@ -470,6 +471,34 @@ def test_register_public_key_for_other_oin_emits_rejected(
     assert record.organisatie_oin == oin.value  # type: ignore[attr-defined]
     assert record.key_algoritme == "RSA"  # type: ignore[attr-defined]
     assert record.rejection_reason == "Unauthorized for supplied `oin`"  # type: ignore[attr-defined]
+    assert not _events(records, "250404")
+
+
+def test_register_non_rsa_public_key_emits_rejected(
+    record_logs: RecordLogs,
+    client: TestClient,
+    persisted_organization: OrganizationEntity,
+    valid_headers: dict[str, str],
+) -> None:
+    records = record_logs("app.services.organization_public_key_service")
+    oin = persisted_organization.external_id
+    private_key = (
+        JWK.generate(kty="EC", crv="P-256")
+        .export_to_pem(private_key=True, password=None)
+        .decode()
+    )
+
+    response = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": create_signed_jws(private_key, oin, "ES256")},
+        headers=_auth_headers(valid_headers, oin),
+    )
+
+    assert response.status_code == 422
+    events = _events(records, "250405")
+    assert len(events) == 1
+    assert events[0].key_algoritme == "EC/P-256"  # type: ignore[attr-defined]
+    assert events[0].rejection_reason == "'jwk' must be an RSA key"  # type: ignore[attr-defined]
     assert not _events(records, "250404")
 
 

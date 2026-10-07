@@ -29,6 +29,10 @@ from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
 
+# Tokens for the organization are encrypted with RSA-OAEP, so only RSA keys of
+# at least this size can be registered.
+MIN_RSA_KEY_BITS = 2048
+
 _CURVE_BITS = {
     "P-256": 256,
     "P-384": 384,
@@ -121,6 +125,13 @@ class OrganizationPublicKeyService:
             raise InvalidJwsError("'jwk' contains private components")
         if "kid" not in jws.jose_header["jwk"]:
             raise InvalidJwsError("'jwk' is missing an 'kid'")
+        if jws.jose_header["jwk"].get("kty") != "RSA":
+            raise InvalidJwsError("'jwk' must be an RSA key")
+        key_length = _key_length(jws.jose_header["jwk"])
+        if key_length is None or key_length < MIN_RSA_KEY_BITS:
+            raise InvalidJwsError(
+                f"'jwk' must be an RSA key of at least {MIN_RSA_KEY_BITS} bits"
+            )
 
         jwk = JWK(**jws.jose_header["jwk"])
         try:
