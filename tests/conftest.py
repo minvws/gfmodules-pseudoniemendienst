@@ -311,3 +311,11 @@ def headers_with_scopes(
         }
 
     return _build
+
+
+@pytest.fixture
+def reset_version_cache() -> Generator[None, None, None]:
+    import app.utils.version
+
+    yield
+    app.utils.version._version_cache = False
