@@ -8,8 +8,8 @@ from uuid import UUID
 
 import pytest
 import requests
+from conftest import hsm_client
 
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.db.repositories.organization_repository import OrganizationRepository
@@ -57,12 +57,6 @@ def _add(
         session.add(version)
         session.commit()
     return version, org
-
-
-def _hsm_config() -> ConfigOprf:
-    return ConfigOprf(
-        hsm_url="https://hsm.local", hsm_module="softhsm", hsm_slot="SoftHSMLabel"
-    )
 
 
 DESTROY_URL = "https://hsm.local/hsm/softhsm/SoftHSMLabel/destroy"
@@ -161,7 +155,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
         versions.append(created)
 
     service = HsmKeyCleanupService(
-        _hsm_config(),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
 
@@ -211,7 +205,7 @@ def test_cleanup_destroys_every_pseudonym_key_of_the_version(
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
     )
-    service = HsmKeyCleanupService(_hsm_config(), HsmKeyVersionService(database))
+    service = HsmKeyCleanupService(hsm_client(), HsmKeyVersionService(database))
 
     with patch(
         "requests.Session.request", side_effect=_fake_hsm(lambda _: True)
@@ -239,7 +233,7 @@ def test_cleanup_marks_version_removed_when_no_keys_were_ever_created(
         from_dt=now - timedelta(days=10),
         until_dt=now - timedelta(days=1),
     )
-    service = HsmKeyCleanupService(_hsm_config(), HsmKeyVersionService(database))
+    service = HsmKeyCleanupService(hsm_client(), HsmKeyVersionService(database))
 
     with patch(
         "requests.Session.request", side_effect=_fake_hsm(lambda _: False)
@@ -249,30 +243,6 @@ def test_cleanup_marks_version_removed_when_no_keys_were_ever_created(
     assert cleaned == 1
     assert _destroyed_labels(post) == set()
     assert HsmKeyVersionService(database).get_expired_versions() == []
-
-
-def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
-    now = datetime.now(timezone.utc)
-    _add(
-        database,
-        oin=TEST_OIN_ACTIVE,
-        version=1,
-        from_dt=now - timedelta(days=10),
-        until_dt=now - timedelta(days=1),
-    )
-
-    service = HsmKeyCleanupService(
-        ConfigOprf(hsm_url=None),
-        HsmKeyVersionService(database),
-    )
-
-    with patch("requests.Session.request") as post:
-        cleaned = service.cleanup_expired_keys()
-
-    assert cleaned == 0
-    post.assert_not_called()
-    # The expired version is untouched (still expired, not removed).
-    assert len(HsmKeyVersionService(database).get_expired_versions()) == 1
 
 
 def test_cleanup_keeps_version_when_hsm_destroy_fails(database: Database) -> None:
@@ -286,7 +256,7 @@ def test_cleanup_keeps_version_when_hsm_destroy_fails(database: Database) -> Non
     )
 
     service = HsmKeyCleanupService(
-        _hsm_config(),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
 
@@ -342,16 +312,3 @@ def test_get_expired_versions_filters(database: Database) -> None:
             .one()
         )
     assert org.external_id == TEST_OIN_111
-
-
-@pytest.mark.parametrize("hsm_url", ["", None])
-def test_cleanup_skips_for_empty_or_missing_hsm_url(
-    database: Database, hsm_url: str | None
-) -> None:
-    service = HsmKeyCleanupService(
-        ConfigOprf(hsm_url=hsm_url),
-        HsmKeyVersionService(database),
-    )
-    with patch("requests.Session.request") as post:
-        assert service.cleanup_expired_keys() == 0
-    post.assert_not_called()

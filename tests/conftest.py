@@ -37,11 +37,19 @@ from app.config import get_config, set_config
 from app.db.db import Database
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
+from app.services.hsm.client import HsmClient
+from app.services.http_client import HttpService
 
 
 def genkey(len: int) -> str:
     key_bytes = secrets.token_bytes(len)
     return base64.urlsafe_b64encode(key_bytes).decode("ascii")
+
+
+def hsm_client() -> HsmClient:
+    return HsmClient(
+        HttpService(endpoint="https://hsm.local/hsm/softhsm/SoftHSMLabel", timeout=10)
+    )
 
 
 conf = get_config()

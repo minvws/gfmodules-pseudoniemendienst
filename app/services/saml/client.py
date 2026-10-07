@@ -21,21 +21,8 @@ class SamlServiceClient:
     which processes DigiD SAML responses so XML parsing stays out of this
     process."""
 
-    def __init__(
-        self,
-        url: str,
-        timeout: float = 5.0,
-        cert_file: str | None = None,
-        key_file: str | None = None,
-        ca_cert_file: str | None = None,
-    ):
-        self._http = HttpService(
-            endpoint=url,
-            timeout=timeout,
-            mtls_cert=cert_file,
-            mtls_key=key_file,
-            verify_ca=ca_cert_file or True,
-        )
+    def __init__(self, http: HttpService) -> None:
+        self._http = http
 
     def decrypt(self, payload: Any) -> Any:
         try:

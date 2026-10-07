@@ -13,12 +13,17 @@ import logging
 import sys
 
 from app import application, container
+from app.config import get_config
 
 logger = logging.getLogger(__name__)
 
 
 def main() -> int:
     application.application_init()
+
+    if not get_config().oprf.hsm_url:
+        logger.info("HSM not configured, skipping expired key cleanup")
+        return 0
 
     service = container.get_hsm_key_cleanup_service()
     try:

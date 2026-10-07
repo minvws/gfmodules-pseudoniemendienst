@@ -2,7 +2,6 @@ import logging
 
 import gfmodules.logging as gflog
 
-from app.config import ConfigOprf
 from app.logging.events import (
     SLEUTELTYPE_IRREVERSIBLE_KEY,
     SLEUTELTYPE_OPRF_SECRET,
@@ -28,22 +27,17 @@ class HsmKeyCleanupService:
 
     def __init__(
         self,
-        hsm_config: ConfigOprf,
+        client: HsmClient,
         version_service: HsmKeyVersionService,
     ) -> None:
-        self.__hsm_config = hsm_config
+        self.__client = client
         self.__version_service = version_service
-        self.__client = HsmClient(hsm_config)
 
     def cleanup_expired_keys(self) -> int:
         """
         Destroy every expired HSM key in the HSM and mark it removed. Returns the
         number of key versions that were successfully cleaned up.
         """
-        if not (self.__hsm_config and self.__hsm_config.hsm_url):
-            logger.debug("HSM not configured, skipping expired key cleanup")
-            return 0
-
         expired = self.__version_service.get_expired_versions()
         cleaned = 0
         for version in expired:

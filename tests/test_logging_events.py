@@ -4,11 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import gfmodules.logging as gflog
 import pytest
+from conftest import hsm_client
 from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 from gfmodules.logging.testing import assert_catalogue_complete, capture_records
 from jwcrypto import jwk
 
-from app.config import ConfigOprf
 from app.logging.events import Log
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
@@ -133,7 +133,7 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     ]
     service = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            client=hsm_client(),
             hsm_key_version_service=hsm_key_version_service,
         )
     )

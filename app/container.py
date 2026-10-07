@@ -10,6 +10,7 @@ from app.services.authorization_service import AuthorizationService
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.http_client import HttpService
 from app.services.irreversible.keys import (
     HsmIrreversibleKeyOperations,
     IrreversibleKeyOperations,
@@ -78,12 +79,6 @@ def container_config(binder: inject.Binder) -> None:
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
 
-    hsm_key_cleanup_service = HsmKeyCleanupService(
-        config.oprf,
-        hsm_key_version_service,
-    )
-    binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
-
     auth_header_service = AuthHeaderService(
         expected_audiences=config.authorization_headers.expected_audiences
     )
@@ -95,9 +90,22 @@ def container_config(binder: inject.Binder) -> None:
     reversible_keys: ReversibleKeyOperations
     irreversible_keys: IrreversibleKeyOperations
     if config.oprf.hsm_url:
-        oprf_evaluator = HsmOprfEvaluator(config.oprf, hsm_key_version_service)
-        reversible_keys = HsmReversibleKeyOperations(HsmClient(config.oprf))
-        irreversible_keys = HsmIrreversibleKeyOperations(HsmClient(config.oprf))
+        hsm_client = HsmClient(
+            HttpService(
+                endpoint=f"{config.oprf.hsm_url}/hsm/{config.oprf.hsm_module}/{config.oprf.hsm_slot}",
+                timeout=10.0,
+                mtls_cert=config.oprf.hsm_cert_file,
+                mtls_key=config.oprf.hsm_key_file,
+                verify_ca=config.oprf.hsm_ca_cert_file or True,
+            )
+        )
+        binder.bind(
+            HsmKeyCleanupService,
+            HsmKeyCleanupService(hsm_client, hsm_key_version_service),
+        )
+        oprf_evaluator = HsmOprfEvaluator(hsm_client, hsm_key_version_service)
+        reversible_keys = HsmReversibleKeyOperations(hsm_client)
+        irreversible_keys = HsmIrreversibleKeyOperations(hsm_client)
     else:
         reversible_keys = LocalReversibleKeyOperations(master_key)
         irreversible_keys = LocalIrreversibleKeyOperations(master_key)
@@ -134,11 +142,13 @@ def container_config(binder: inject.Binder) -> None:
                 "enable_saml_exchange_routes is set."
             )
         saml_service_client = SamlServiceClient(
-            url=config.saml_service.url,
-            timeout=config.saml_service.timeout,
-            cert_file=config.saml_service.cert_file,
-            key_file=config.saml_service.key_file,
-            ca_cert_file=config.saml_service.ca_cert_file,
+            HttpService(
+                endpoint=config.saml_service.url,
+                timeout=config.saml_service.timeout,
+                mtls_cert=config.saml_service.cert_file,
+                mtls_key=config.saml_service.key_file,
+                verify_ca=config.saml_service.ca_cert_file or True,
+            )
         )
         binder.bind(SamlServiceClient, saml_service_client)
 

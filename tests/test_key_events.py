@@ -8,12 +8,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-from conftest import create_signed_jws, generate_rsa_keypair
+from conftest import create_signed_jws, generate_rsa_keypair, hsm_client
 from gfmodules.logging import LogEvent, LoggingStreams
 from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.logging.events import Log
@@ -52,7 +51,7 @@ def _evaluator() -> HsmOprfEvaluator:
     version_service = MagicMock()
     version_service.get_active_version_numbers_by_organization_oin.return_value = [1]
     return HsmOprfEvaluator(
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        client=hsm_client(),
         hsm_key_version_service=version_service,
     )
 
@@ -296,9 +295,7 @@ def _add_expired_version(
 
 def _cleanup_service(database: Database) -> HsmKeyCleanupService:
     return HsmKeyCleanupService(
-        ConfigOprf(
-            hsm_url="https://hsm.local", hsm_module="softhsm", hsm_slot="SoftHSMLabel"
-        ),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
 
