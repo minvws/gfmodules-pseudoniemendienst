@@ -156,9 +156,10 @@ TAGS_METADATA = [
     {
         "name": "Key Registration Services",
         "description": (
-            "Register and manage the public keys that pseudonyms and reversible pseudonyms are "
-            "encrypted to. The organization and its public key are derived from the "
-            "mTLS client certificate, so they are not part of the request body."
+            "Register and manage the public keys that pseudonyms and reversible "
+            "pseudonyms are encrypted to. To register a public key, the request "
+            "must include a JWS signed by the corresponding private key, proving "
+            "ownership of that private key."
         ),
     },
     {
