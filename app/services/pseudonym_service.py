@@ -6,7 +6,7 @@ import logging
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from app.personal_id import PersonalId
+from app.models.personal_id import PersonalId
 
 logger = logging.getLogger(__name__)
 
