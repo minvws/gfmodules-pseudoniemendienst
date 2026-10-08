@@ -3,6 +3,8 @@ from typing import Any
 
 import requests
 
+from app.services.http_client import HttpService
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,23 +29,17 @@ class SamlServiceClient:
         key_file: str | None = None,
         ca_cert_file: str | None = None,
     ):
-        self.url = url.rstrip("/")
-        self.timeout = timeout
-        # Client certificate presented to the service (mTLS), and the internal
-        # CA that its server certificate must chain to. Mirrors the PRS-to-HSM
-        # API setup in HsmClient.post.
-        self.cert = (cert_file, key_file) if (cert_file and key_file) else None
-        self.verify: str | bool = ca_cert_file or True
+        self._http = HttpService(
+            endpoint=url,
+            timeout=timeout,
+            mtls_cert=cert_file,
+            mtls_key=key_file,
+            verify_ca=ca_cert_file or True,
+        )
 
     def decrypt(self, payload: Any) -> Any:
         try:
-            response = requests.post(
-                f"{self.url}/saml/decrypt",
-                json=payload,
-                timeout=self.timeout,
-                cert=self.cert,
-                verify=self.verify,
-            )
+            response = self._http.do_request("POST", "/saml/decrypt", json=payload)
         except requests.exceptions.RequestException as e:
             logger.warning("PRS-SAML service unreachable: %s", e)
             raise SamlServiceError("saml_service_unreachable", str(e)) from e
