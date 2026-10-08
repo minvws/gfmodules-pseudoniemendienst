@@ -31,9 +31,17 @@ FEATURES: list[Feature] = [
         info=FeatureInfo(
             id="reversible_pseudonym",
             title="Reversible pseudonym",
+            description="Exchange a personal ID for a reversible pseudonym",
+        ),
+        enabled=lambda config: config.app.enable_exchange_services_routes,
+    ),
+    Feature(
+        info=FeatureInfo(
+            id="irreversible_pseudonym",
+            title="Irreversible pseudonym",
             description=(
-                "Exchange a personal ID for reversible pseudonyms and redeem "
-                "them for a pseudonym"
+                "Exchange a personal ID, or a reversible pseudonym issued to "
+                "the caller, for an irreversible pseudonym"
             ),
         ),
         enabled=lambda config: config.app.enable_exchange_services_routes,
