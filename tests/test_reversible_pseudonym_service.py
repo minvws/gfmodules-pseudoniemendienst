@@ -9,13 +9,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from conftest import hsm_client
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from app.config import ConfigOprf
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.personal_id import PersonalId
-from app.services.hsm.client import HsmClient
 from app.services.reversible.keys import (
     HsmReversibleKeyOperations,
     LocalReversibleKeyOperations,
@@ -337,9 +336,7 @@ def fake_hsm() -> FakeHsm:
 
 @pytest.fixture
 def hsm_keys() -> ReversibleKeyOperations:
-    return HsmReversibleKeyOperations(
-        HsmClient(ConfigOprf(hsm_url="https://hsm.local"))
-    )
+    return HsmReversibleKeyOperations(hsm_client())
 
 
 def _with_fake_hsm(fake: FakeHsm) -> Any:
@@ -465,7 +462,7 @@ def test_local_and_hsm_operations_are_interchangeable(
 
     versions: Callable[[], MagicMock] = lambda: _key_versions({recipient: [1]})
     hsm_service = ReversiblePseudonymService(
-        HsmReversibleKeyOperations(HsmClient(ConfigOprf(hsm_url="https://hsm.local"))),
+        HsmReversibleKeyOperations(hsm_client()),
         versions(),
     )
     with _with_fake_hsm(fake_hsm):

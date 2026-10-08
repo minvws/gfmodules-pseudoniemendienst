@@ -8,18 +8,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-from conftest import create_signed_jws, generate_rsa_keypair
+from conftest import (
+    create_signed_jws,
+    generate_rsa_keypair,
+    hsm_client,
+    hsm_key_cleanup_service,
+)
 from gfmodules.logging import LogEvent, LoggingStreams
 from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.logging.events import Log
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
-from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmOprfEvaluator, OprfHsmKeyLabel
 
 RecordLogs = Callable[[str], list[logging.LogRecord]]
@@ -52,7 +54,7 @@ def _evaluator() -> HsmOprfEvaluator:
     version_service = MagicMock()
     version_service.get_active_version_numbers_by_organization_oin.return_value = [1]
     return HsmOprfEvaluator(
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        client=hsm_client(),
         hsm_key_version_service=version_service,
     )
 
@@ -294,15 +296,6 @@ def _add_expired_version(
         session.commit()
 
 
-def _cleanup_service(database: Database) -> HsmKeyCleanupService:
-    return HsmKeyCleanupService(
-        ConfigOprf(
-            hsm_url="https://hsm.local", hsm_module="softhsm", hsm_slot="SoftHSMLabel"
-        ),
-        HsmKeyVersionService(database),
-    )
-
-
 def test_cleanup_emits_key_version_destroyed(
     record_logs: RecordLogs,
     database: Database,
@@ -315,7 +308,7 @@ def test_cleanup_emits_key_version_destroyed(
         "requests.Session.request",
         return_value=_hsm_response({"objects": [{"label": "x"}]}),
     ):
-        cleaned = _cleanup_service(database).cleanup_expired_keys()
+        cleaned = hsm_key_cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 1
     # The AES and HMAC reversible keys share one event.
@@ -352,7 +345,7 @@ def test_cleanup_key_version_destroyed_names_the_destroyed_key_type(
         return _hsm_response({"objects": [{"label": "x"}] if present else []})
 
     with patch("requests.Session.request", side_effect=post):
-        cleaned = _cleanup_service(database).cleanup_expired_keys()
+        cleaned = hsm_key_cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 1
     events = _events(records, "250403")
@@ -372,7 +365,7 @@ def test_cleanup_destroy_failure_emits_operation_failed(
         "requests.Session.request",
         return_value=_hsm_response(None, status_code=503),
     ):
-        cleaned = _cleanup_service(database).cleanup_expired_keys()
+        cleaned = hsm_key_cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 0
     events = _events(records, "250406")

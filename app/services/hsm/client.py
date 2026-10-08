@@ -5,7 +5,6 @@ from typing import Any
 import gfmodules.logging as gflog
 import requests
 
-from app.config import ConfigOprf
 from app.logging.events import Log
 from app.services.http_client import HttpService
 
@@ -50,14 +49,8 @@ def _expected_error(response: requests.Response) -> Exception | None:
 class HsmClient:
     """Client for nl-rdo-hsm-api-service. Keys are addressed by label."""
 
-    def __init__(self, config: ConfigOprf, timeout: float = 10.0) -> None:
-        self._http = HttpService(
-            endpoint=f"{config.hsm_url}/hsm/{config.hsm_module}/{config.hsm_slot}",
-            timeout=timeout,
-            mtls_cert=config.hsm_cert_file,
-            mtls_key=config.hsm_key_file,
-            verify_ca=config.hsm_ca_cert_file or True,
-        )
+    def __init__(self, http: HttpService) -> None:
+        self._http = http
 
     def post(self, path: str, payload: dict[str, Any], operation: str) -> Any:
         """
