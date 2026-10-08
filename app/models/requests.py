@@ -2,13 +2,11 @@ import base64
 import binascii
 import logging
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.oin import RecipientOrganizationOin
-from app.models.personal_id import PersonalId
-from app.rid import RidUsage
 from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
@@ -137,13 +135,6 @@ class HsmKeyVersionUpdateRequest(BaseModel):
         return self
 
 
-class RidReceiveRequest(BaseModel):
-    rid: str
-    recipientOrganization: RecipientOrganizationOin
-    recipientScope: str
-    pseudonymType: Literal["rp", "irp", "bsn"]
-
-
 class BlindRequest(BaseModel):
     encryptedPersonalId: str = Field(..., min_length=2)
     recipientOrganization: RecipientOrganizationOin
@@ -159,33 +150,6 @@ class BlindRequest(BaseModel):
             raise ValueError(f"must be base64url: {e}")
 
         return normalized
-
-
-class RidExchangeRequest(BaseModel):
-    personalId: Any
-    recipientOrganization: RecipientOrganizationOin
-    recipientScope: str
-    ridUsage: Any
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_personal_id(cls, data: dict[str, Any]) -> dict[str, Any]:
-        pid = data.get("personalId")
-        if isinstance(pid, str):
-            data["personalId"] = PersonalId.from_str(pid)
-        if isinstance(pid, dict):
-            data["personalId"] = PersonalId.from_dict(pid)
-
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def convert_rid_usage(cls, data: dict[str, Any]) -> dict[str, Any]:
-        ridUsage = data.get("ridUsage")
-        if isinstance(ridUsage, str):
-            data["ridUsage"] = RidUsage(ridUsage)
-
-        return data
 
 
 class ReversiblePseudonymExchangeRequest(BaseModel):
