@@ -99,14 +99,11 @@ def container_config(binder: inject.Binder) -> None:
                 verify_ca=config.oprf.hsm_ca_cert_file or True,
             )
         )
-        binder.bind(
-            HsmKeyCleanupService,
-            HsmKeyCleanupService(hsm_client, hsm_key_version_service),
-        )
         oprf_evaluator = HsmOprfEvaluator(hsm_client, hsm_key_version_service)
         reversible_keys = HsmReversibleKeyOperations(hsm_client)
         irreversible_keys = HsmIrreversibleKeyOperations(hsm_client)
     else:
+        logger.info("HSM not configured, using keys derived from the master key")
         reversible_keys = LocalReversibleKeyOperations(master_key)
         irreversible_keys = LocalIrreversibleKeyOperations(master_key)
         try:
@@ -134,6 +131,14 @@ def container_config(binder: inject.Binder) -> None:
         irreversible_keys, hsm_key_version_service
     )
     binder.bind(IrreversiblePseudonymService, irreversible_pseudonym_service)
+
+    hsm_key_cleanup_service = HsmKeyCleanupService(
+        oprf_keys=oprf_evaluator,
+        irreversible_keys=irreversible_keys,
+        reversible_keys=reversible_keys,
+        version_service=hsm_key_version_service,
+    )
+    binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
 
     if config.app.enable_saml_exchange_routes:
         if not config.saml_service.url:
