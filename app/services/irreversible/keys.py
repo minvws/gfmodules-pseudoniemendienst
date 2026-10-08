@@ -12,8 +12,8 @@ import gfmodules.logging as gflog
 
 from app.logging.events import SLEUTELTYPE_IRREVERSIBLE_KEY, Log
 from app.models.oin import Oin
+from app.services.hkdf import hkdf_derive
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
-from app.services.pseudonym_service import hkdf_derive
 
 logger = logging.getLogger(__name__)
 
