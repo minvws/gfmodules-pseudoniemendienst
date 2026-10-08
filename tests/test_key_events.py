@@ -8,18 +8,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-from conftest import create_signed_jws, generate_rsa_keypair
+from conftest import (
+    create_signed_jws,
+    generate_rsa_keypair,
+    hsm_client,
+    hsm_key_cleanup_service,
+)
 from gfmodules.logging import LogEvent, LoggingStreams
 from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.logging.events import Log
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
-from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import HsmOprfEvaluator, OprfHsmKeyLabel
 
 RecordLogs = Callable[[str], list[logging.LogRecord]]
@@ -52,7 +54,7 @@ def _evaluator() -> HsmOprfEvaluator:
     version_service = MagicMock()
     version_service.get_active_version_numbers_by_organization_oin.return_value = [1]
     return HsmOprfEvaluator(
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        client=hsm_client(),
         hsm_key_version_service=version_service,
     )
 
@@ -91,7 +93,7 @@ def test_lazy_oprf_key_generation_emits_key_generated(
     with (
         caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=[
                 _hsm_no_such_key(),  # oprf_evaluate: key does not exist yet
                 _hsm_response({"result": "ok"}),  # keygen
@@ -120,7 +122,7 @@ def test_existing_oprf_key_does_not_emit_key_generated(
     with (
         caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=[_hsm_response({"result": "AAAA"})],
         ),
     ):
@@ -140,7 +142,7 @@ def test_oprf_key_created_by_another_instance_emits_nothing(
     with (
         caplog.at_level(logging.INFO, logger=EVALUATOR_LOGGER),
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=[
                 _hsm_no_such_key(),
                 _hsm_response({"error_description": "Object already exists"}, 422),
@@ -160,7 +162,7 @@ def test_hsm_http_error_emits_operation_failed(record_logs: RecordLogs) -> None:
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             return_value=_hsm_response(None, status_code=500),
         ),
         pytest.raises(requests.HTTPError),
@@ -186,7 +188,7 @@ def test_hsm_keygen_without_result_emits_operation_failed(
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=[
                 _hsm_no_such_key(),
                 _hsm_response({"error": "denied"}),
@@ -294,15 +296,6 @@ def _add_expired_version(
         session.commit()
 
 
-def _cleanup_service(database: Database) -> HsmKeyCleanupService:
-    return HsmKeyCleanupService(
-        ConfigOprf(
-            hsm_url="https://hsm.local", hsm_module="softhsm", hsm_slot="SoftHSMLabel"
-        ),
-        HsmKeyVersionService(database),
-    )
-
-
 def test_cleanup_emits_key_version_destroyed(
     record_logs: RecordLogs,
     database: Database,
@@ -312,10 +305,10 @@ def test_cleanup_emits_key_version_destroyed(
     _add_expired_version(database, persisted_organization, version=7)
 
     with patch(
-        "app.services.hsm.client.requests.post",
+        "requests.Session.request",
         return_value=_hsm_response({"objects": [{"label": "x"}]}),
     ):
-        cleaned = _cleanup_service(database).cleanup_expired_keys()
+        cleaned = hsm_key_cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 1
     # The AES and HMAC reversible keys share one event.
@@ -345,12 +338,14 @@ def test_cleanup_key_version_destroyed_names_the_destroyed_key_type(
     records = record_logs("app.services.hsm_key_cleanup_service")
     _add_expired_version(database, persisted_organization, version=7)
 
-    def post(url: str, json: dict[str, str], **kwargs: object) -> MagicMock:
+    def post(
+        method: str, url: str, json: dict[str, str], **kwargs: object
+    ) -> MagicMock:
         present = "-irp-" in json["label"]
         return _hsm_response({"objects": [{"label": "x"}] if present else []})
 
-    with patch("app.services.hsm.client.requests.post", side_effect=post):
-        cleaned = _cleanup_service(database).cleanup_expired_keys()
+    with patch("requests.Session.request", side_effect=post):
+        cleaned = hsm_key_cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 1
     events = _events(records, "250403")
@@ -367,10 +362,10 @@ def test_cleanup_destroy_failure_emits_operation_failed(
     _add_expired_version(database, persisted_organization, version=7)
 
     with patch(
-        "app.services.hsm.client.requests.post",
+        "requests.Session.request",
         return_value=_hsm_response(None, status_code=503),
     ):
-        cleaned = _cleanup_service(database).cleanup_expired_keys()
+        cleaned = hsm_key_cleanup_service(database).cleanup_expired_keys()
 
     assert cleaned == 0
     events = _events(records, "250406")

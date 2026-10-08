@@ -5,8 +5,9 @@ It registers an organization with a public key, creates key versions through
 the public ``/administration/key-versions`` endpoint and verifies that an OPRF evaluation
 returns a pseudonym carrying every active key version in the resulting JWE.
 
-The HSM itself is mocked: ``requests.post`` returns a deterministic evaluation
-per key version, so we can assert exactly which versions end up in the JWE.
+The HSM itself is mocked: ``requests.Session.request`` returns a deterministic
+evaluation per key version, so we can assert exactly which versions end up in
+the JWE.
 """
 
 import base64
@@ -14,7 +15,7 @@ import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from conftest import generate_rsa_keypair
+from conftest import generate_rsa_keypair, hsm_client
 from fastapi import FastAPI
 from jwcrypto import jwe as jwelib
 from jwcrypto import jwk
@@ -22,7 +23,6 @@ from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
 from app import container
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import OrganizationEntity, OrganizationPublicKeyEntity
 from app.db.session import DbSession
@@ -34,7 +34,9 @@ from app.services.oprf.oprf_service import OprfService
 SCOPE = "nvi"
 
 
-def _fake_hsm_post(url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
+def _fake_hsm_post(
+    method: str, url: str, json: dict[str, Any], **kwargs: Any
+) -> MagicMock:
     """Return a distinct evaluation per key version, derived from the label."""
 
     # Return slot info when asked
@@ -98,13 +100,13 @@ def test_new_key_version_is_added_to_jwe(
     # versions from the same database the endpoint writes to.
     hsm_oprf = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            client=hsm_client(),
             hsm_key_version_service=HsmKeyVersionService(database),
         )
     )
     app.dependency_overrides[container.get_oprf_service] = lambda: hsm_oprf
     try:
-        with patch("app.services.hsm.client.requests.post", side_effect=_fake_hsm_post):
+        with patch("requests.Session.request", side_effect=_fake_hsm_post):
             # We get a pseudonym back, carrying only version 1.
             eval_resp = _eval(
                 client, persisted_organization_2.external_id, valid_headers

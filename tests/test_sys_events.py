@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from conftest import hsm_client
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gfmodules.logging.testing import capture_records
@@ -13,7 +14,7 @@ from jwcrypto import jwk
 from sqlalchemy.exc import DatabaseError, OperationalError
 
 from app import container
-from app.config import ConfigOprf, get_config
+from app.config import get_config
 from app.db.db import Database
 from app.db.models import OrganizationEntity
 from app.logging.events import Log
@@ -158,7 +159,7 @@ def test_hsm_unreachable_emits_sys_event(
 
     service = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            client=hsm_client(),
             hsm_key_version_service=hsm_key_version_service,
         )
     )
@@ -167,7 +168,7 @@ def test_hsm_unreachable_emits_sys_event(
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=requests.exceptions.ConnectionError("connection refused"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

@@ -5,10 +5,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from conftest import create_organization
+from conftest import create_organization, hsm_client
 from jwcrypto import jwk
 
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.db.session import DbSession
@@ -192,7 +191,7 @@ def test_eval_via_hsm_returns_entry_per_active_version(
     )
 
     evaluator = HsmOprfEvaluator(
-        ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
 
@@ -230,7 +229,7 @@ def test_eval_generates_keys_if_needed(
     )
 
     evaluator = HsmOprfEvaluator(
-        ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
 
@@ -295,7 +294,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     )
 
     evaluator = HsmOprfEvaluator(
-        ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
     service = OprfService(evaluator)
@@ -303,7 +302,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
-    def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
         # Return slot info when asked
         if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
             resp = MagicMock()
@@ -325,7 +324,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         recipientScope="scope",
     )
 
-    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
+    with patch("requests.Session.request", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 2, 7)
@@ -392,7 +391,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     )
 
     evaluator = HsmOprfEvaluator(
-        ConfigOprf(hsm_url="https://hsm.local"),
+        hsm_client(),
         HsmKeyVersionService(database),
     )
     service = OprfService(evaluator)
@@ -400,7 +399,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
-    def fake_post(url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
         # Return slot info when asked
         if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
             resp = MagicMock()
@@ -422,7 +421,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         recipientScope="scope",
     )
 
-    with patch("app.services.hsm.client.requests.post", side_effect=fake_post):
+    with patch("requests.Session.request", side_effect=fake_post):
         result = service.eval_blind(req, pub)
 
     assert result.key_versions == (1, 3, 5)
@@ -449,7 +448,7 @@ def test_eval_via_hsm_without_service_raises() -> None:
     org_service = MagicMock()
     org_service.get_by_oin.return_value = SimpleNamespace(id=SimpleNamespace())
     evaluator = HsmOprfEvaluator(
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        client=hsm_client(),
         hsm_key_version_service=None,  # type: ignore[arg-type]
     )
 
@@ -462,7 +461,7 @@ def test_eval_via_hsm_without_service_raises() -> None:
 
 def test_eval_generate_key_without_result_raises_value_error() -> None:
     evaluator = HsmOprfEvaluator(
-        hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+        client=hsm_client(),
         hsm_key_version_service=MagicMock(),
     )
 

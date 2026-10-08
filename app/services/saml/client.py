@@ -3,6 +3,8 @@ from typing import Any
 
 import requests
 
+from app.services.http_client import HttpService
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,31 +21,12 @@ class SamlServiceClient:
     which processes DigiD SAML responses so XML parsing stays out of this
     process."""
 
-    def __init__(
-        self,
-        url: str,
-        timeout: float = 5.0,
-        cert_file: str | None = None,
-        key_file: str | None = None,
-        ca_cert_file: str | None = None,
-    ):
-        self.url = url.rstrip("/")
-        self.timeout = timeout
-        # Client certificate presented to the service (mTLS), and the internal
-        # CA that its server certificate must chain to. Mirrors the PRS-to-HSM
-        # API setup in HsmClient.post.
-        self.cert = (cert_file, key_file) if (cert_file and key_file) else None
-        self.verify: str | bool = ca_cert_file or True
+    def __init__(self, http: HttpService) -> None:
+        self._http = http
 
     def decrypt(self, payload: Any) -> Any:
         try:
-            response = requests.post(
-                f"{self.url}/saml/decrypt",
-                json=payload,
-                timeout=self.timeout,
-                cert=self.cert,
-                verify=self.verify,
-            )
+            response = self._http.do_request("POST", "/saml/decrypt", json=payload)
         except requests.exceptions.RequestException as e:
             logger.warning("PRS-SAML service unreachable: %s", e)
             raise SamlServiceError("saml_service_unreachable", str(e)) from e

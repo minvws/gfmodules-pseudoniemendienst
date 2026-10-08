@@ -5,16 +5,16 @@ from typing import Protocol
 import gfmodules.logging as gflog
 import pyoprf
 
-from app.config import ConfigOprf
 from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.key_destroyer import KeyDestroyer
 
 logger = logging.getLogger(__name__)
 
 
-class OprfEvaluator(Protocol):
+class OprfEvaluator(KeyDestroyer, Protocol):
     def evaluate(
         self, recipient_org_oin: Oin, blinded_bytes: bytes
     ) -> dict[int, bytes]: ...
@@ -42,14 +42,17 @@ class LocalOprfEvaluator:
     ) -> dict[int, bytes]:
         return {1: pyoprf.evaluate(self._server_key, blinded_bytes)}
 
+    def destroy(self, oin: Oin, version: int) -> bool:
+        return False
+
 
 class HsmOprfEvaluator:
     def __init__(
         self,
-        hsm_config: ConfigOprf,
+        client: HsmClient,
         hsm_key_version_service: HsmKeyVersionService,
     ):
-        self._client = HsmClient(hsm_config)
+        self._client = client
         self._hsm_key_version_service = hsm_key_version_service
 
     def evaluate(
@@ -72,6 +75,9 @@ class HsmOprfEvaluator:
                 ret[version] = self._client.oprf_evaluate(str(label), blinded_bytes)
 
         return ret
+
+    def destroy(self, oin: Oin, version: int) -> bool:
+        return self._client.destroy_if_present(str(OprfHsmKeyLabel(oin, version)))
 
     def _generate_key(self, label: OprfHsmKeyLabel) -> None:
         if not self._client.generate_oprf_key(str(label)):

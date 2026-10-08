@@ -1,90 +1,42 @@
-from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import requests
 
+from app.services.http_client import HttpService
 from app.services.saml.client import SamlServiceClient, SamlServiceError
 
 
-class _FakeResponse:
-    def __init__(self, status_code: int, body: Any) -> None:
-        self.status_code = status_code
-        self._body = body
-
-    def json(self) -> Any:
-        return self._body
+def _client(http: MagicMock) -> SamlServiceClient:
+    return SamlServiceClient(http)
 
 
-def test_client_passes_mtls_options_to_requests(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured: dict[str, Any] = {}
+def _http(status_code: int = 200, body: object = None) -> MagicMock:
+    http = MagicMock(spec=HttpService)
+    http.do_request.return_value.status_code = status_code
+    http.do_request.return_value.json.return_value = body
+    return http
 
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
-        captured["url"] = url
-        captured.update(kwargs)
-        return _FakeResponse(200, {"ok": True})
 
-    monkeypatch.setattr(requests, "post", fake_post)
+def test_client_posts_the_payload_to_saml_decrypt() -> None:
+    http = _http(body={"ok": True})
 
-    client = SamlServiceClient(
-        url="https://prs-saml:8504/",
-        timeout=2.5,
-        cert_file="client.crt",
-        key_file="client.key",
-        ca_cert_file="ca.crt",
+    assert _client(http).decrypt({"foo": "bar"}) == {"ok": True}
+    http.do_request.assert_called_once_with(
+        "POST", "/saml/decrypt", json={"foo": "bar"}
     )
-    assert client.decrypt({"foo": "bar"}) == {"ok": True}
-
-    assert captured["url"] == "https://prs-saml:8504/saml/decrypt"
-    assert captured["cert"] == ("client.crt", "client.key")
-    assert captured["verify"] == "ca.crt"
-    assert captured["timeout"] == 2.5
 
 
-def test_client_without_mtls_verifies_default_ca(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured: dict[str, Any] = {}
-
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
-        captured.update(kwargs)
-        return _FakeResponse(200, {})
-
-    monkeypatch.setattr(requests, "post", fake_post)
-
-    SamlServiceClient(url="http://localhost:8504").decrypt({})
-    assert captured["cert"] is None
-    assert captured["verify"] is True
-
-
-def test_client_requires_both_cert_and_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, Any] = {}
-
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
-        captured.update(kwargs)
-        return _FakeResponse(200, {})
-
-    monkeypatch.setattr(requests, "post", fake_post)
-
-    SamlServiceClient(url="http://localhost:8504", cert_file="client.crt").decrypt({})
-    assert captured["cert"] is None
-
-
-def test_client_raises_on_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(requests, "post", lambda url, **kwargs: _FakeResponse(500, {}))
-
+def test_client_raises_on_non_200() -> None:
     with pytest.raises(SamlServiceError) as exc_info:
-        SamlServiceClient(url="http://localhost:8504").decrypt({})
+        _client(_http(status_code=500)).decrypt({})
     assert exc_info.value.error_type == "saml_service_error"
 
 
-def test_client_raises_on_connection_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
-        raise requests.exceptions.ConnectionError("refused")
-
-    monkeypatch.setattr(requests, "post", fake_post)
+def test_client_raises_on_connection_error() -> None:
+    http = _http()
+    http.do_request.side_effect = requests.exceptions.ConnectionError("refused")
 
     with pytest.raises(SamlServiceError) as exc_info:
-        SamlServiceClient(url="http://localhost:8504").decrypt({})
+        _client(http).decrypt({})
     assert exc_info.value.error_type == "saml_service_unreachable"

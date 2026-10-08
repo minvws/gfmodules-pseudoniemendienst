@@ -4,10 +4,9 @@ from typing import Any
 
 import gfmodules.logging as gflog
 import requests
-from gfmodules.logging import correlation_headers
 
-from app.config import ConfigOprf
 from app.logging.events import Log
+from app.services.http_client import HttpService
 
 logger = logging.getLogger(__name__)
 
@@ -50,30 +49,16 @@ def _expected_error(response: requests.Response) -> Exception | None:
 class HsmClient:
     """Client for nl-rdo-hsm-api-service. Keys are addressed by label."""
 
-    def __init__(self, config: ConfigOprf, timeout: float = 10.0) -> None:
-        self._config = config
-        self._timeout = timeout
+    def __init__(self, http: HttpService) -> None:
+        self._http = http
 
     def post(self, path: str, payload: dict[str, Any], operation: str) -> Any:
         """
         POST to the HSM API. ``operation`` names the HSM operation in the
         PRS-KEY-007 event when the HSM refuses it.
         """
-        cfg = self._config
-        url = f"{cfg.hsm_url}/hsm/{cfg.hsm_module}/{cfg.hsm_slot}{path}"
         try:
-            response = requests.post(
-                url,
-                json=payload,
-                headers=correlation_headers(),
-                timeout=self._timeout,
-                verify=cfg.hsm_ca_cert_file or True,
-                cert=(
-                    (cfg.hsm_cert_file, cfg.hsm_key_file)
-                    if (cfg.hsm_cert_file and cfg.hsm_key_file)
-                    else None
-                ),
-            )
+            response = self._http.do_request("POST", path, json=payload)
         except HSM_UNREACHABLE_ERRORS as e:
             gflog.emit(
                 logger,
@@ -138,6 +123,13 @@ class HsmClient:
 
     def destroy(self, label: str) -> None:
         self.post("/destroy", {"label": label}, "destroy")
+
+    def destroy_if_present(self, label: str) -> bool:
+        if not self.label_exists(label):
+            return False
+        self.destroy(label)
+        logger.info("destroyed HSM key %r", label)
+        return True
 
     def oprf_evaluate(self, label: str, blinded: bytes) -> bytes:
         data = self.post(

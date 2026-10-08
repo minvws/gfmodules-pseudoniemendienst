@@ -1,66 +1,18 @@
-import base64
-import logging
-
 import inject
 
 from app.config import get_config
 from app.db.db import Database
 from app.services.auth.header import AuthHeaderService
 from app.services.authorization_service import AuthorizationService
-from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.irreversible.keys import (
-    HsmIrreversibleKeyOperations,
-    IrreversibleKeyOperations,
-    LocalIrreversibleKeyOperations,
-)
+from app.services.http_client import HttpService
 from app.services.irreversible.service import IrreversiblePseudonymService
-from app.services.oprf.evaluators import (
-    HsmOprfEvaluator,
-    LocalOprfEvaluator,
-    OprfEvaluator,
-)
+from app.services.key_operations import KeyOperations
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
-from app.services.reversible.keys import (
-    HsmReversibleKeyOperations,
-    LocalReversibleKeyOperations,
-    ReversibleKeyOperations,
-)
 from app.services.reversible.service import ReversiblePseudonymService
 from app.services.saml.client import SamlServiceClient
-
-logger = logging.getLogger(__name__)
-
-# Minimum master key size in bytes. The master key must have at least as much
-# entropy as the 256-bit keys HKDF derives from it.
-_MIN_MASTER_KEY_BYTES = 32
-
-
-def _load_master_key(raw: str) -> bytes:
-    """
-    Decode and validate the configured pseudonym master key.
-
-    All pseudonym, reversible-pseudonym and RID keys are derived from this key,
-    so an empty or weak master key would make every pseudonym forgeable and every
-    reversible pseudonym/RID decryptable. Refuse to start rather than silently
-    run with a b"" key.
-    """
-    if not raw:
-        raise ValueError(
-            "pseudonym.master_key is not configured. Set a base64-encoded key of "
-            "at least 32 bytes, e.g. `openssl rand -base64 32`."
-        )
-
-    key = base64.urlsafe_b64decode(raw)
-    if len(key) < _MIN_MASTER_KEY_BYTES:
-        raise ValueError(
-            f"pseudonym.master_key is too short ({len(key)} bytes decoded); "
-            f"at least {_MIN_MASTER_KEY_BYTES} bytes are required."
-        )
-
-    return key
 
 
 def container_config(binder: inject.Binder) -> None:
@@ -78,54 +30,33 @@ def container_config(binder: inject.Binder) -> None:
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
 
-    hsm_key_cleanup_service = HsmKeyCleanupService(
-        config.oprf,
-        hsm_key_version_service,
-    )
-    binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
-
     auth_header_service = AuthHeaderService(
         expected_audiences=config.authorization_headers.expected_audiences
     )
     binder.bind(AuthHeaderService, auth_header_service)
 
-    master_key = _load_master_key(config.pseudonym.master_key.get_secret_value())
+    key_operations = KeyOperations.from_config(config, hsm_key_version_service)
 
-    oprf_evaluator: OprfEvaluator
-    reversible_keys: ReversibleKeyOperations
-    irreversible_keys: IrreversibleKeyOperations
-    if config.oprf.hsm_url:
-        oprf_evaluator = HsmOprfEvaluator(config.oprf, hsm_key_version_service)
-        reversible_keys = HsmReversibleKeyOperations(HsmClient(config.oprf))
-        irreversible_keys = HsmIrreversibleKeyOperations(HsmClient(config.oprf))
-    else:
-        reversible_keys = LocalReversibleKeyOperations(master_key)
-        irreversible_keys = LocalIrreversibleKeyOperations(master_key)
-        try:
-            with open(config.oprf.server_key_file, "r") as f:
-                key = f.read().strip()
-            if key == "":
-                raise ValueError(
-                    "OPRF server key file is empty. Generate it using the 'make generate-oprf-key' command."
-                )
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                "OPRF server key file not found. Generate it using the 'make generate-oprf-key' command."
-            )
-        oprf_evaluator = LocalOprfEvaluator(base64.urlsafe_b64decode(key))
-
-    oprf_service = OprfService(oprf_evaluator)
+    oprf_service = OprfService(key_operations.oprf_evaluator)
     binder.bind(OprfService, oprf_service)
 
     reversible_pseudonym_service = ReversiblePseudonymService(
-        reversible_keys, hsm_key_version_service
+        key_operations.reversible_keys, hsm_key_version_service
     )
     binder.bind(ReversiblePseudonymService, reversible_pseudonym_service)
 
     irreversible_pseudonym_service = IrreversiblePseudonymService(
-        irreversible_keys, hsm_key_version_service
+        key_operations.irreversible_keys, hsm_key_version_service
     )
     binder.bind(IrreversiblePseudonymService, irreversible_pseudonym_service)
+
+    hsm_key_cleanup_service = HsmKeyCleanupService(
+        oprf_keys=key_operations.oprf_evaluator,
+        irreversible_keys=key_operations.irreversible_keys,
+        reversible_keys=key_operations.reversible_keys,
+        version_service=hsm_key_version_service,
+    )
+    binder.bind(HsmKeyCleanupService, hsm_key_cleanup_service)
 
     if config.app.enable_saml_exchange_routes:
         if not config.saml_service.url:
@@ -134,11 +65,13 @@ def container_config(binder: inject.Binder) -> None:
                 "enable_saml_exchange_routes is set."
             )
         saml_service_client = SamlServiceClient(
-            url=config.saml_service.url,
-            timeout=config.saml_service.timeout,
-            cert_file=config.saml_service.cert_file,
-            key_file=config.saml_service.key_file,
-            ca_cert_file=config.saml_service.ca_cert_file,
+            HttpService(
+                endpoint=config.saml_service.url,
+                timeout=config.saml_service.timeout,
+                mtls_cert=config.saml_service.cert_file,
+                mtls_key=config.saml_service.key_file,
+                verify_ca=config.saml_service.ca_cert_file or True,
+            )
         )
         binder.bind(SamlServiceClient, saml_service_client)
 
