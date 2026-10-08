@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, Any
 
 import gfmodules.logging as gflog
-from fastapi import APIRouter, Body, Depends, Security
+from fastapi import APIRouter, Body, Depends, HTTPException, Security
 from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _ENDPOINT = "/saml-exchange/reversible-pseudonym"
+FAIL_TEXT = "SAML exchange failed"
 
 
 @router.post(
@@ -32,6 +33,7 @@ Requires the `prs:saml-pseudonym` OAuth scope; the token itself is
 validated upstream by the OIN-verifier proxy, which forwards its scopes in the
 `x-gf-scope` header.
 """,
+    responses={502: {"description": FAIL_TEXT}},
 )
 def post_reversible_pseudonym(
     payload: Annotated[Any, Body(...)],
@@ -60,7 +62,7 @@ def post_reversible_pseudonym(
                 "error_type": e.error_type,
             },
         )
-        return JSONResponse({"detail": "SAML exchange failed"}, status_code=502)
+        raise HTTPException(status_code=502, detail=FAIL_TEXT) from e
 
     gflog.emit(
         logger,
