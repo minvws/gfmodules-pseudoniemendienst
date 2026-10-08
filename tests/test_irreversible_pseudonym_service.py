@@ -7,12 +7,11 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from conftest import hsm_client
 from test_reversible_pseudonym_service import FakeHsm, _with_fake_hsm
 
-from app.config import ConfigOprf
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.personal_id import PersonalId
-from app.services.hsm.client import HsmClient
 from app.services.irreversible.keys import (
     HsmIrreversibleKeyOperations,
     IrreversibleKeyLabel,
@@ -155,9 +154,7 @@ def test_scope_with_delimiter_is_refused(service: IrreversiblePseudonymService) 
 @pytest.fixture
 def hsm_service() -> IrreversiblePseudonymService:
     return IrreversiblePseudonymService(
-        HsmIrreversibleKeyOperations(
-            HsmClient(ConfigOprf(hsm_url="https://hsm.local"))
-        ),
+        HsmIrreversibleKeyOperations(hsm_client()),
         _key_versions({OIN: [1]}),
     )
 

@@ -37,11 +37,35 @@ from app.config import get_config, set_config
 from app.db.db import Database
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
+from app.services.hsm.client import HsmClient
+from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
+from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.http_client import HttpService
+from app.services.irreversible.keys import HsmIrreversibleKeyOperations
+from app.services.oprf.evaluators import HsmOprfEvaluator
+from app.services.reversible.keys import HsmReversibleKeyOperations
 
 
 def genkey(len: int) -> str:
     key_bytes = secrets.token_bytes(len)
     return base64.urlsafe_b64encode(key_bytes).decode("ascii")
+
+
+def hsm_client() -> HsmClient:
+    return HsmClient(
+        HttpService(endpoint="https://hsm.local/hsm/softhsm/SoftHSMLabel", timeout=10)
+    )
+
+
+def hsm_key_cleanup_service(database: Database) -> HsmKeyCleanupService:
+    client = hsm_client()
+    version_service = HsmKeyVersionService(database)
+    return HsmKeyCleanupService(
+        oprf_keys=HsmOprfEvaluator(client, version_service),
+        irreversible_keys=HsmIrreversibleKeyOperations(client),
+        reversible_keys=HsmReversibleKeyOperations(client),
+        version_service=version_service,
+    )
 
 
 conf = get_config()
