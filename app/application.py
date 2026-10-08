@@ -1,9 +1,7 @@
-import json
 import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Any
 
 import gfmodules.logging as gflog
@@ -30,6 +28,7 @@ from app.routers.oprf import router as oprf_router
 from app.routers.reversible_pseudonym import router as reversible_pseudonym_router
 from app.routers.saml_exchange import router as saml_exchange_router
 from app.routers.test_oprf import router as test_oprf_router
+from app.utils.version import load_version_json
 
 logger = logging.getLogger(__name__)
 
@@ -280,13 +279,10 @@ def create_fastapi_app() -> FastAPI:
 
 
 def _read_version() -> str:
-    path = Path(__file__).parent.parent / "version.json"
-    try:
-        with open(path, "r") as fh:
-            data = json.load(fh)
-            return str(data.get("version", "unknown"))
-    except (FileNotFoundError, json.JSONDecodeError):
+    data = load_version_json()
+    if data is None:
         return "unknown"
+    return str(data.get("version", "unknown"))
 
 
 @asynccontextmanager

@@ -23,7 +23,7 @@ def _mock_open_version_json(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_index_endpoint_includes_version_line(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, reset_version_cache: None
 ) -> None:
     _mock_open_version_json(monkeypatch)
 
@@ -35,7 +35,7 @@ def test_index_endpoint_includes_version_line(
 
 
 def test_version_json_endpoint_returns_json(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, reset_version_cache: None
 ) -> None:
     _mock_open_version_json(monkeypatch)
 
@@ -49,7 +49,7 @@ def test_version_json_endpoint_returns_json(
 
 
 def test_index_endpoint_handles_missing_version_file(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, reset_version_cache: None
 ) -> None:
     def raise_file_not_found(*args: Any, **kwargs: Any) -> None:
         raise FileNotFoundError("missing")
@@ -63,7 +63,7 @@ def test_index_endpoint_handles_missing_version_file(
 
 
 def test_version_json_endpoint_returns_404_when_version_file_missing(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, reset_version_cache: None
 ) -> None:
     def raise_file_not_found(*args: Any, **kwargs: Any) -> None:
         raise FileNotFoundError("missing")
@@ -76,7 +76,7 @@ def test_version_json_endpoint_returns_404_when_version_file_missing(
 
 
 def test_version_json_endpoint_includes_enabled_features(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, reset_version_cache: None
 ) -> None:
     _mock_open_version_json(monkeypatch)
 
