@@ -131,6 +131,13 @@ class HsmClient:
     def destroy(self, label: str) -> None:
         self.post("/destroy", {"label": label}, "destroy")
 
+    def destroy_if_present(self, label: str) -> bool:
+        if not self.label_exists(label):
+            return False
+        self.destroy(label)
+        logger.info("destroyed HSM key %r", label)
+        return True
+
     def oprf_evaluate(self, label: str, blinded: bytes) -> bytes:
         data = self.post(
             "/oprf/evaluate",

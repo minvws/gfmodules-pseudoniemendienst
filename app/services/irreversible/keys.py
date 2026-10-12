@@ -14,6 +14,7 @@ from app.logging.events import SLEUTELTYPE_IRREVERSIBLE_KEY, Log
 from app.models.oin import Oin
 from app.services.hkdf import hkdf_derive
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
+from app.services.key_destroyer import KeyDestroyer
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class IrreversibleKeyLabel:
         return f"oin-{self.oin.value}-irp-v{self.version}-hmac"
 
 
-class IrreversibleKeyOperations(Protocol):
+class IrreversibleKeyOperations(KeyDestroyer, Protocol):
     """The secret is created on first use."""
 
     def hmac(self, oin: Oin, version: int, data: bytes) -> bytes:
@@ -38,7 +39,7 @@ class IrreversibleKeyOperations(Protocol):
         ...
 
 
-class LocalIrreversibleKeyOperations:
+class LocalIrreversibleKeyOperations(IrreversibleKeyOperations):
     """HKDF from the master key. Development and tests only."""
 
     def __init__(self, master_key: bytes) -> None:
@@ -51,8 +52,11 @@ class LocalIrreversibleKeyOperations:
     def hmac(self, oin: Oin, version: int, data: bytes) -> bytes:
         return hmac.new(self._key(oin, version), data, hashlib.sha256).digest()
 
+    def destroy(self, oin: Oin, version: int) -> bool:
+        return False
 
-class HsmIrreversibleKeyOperations:
+
+class HsmIrreversibleKeyOperations(IrreversibleKeyOperations):
     def __init__(self, client: HsmClient) -> None:
         self._client = client
 
@@ -64,6 +68,9 @@ class HsmIrreversibleKeyOperations:
             # First use of this key version: create the secret and try again.
             self._create_key(label)
             return self._client.hmac(str(label), data)
+
+    def destroy(self, oin: Oin, version: int) -> bool:
+        return self._client.destroy_if_present(str(IrreversibleKeyLabel(oin, version)))
 
     def _create_key(self, label: IrreversibleKeyLabel) -> None:
         if not self._client.generate_secret_key(str(label)):

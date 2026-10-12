@@ -13,6 +13,7 @@ from app.logging.events import SLEUTELTYPE_REVERSIBLE_KEY, Log
 from app.models.oin import Oin
 from app.services.hkdf import hkdf_derive
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
+from app.services.key_destroyer import KeyDestroyer
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def reversible_key_labels(oin: Oin, version: int) -> tuple[ReversibleKeyLabel, .
     )
 
 
-class ReversibleKeyOperations(Protocol):
+class ReversibleKeyOperations(KeyDestroyer, Protocol):
     """Keys are created on first use by hmac/encrypt; decrypt never creates
     them, since a missing key there means the pseudonym cannot be genuine."""
 
@@ -56,7 +57,7 @@ class ReversibleKeyOperations(Protocol):
     def decrypt(self, oin: Oin, version: int, iv: bytes, data: bytes) -> bytes: ...
 
 
-class LocalReversibleKeyOperations:
+class LocalReversibleKeyOperations(ReversibleKeyOperations):
     """HKDF from the master key. Development and tests only."""
 
     def __init__(self, master_key: bytes) -> None:
@@ -85,8 +86,11 @@ class LocalReversibleKeyOperations:
         unpadder = padding.PKCS7(128).unpadder()
         return unpadder.update(padded) + unpadder.finalize()
 
+    def destroy(self, oin: Oin, version: int) -> bool:
+        return False
 
-class HsmReversibleKeyOperations:
+
+class HsmReversibleKeyOperations(ReversibleKeyOperations):
     def __init__(self, client: HsmClient) -> None:
         self._client = client
 
@@ -100,6 +104,12 @@ class HsmReversibleKeyOperations:
         except HsmKeyNotFound:
             self._create_keys(oin, version)
             return operation()
+
+    def destroy(self, oin: Oin, version: int) -> bool:
+        destroyed = False
+        for label in reversible_key_labels(oin, version):
+            destroyed |= self._client.destroy_if_present(str(label))
+        return destroyed
 
     def _create_keys(self, oin: Oin, version: int) -> None:
         for label in reversible_key_labels(oin, version):
