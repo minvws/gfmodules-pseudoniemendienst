@@ -4,9 +4,9 @@ import gfmodules.logging as gflog
 
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.logging.events import (
-    SLEUTELTYPE_IRREVERSIBLE_KEY,
-    SLEUTELTYPE_OPRF_SECRET,
-    SLEUTELTYPE_REVERSIBLE_KEY,
+    KEY_TYPE_IRREVERSIBLE_KEY,
+    KEY_TYPE_OPRF_SECRET,
+    KEY_TYPE_REVERSIBLE_KEY,
     Log,
 )
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -27,10 +27,10 @@ class HsmKeyCleanupService:
         reversible_keys: KeyDestroyer,
         version_service: HsmKeyVersionService,
     ) -> None:
-        self.__keys_by_sleuteltype = (
-            (oprf_keys, SLEUTELTYPE_OPRF_SECRET),
-            (irreversible_keys, SLEUTELTYPE_IRREVERSIBLE_KEY),
-            (reversible_keys, SLEUTELTYPE_REVERSIBLE_KEY),
+        self.__keys_by_key_type = (
+            (oprf_keys, KEY_TYPE_OPRF_SECRET),
+            (irreversible_keys, KEY_TYPE_IRREVERSIBLE_KEY),
+            (reversible_keys, KEY_TYPE_REVERSIBLE_KEY),
         )
         self.__version_service = version_service
 
@@ -71,14 +71,14 @@ class HsmKeyCleanupService:
 
     def _destroy_keys(self, version: HsmKeyVersionEntity) -> None:
         oin = version.organization.external_id
-        for keys, sleuteltype in self.__keys_by_sleuteltype:
+        for keys, key_type in self.__keys_by_key_type:
             if keys.destroy(oin, version.version):
                 gflog.emit(
                     logger,
                     Log.KEY_VERSION_DESTROYED,
                     "expired HSM key version destroyed",
                     fields={
-                        "sleuteltype": sleuteltype,
+                        "key_type": key_type,
                         "organisatie_oin": oin.value,
                         "vernietigde_versie": version.version,
                     },

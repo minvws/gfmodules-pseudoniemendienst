@@ -7,11 +7,9 @@ _SIEM = LoggingStreams.SIEM
 
 _Base = DefaultEventCatalogue
 
-# PRS-KEY "sleuteltype" for the per-organisation OPRF secret and its derived keys.
-SLEUTELTYPE_OPRF_SECRET = "oprf_secret"
-# PRS-KEY "sleuteltype" for the per-organisation reversible pseudonym AES/HMAC keys.
-SLEUTELTYPE_REVERSIBLE_KEY = "reversible_pseudonym_key"
-SLEUTELTYPE_IRREVERSIBLE_KEY = "irreversible_pseudonym_key"
+KEY_TYPE_OPRF_SECRET = "oprf_secret"
+KEY_TYPE_REVERSIBLE_KEY = "reversible_pseudonym_key"
+KEY_TYPE_IRREVERSIBLE_KEY = "irreversible_pseudonym_key"
 
 
 class Log(_Base):
@@ -202,13 +200,13 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "sleuteltype",
+                "key_type",
                 "organisatie_oin",
                 "domein",
                 "secret_id",
                 "sleutel_versie",
             ),
-            _SIEM: ("sleuteltype", "organisatie_oin"),
+            _SIEM: ("key_type", "organisatie_oin"),
         },
     )
     KEY_ROTATION_STARTED = LogEvent(  # PRS-KEY-002
@@ -217,13 +215,13 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "sleuteltype",
+                "key_type",
                 "organisatie_oin",
                 "domein",
                 "oude_versie",
                 "nieuwe_versie",
             ),
-            _SIEM: ("sleuteltype", "organisatie_oin", "oude_versie", "nieuwe_versie"),
+            _SIEM: ("key_type", "organisatie_oin", "oude_versie", "nieuwe_versie"),
         },
     )
     KEY_GRACE_STARTED = LogEvent(  # PRS-KEY-003
@@ -232,13 +230,13 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "sleuteltype",
+                "key_type",
                 "organisatie_oin",
                 "oude_versie",
                 "grace_start",
                 "grace_eind",
             ),
-            _SIEM: ("sleuteltype", "organisatie_oin", "oude_versie"),
+            _SIEM: ("key_type", "organisatie_oin", "oude_versie"),
         },
     )
     KEY_VERSION_DESTROYED = LogEvent(  # PRS-KEY-004
@@ -246,8 +244,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("sleuteltype", "organisatie_oin", "vernietigde_versie"),
-            _SIEM: ("sleuteltype", "organisatie_oin", "vernietigde_versie"),
+            _APP: ("key_type", "organisatie_oin", "vernietigde_versie"),
+            _SIEM: ("key_type", "organisatie_oin", "vernietigde_versie"),
         },
     )
     DECRYPT_PUBKEY_REGISTERED = LogEvent(  # PRS-KEY-005

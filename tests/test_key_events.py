@@ -107,7 +107,7 @@ def test_lazy_oprf_key_generation_emits_key_generated(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert record.sleuteltype == "oprf_secret"  # type: ignore[attr-defined]
+    assert record.key_type == "oprf_secret"  # type: ignore[attr-defined]
     assert record.organisatie_oin == TEST_OIN.value  # type: ignore[attr-defined]
     assert record.secret_id == str(OprfHsmKeyLabel(TEST_OIN, 1))  # type: ignore[attr-defined]
     assert record.sleutel_versie == 1  # type: ignore[attr-defined]
@@ -220,7 +220,7 @@ def test_create_key_version_emits_rotation_started(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.WARNING
-    assert record.sleuteltype == "oprf_secret"  # type: ignore[attr-defined]
+    assert record.key_type == "oprf_secret"  # type: ignore[attr-defined]
     assert (
         record.organisatie_oin  # type: ignore[attr-defined]
         == persisted_organization.external_id.value
@@ -250,7 +250,7 @@ def test_update_key_version_with_until_dt_emits_grace_started(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert record.sleuteltype == "oprf_secret"  # type: ignore[attr-defined]
+    assert record.key_type == "oprf_secret"  # type: ignore[attr-defined]
     assert (
         record.organisatie_oin  # type: ignore[attr-defined]
         == persisted_organization.external_id.value
@@ -313,7 +313,7 @@ def test_cleanup_emits_key_version_destroyed(
     assert cleaned == 1
     # The AES and HMAC reversible keys share one event.
     events = _events(records, "250403")
-    assert sorted(r.sleuteltype for r in events) == [  # type: ignore[attr-defined]
+    assert sorted(r.key_type for r in events) == [  # type: ignore[attr-defined]
         "irreversible_pseudonym_key",
         "oprf_secret",
         "reversible_pseudonym_key",
@@ -350,7 +350,7 @@ def test_cleanup_key_version_destroyed_names_the_destroyed_key_type(
     assert cleaned == 1
     events = _events(records, "250403")
     assert len(events) == 1
-    assert events[0].sleuteltype == "irreversible_pseudonym_key"  # type: ignore[attr-defined]
+    assert events[0].key_type == "irreversible_pseudonym_key"  # type: ignore[attr-defined]
 
 
 def test_cleanup_destroy_failure_emits_operation_failed(

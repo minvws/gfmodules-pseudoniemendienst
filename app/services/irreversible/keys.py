@@ -10,7 +10,7 @@ from typing import Protocol
 
 import gfmodules.logging as gflog
 
-from app.logging.events import SLEUTELTYPE_IRREVERSIBLE_KEY, Log
+from app.logging.events import KEY_TYPE_IRREVERSIBLE_KEY, Log
 from app.models.oin import Oin
 from app.services.hkdf import hkdf_derive
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
@@ -82,7 +82,7 @@ class HsmIrreversibleKeyOperations(IrreversibleKeyOperations):
             Log.KEY_GENERATED,
             "irreversible pseudonym secret generated in HSM",
             fields={
-                "sleuteltype": SLEUTELTYPE_IRREVERSIBLE_KEY,
+                "key_type": KEY_TYPE_IRREVERSIBLE_KEY,
                 "organisatie_oin": label.oin.value,
                 "secret_id": str(label),
                 "sleutel_versie": label.version,

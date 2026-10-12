@@ -15,7 +15,7 @@ from app.exceptions import (
     NoKeyVersionError,
     RecipientNotFoundError,
 )
-from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
+from app.logging.events import KEY_TYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
 from app.utils.datetime import now_utc
 
@@ -145,7 +145,7 @@ class HsmKeyVersionService:
                 Log.KEY_ROTATION_STARTED,
                 "HSM key version rotation started",
                 fields={
-                    "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                    "key_type": KEY_TYPE_OPRF_SECRET,
                     "organisatie_oin": organization_external_id.value,
                     "oude_versie": current_version,
                     "nieuwe_versie": hsm_key_version.version,
@@ -181,7 +181,7 @@ class HsmKeyVersionService:
                     Log.KEY_GRACE_STARTED,
                     "HSM key version grace period started",
                     fields={
-                        "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                        "key_type": KEY_TYPE_OPRF_SECRET,
                         "organisatie_oin": organization_external_id.value,
                         "oude_versie": version.version,
                         "grace_start": datetime.now(timezone.utc).isoformat(),
