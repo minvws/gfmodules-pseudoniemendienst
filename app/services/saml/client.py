@@ -3,7 +3,7 @@ from typing import Any
 
 import requests
 
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 
 logger = logging.getLogger(__name__)
 

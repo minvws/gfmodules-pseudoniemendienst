@@ -7,7 +7,7 @@ import requests
 
 from app.config import ConfigOprf
 from app.logging.events import Log
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 
 logger = logging.getLogger(__name__)
 
