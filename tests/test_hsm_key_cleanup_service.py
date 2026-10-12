@@ -72,7 +72,7 @@ def _fake_hsm(existing: Callable[[str], bool]) -> Callable[..., MagicMock]:
     """A fake HSM API: the object search reports a label as present when
     ``existing`` says so, and destroy always succeeds."""
 
-    def _post(url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
+    def _post(method: str, url: str, json: dict[str, Any], **kwargs: Any) -> MagicMock:
         resp = MagicMock()
         if url == DESTROY_URL:
             resp.json.return_value = {"result": "ok"}
@@ -89,7 +89,7 @@ def _destroyed_labels(post: MagicMock) -> set[str]:
     return {
         call.kwargs["json"]["label"]
         for call in post.call_args_list
-        if call.args[0] == DESTROY_URL
+        if call.args[1] == DESTROY_URL
     }
 
 
@@ -172,7 +172,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
             SimpleNamespace(now=lambda tz=None: now),
         ),
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=_fake_hsm(lambda label: "-oprf-" in label),
         ) as post,
     ):
@@ -214,7 +214,7 @@ def test_cleanup_destroys_every_pseudonym_key_of_the_version(
     service = HsmKeyCleanupService(_hsm_config(), HsmKeyVersionService(database))
 
     with patch(
-        "app.services.hsm.client.requests.post", side_effect=_fake_hsm(lambda _: True)
+        "requests.Session.request", side_effect=_fake_hsm(lambda _: True)
     ) as post:
         cleaned = service.cleanup_expired_keys()
 
@@ -242,7 +242,7 @@ def test_cleanup_marks_version_removed_when_no_keys_were_ever_created(
     service = HsmKeyCleanupService(_hsm_config(), HsmKeyVersionService(database))
 
     with patch(
-        "app.services.hsm.client.requests.post", side_effect=_fake_hsm(lambda _: False)
+        "requests.Session.request", side_effect=_fake_hsm(lambda _: False)
     ) as post:
         cleaned = service.cleanup_expired_keys()
 
@@ -266,7 +266,7 @@ def test_cleanup_skips_when_hsm_not_configured(database: Database) -> None:
         HsmKeyVersionService(database),
     )
 
-    with patch("app.services.hsm.client.requests.post") as post:
+    with patch("requests.Session.request") as post:
         cleaned = service.cleanup_expired_keys()
 
     assert cleaned == 0
@@ -293,7 +293,7 @@ def test_cleanup_keeps_version_when_hsm_destroy_fails(database: Database) -> Non
     failing = MagicMock()
     failing.raise_for_status.side_effect = requests.HTTPError("boom")
 
-    with patch("app.services.hsm.client.requests.post", return_value=failing):
+    with patch("requests.Session.request", return_value=failing):
         cleaned = service.cleanup_expired_keys()
 
     # HSM removal failed, so the version is left for the next run to retry.
@@ -352,6 +352,6 @@ def test_cleanup_skips_for_empty_or_missing_hsm_url(
         ConfigOprf(hsm_url=hsm_url),
         HsmKeyVersionService(database),
     )
-    with patch("app.services.hsm.client.requests.post") as post:
+    with patch("requests.Session.request") as post:
         assert service.cleanup_expired_keys() == 0
     post.assert_not_called()

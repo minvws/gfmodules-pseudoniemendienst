@@ -167,7 +167,7 @@ def test_hsm_unreachable_emits_sys_event(
 
     with (
         patch(
-            "app.services.hsm.client.requests.post",
+            "requests.Session.request",
             side_effect=requests.exceptions.ConnectionError("connection refused"),
         ),
         pytest.raises(OprfEvaluationError) as exc,

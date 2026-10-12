@@ -20,12 +20,10 @@ def test_client_passes_mtls_options_to_requests(
 ) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
+    def fake_request(method: str, url: str, **kwargs: Any) -> _FakeResponse:
         captured["url"] = url
         captured.update(kwargs)
         return _FakeResponse(200, {"ok": True})
-
-    monkeypatch.setattr(requests, "post", fake_post)
 
     client = SamlServiceClient(
         url="https://prs-saml:8504/",
@@ -34,6 +32,8 @@ def test_client_passes_mtls_options_to_requests(
         key_file="client.key",
         ca_cert_file="ca.crt",
     )
+    monkeypatch.setattr(client._http._session, "request", fake_request)
+
     assert client.decrypt({"foo": "bar"}) == {"ok": True}
 
     assert captured["url"] == "https://prs-saml:8504/saml/decrypt"
@@ -47,13 +47,14 @@ def test_client_without_mtls_verifies_default_ca(
 ) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
+    def fake_request(method: str, url: str, **kwargs: Any) -> _FakeResponse:
         captured.update(kwargs)
         return _FakeResponse(200, {})
 
-    monkeypatch.setattr(requests, "post", fake_post)
+    client = SamlServiceClient(url="http://localhost:8504")
+    monkeypatch.setattr(client._http._session, "request", fake_request)
 
-    SamlServiceClient(url="http://localhost:8504").decrypt({})
+    client.decrypt({})
     assert captured["cert"] is None
     assert captured["verify"] is True
 
@@ -61,30 +62,37 @@ def test_client_without_mtls_verifies_default_ca(
 def test_client_requires_both_cert_and_key(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
+    def fake_request(method: str, url: str, **kwargs: Any) -> _FakeResponse:
         captured.update(kwargs)
         return _FakeResponse(200, {})
 
-    monkeypatch.setattr(requests, "post", fake_post)
+    client = SamlServiceClient(url="http://localhost:8504", cert_file="client.crt")
+    monkeypatch.setattr(client._http._session, "request", fake_request)
 
-    SamlServiceClient(url="http://localhost:8504", cert_file="client.crt").decrypt({})
+    client.decrypt({})
     assert captured["cert"] is None
 
 
 def test_client_raises_on_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(requests, "post", lambda url, **kwargs: _FakeResponse(500, {}))
+    client = SamlServiceClient(url="http://localhost:8504")
+    monkeypatch.setattr(
+        client._http._session,
+        "request",
+        lambda method, url, **kwargs: _FakeResponse(500, {}),
+    )
 
     with pytest.raises(SamlServiceError) as exc_info:
-        SamlServiceClient(url="http://localhost:8504").decrypt({})
+        client.decrypt({})
     assert exc_info.value.error_type == "saml_service_error"
 
 
 def test_client_raises_on_connection_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_post(url: str, **kwargs: Any) -> _FakeResponse:
+    def fake_request(method: str, url: str, **kwargs: Any) -> _FakeResponse:
         raise requests.exceptions.ConnectionError("refused")
 
-    monkeypatch.setattr(requests, "post", fake_post)
+    client = SamlServiceClient(url="http://localhost:8504")
+    monkeypatch.setattr(client._http._session, "request", fake_request)
 
     with pytest.raises(SamlServiceError) as exc_info:
-        SamlServiceClient(url="http://localhost:8504").decrypt({})
+        client.decrypt({})
     assert exc_info.value.error_type == "saml_service_unreachable"
