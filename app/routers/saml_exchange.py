@@ -16,12 +16,11 @@ from app.services.saml.client import SamlServiceClient, SamlServiceError
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_ENDPOINT = "/saml-exchange/reversible-pseudonym"
 FAIL_TEXT = "SAML exchange failed"
 
 
 @router.post(
-    _ENDPOINT,
+    "/saml-exchange/reversible-pseudonym",
     summary="MOCK: exchange a DigiD SAML response for a reversible pseudonym",
     tags=["SAML Exchange Services"],
     description="""

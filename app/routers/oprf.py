@@ -21,11 +21,9 @@ from app.services.organization_public_key_service import OrganizationPublicKeySe
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_ENDPOINT = "/oprf/eval"
-
 
 @router.post(
-    _ENDPOINT,
+    "/oprf/eval",
     summary="Evaluate OPRF blind and returns an encrypted JWE for the organization",
     tags=["OPRF Services"],
 )
