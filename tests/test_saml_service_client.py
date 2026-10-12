@@ -28,15 +28,18 @@ def test_client_posts_the_payload_to_saml_decrypt() -> None:
 
 
 def test_client_raises_on_non_200() -> None:
+    client = _client(_http(status_code=500))
+
     with pytest.raises(SamlServiceError) as exc_info:
-        _client(_http(status_code=500)).decrypt({})
+        client.decrypt({})
     assert exc_info.value.error_type == "saml_service_error"
 
 
 def test_client_raises_on_connection_error() -> None:
     http = _http()
     http.do_request.side_effect = requests.exceptions.ConnectionError("refused")
+    client = _client(http)
 
     with pytest.raises(SamlServiceError) as exc_info:
-        _client(http).decrypt({})
+        client.decrypt({})
     assert exc_info.value.error_type == "saml_service_unreachable"
