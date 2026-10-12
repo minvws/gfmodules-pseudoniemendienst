@@ -8,7 +8,7 @@ import pytest
 import requests
 from urllib3.util import connection
 
-from app.services.http_client import HttpMethod, HttpService
+from app.services.http_service import HttpMethod, HttpService
 
 pytestmark = pytest.mark.parametrize("method", ["GET", "POST"])
 
