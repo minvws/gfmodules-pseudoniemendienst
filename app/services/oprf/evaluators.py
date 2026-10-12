@@ -34,7 +34,7 @@ class OprfHsmKeyLabel:
         return f"oin-{self.oin.value}-oprf-v{self.version}"
 
 
-class LocalOprfEvaluator:
+class LocalOprfEvaluator(OprfEvaluator):
     def __init__(self, server_key: bytes):
         self._server_key = server_key
 
@@ -47,7 +47,7 @@ class LocalOprfEvaluator:
         return False
 
 
-class HsmOprfEvaluator:
+class HsmOprfEvaluator(OprfEvaluator):
     def __init__(
         self,
         hsm_config: ConfigOprf,

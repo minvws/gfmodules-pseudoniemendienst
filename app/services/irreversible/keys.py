@@ -39,7 +39,7 @@ class IrreversibleKeyOperations(KeyDestroyer, Protocol):
         ...
 
 
-class LocalIrreversibleKeyOperations:
+class LocalIrreversibleKeyOperations(IrreversibleKeyOperations):
     """HKDF from the master key. Development and tests only."""
 
     def __init__(self, master_key: bytes) -> None:
@@ -56,7 +56,7 @@ class LocalIrreversibleKeyOperations:
         return False
 
 
-class HsmIrreversibleKeyOperations:
+class HsmIrreversibleKeyOperations(IrreversibleKeyOperations):
     def __init__(self, client: HsmClient) -> None:
         self._client = client
 

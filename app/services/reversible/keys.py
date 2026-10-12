@@ -57,7 +57,7 @@ class ReversibleKeyOperations(KeyDestroyer, Protocol):
     def decrypt(self, oin: Oin, version: int, iv: bytes, data: bytes) -> bytes: ...
 
 
-class LocalReversibleKeyOperations:
+class LocalReversibleKeyOperations(ReversibleKeyOperations):
     """HKDF from the master key. Development and tests only."""
 
     def __init__(self, master_key: bytes) -> None:
@@ -90,7 +90,7 @@ class LocalReversibleKeyOperations:
         return False
 
 
-class HsmReversibleKeyOperations:
+class HsmReversibleKeyOperations(ReversibleKeyOperations):
     def __init__(self, client: HsmClient) -> None:
         self._client = client
 
@@ -106,11 +106,10 @@ class HsmReversibleKeyOperations:
             return operation()
 
     def destroy(self, oin: Oin, version: int) -> bool:
-        destroyed = [
-            self._client.destroy_if_present(str(label))
-            for label in reversible_key_labels(oin, version)
-        ]
-        return any(destroyed)
+        destroyed = False
+        for label in reversible_key_labels(oin, version):
+            destroyed |= self._client.destroy_if_present(str(label))
+        return destroyed
 
     def _create_keys(self, oin: Oin, version: int) -> None:
         for label in reversible_key_labels(oin, version):

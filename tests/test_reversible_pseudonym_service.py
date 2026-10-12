@@ -297,6 +297,9 @@ class FakeHsm:
             resp.json.return_value = {"result": "created"}
         elif label not in self.keys:
             return self._hsm_error(resp, f"No such key: {label!r}")
+        elif path == "/destroy":
+            del self.keys[label]
+            resp.json.return_value = {"result": "destroyed"}
         elif path == "/sign":
             assert json["mechanism"] == "SHA256_HMAC"
             digest = hmac.new(
@@ -420,6 +423,19 @@ def test_hsm_roundtrip(
 
     assert reversed_.personal_id == PID
     assert reversed_.recipient_scope == SCOPE
+
+
+def test_hsm_destroy_removes_both_keys_of_the_version(
+    hsm_keys: ReversibleKeyOperations, fake_hsm: FakeHsm, recipient: Oin
+) -> None:
+    fake_hsm.keys[f"oin-{OIN}-rp-v1-aes"] = os.urandom(32)
+    fake_hsm.keys[f"oin-{OIN}-rp-v1-hmac"] = os.urandom(32)
+
+    with _with_fake_hsm(fake_hsm):
+        destroyed = hsm_keys.destroy(recipient, 1)
+
+    assert destroyed
+    assert fake_hsm.keys == {}
 
 
 def test_hsm_unreachable_is_reported_as_such(

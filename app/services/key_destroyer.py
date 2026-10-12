@@ -4,5 +4,4 @@ from app.models.oin import Oin
 
 
 class KeyDestroyer(Protocol):
-    def destroy(self, oin: Oin, version: int) -> bool:
-        pass
+    def destroy(self, oin: Oin, version: int) -> bool: ...
