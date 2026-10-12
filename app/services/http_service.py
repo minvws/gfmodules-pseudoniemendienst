@@ -9,15 +9,14 @@ from urllib3.util.retry import Retry
 # synchronous FastAPI endpoints can hold a pooled connection.
 _POOL_MAXSIZE = 40
 
-# Only failures to connect are retried
 _RETRY = Retry(
     total=3,
-    connect=3,
-    read=0,
-    status=0,
+    connect=3,  # safe for every method, the request never reached the server
+    read=0,  # each retry repeats the full timeout, so a slow upstream would hold
+    # every worker thread and make the whole service unresponsive
+    status=0,  # the server already answered
     other=0,
     backoff_factor=0.3,
-    allowed_methods=frozenset({"POST"}),
     respect_retry_after_header=False,
     raise_on_status=False,
 )

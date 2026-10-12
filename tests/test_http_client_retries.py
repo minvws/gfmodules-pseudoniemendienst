@@ -8,7 +8,9 @@ import pytest
 import requests
 from urllib3.util import connection
 
-from app.services.http_client import HttpService
+from app.services.http_client import HttpMethod, HttpService
+
+pytestmark = pytest.mark.parametrize("method", ["GET", "POST"])
 
 
 @contextmanager
@@ -26,6 +28,8 @@ def _server(status: int | None) -> Iterator[tuple[HttpService, list[str]]]:
             self.send_header("Content-Length", "0")
             self.end_headers()
 
+        do_GET = do_POST
+
         def log_message(self, *args: object) -> None:
             pass
 
@@ -38,7 +42,7 @@ def _server(status: int | None) -> Iterator[tuple[HttpService, list[str]]]:
         server.server_close()
 
 
-def test_retries_until_the_service_accepts_connections() -> None:
+def test_retries_until_the_service_accepts_connections(method: HttpMethod) -> None:
     refused_twice = [ConnectionRefusedError, ConnectionRefusedError, DEFAULT]
     with (
         _server(200) as (http, attempts),
@@ -49,27 +53,29 @@ def test_retries_until_the_service_accepts_connections() -> None:
             side_effect=refused_twice,
         ) as create_connection,
     ):
-        response = http.do_request("POST")
+        response = http.do_request(method)
 
     assert response.status_code == 200
     assert create_connection.call_count == 3
     assert len(attempts) == 1
 
 
-def test_does_not_retry_a_connection_dropped_after_the_request_was_sent() -> None:
+def test_does_not_retry_a_connection_dropped_after_the_request_was_sent(
+    method: HttpMethod,
+) -> None:
     with (
         _server(None) as (http, attempts),
         pytest.raises(requests.exceptions.ConnectionError),
     ):
-        http.do_request("POST")
+        http.do_request(method)
 
     assert len(attempts) == 1
 
 
 @pytest.mark.parametrize("status", [429, 500, 503])
-def test_does_not_retry_an_http_error_status(status: int) -> None:
+def test_does_not_retry_an_http_error_status(method: HttpMethod, status: int) -> None:
     with _server(status) as (http, attempts):
-        response = http.do_request("POST")
+        response = http.do_request(method)
 
     assert response.status_code == status
     assert len(attempts) == 1
