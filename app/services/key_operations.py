@@ -1,6 +1,7 @@
 import base64
 import logging
 from dataclasses import dataclass
+from typing import Self
 
 from app.config import Config, ConfigOprf
 from app.services.hsm.client import HsmClient
@@ -66,17 +67,13 @@ class KeyOperations:
     irreversible_keys: IrreversibleKeyOperations
 
     @classmethod
-    def from_config(
-        cls, config: Config, version_service: HsmKeyVersionService
-    ) -> "KeyOperations":
+    def from_config(cls, config: Config, version_service: HsmKeyVersionService) -> Self:
         if config.oprf.hsm_url:
             return cls._hsm(config.oprf, version_service)
         return cls._local(config)
 
     @classmethod
-    def _hsm(
-        cls, config: ConfigOprf, version_service: HsmKeyVersionService
-    ) -> "KeyOperations":
+    def _hsm(cls, config: ConfigOprf, version_service: HsmKeyVersionService) -> Self:
         hsm_client = HsmClient(
             HttpService(
                 endpoint=f"{config.hsm_url}/hsm/{config.hsm_module}/{config.hsm_slot}",
@@ -93,7 +90,7 @@ class KeyOperations:
         )
 
     @classmethod
-    def _local(cls, config: Config) -> "KeyOperations":
+    def _local(cls, config: Config) -> Self:
         logger.info("HSM not configured, using keys derived from the master key")
         master_key = _load_master_key(config.pseudonym.master_key.get_secret_value())
         return cls(
