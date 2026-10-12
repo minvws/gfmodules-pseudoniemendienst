@@ -5,7 +5,7 @@ import pytest
 from gfmodules.logging import CORRELATION_ID_HEADER, bind_context
 from requests.exceptions import ConnectionError, Timeout
 
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 
 
 @pytest.fixture
