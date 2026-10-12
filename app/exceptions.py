@@ -75,3 +75,9 @@ class NoKeyVersionError(DomainError):
 
 class InvalidAudienceError(DomainError):
     message = "Unauthorized request"
+
+
+class UnauthorizedRequestError(DomainError):
+    """Malformed/missing proxy-verified headers, or a missing OAuth scope."""
+
+    message = "Unauthorized request"

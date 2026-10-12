@@ -25,6 +25,7 @@ from app.exceptions import (
     OrganizationNotRegisteredError,
     PublicKeyNotFoundError,
     RecipientNotFoundError,
+    UnauthorizedRequestError,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ STATUS_CODES: dict[type[DomainError], int] = {
     # The version exists and belongs to the caller; its state forbids the change.
     KeyVersionRemovedError: 409,
     NoKeyVersionError: 409,
+    UnauthorizedRequestError: 403,
 }
 
 

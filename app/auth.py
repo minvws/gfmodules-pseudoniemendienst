@@ -1,11 +1,12 @@
 import logging
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Security
+from fastapi import Depends, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
 
 from app import container
+from app.exceptions import UnauthorizedRequestError
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
@@ -30,9 +31,9 @@ def get_auth_ctx(
 ) -> AuthContext:
     try:
         auth_headers = AuthHeaders.from_request(request)
-    except ValueError:
+    except ValueError as e:
         logger.exception("Invalid Authorization Headers in request")
-        raise HTTPException(status_code=403, detail="Unauthorized request")
+        raise UnauthorizedRequestError() from e
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)
     claims = AuthenticationClaims(
@@ -55,7 +56,7 @@ def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
         logger.warning(
             "scope %s missing for request, granted scopes: %s", required.value, granted
         )
-        raise HTTPException(status_code=403, detail="Unauthorized request")
+        raise UnauthorizedRequestError()
     return ctx
 
 
