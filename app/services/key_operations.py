@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from app.config import Config, ConfigOprf
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 from app.services.irreversible.keys import (
     HsmIrreversibleKeyOperations,
     IrreversibleKeyOperations,

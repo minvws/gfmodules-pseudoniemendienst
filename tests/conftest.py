@@ -40,7 +40,7 @@ from app.models.auth.data import AuthorizationScope
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 from app.services.irreversible.keys import HsmIrreversibleKeyOperations
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.reversible.keys import HsmReversibleKeyOperations

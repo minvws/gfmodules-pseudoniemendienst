@@ -6,7 +6,7 @@ from app.services.auth.header import AuthHeaderService
 from app.services.authorization_service import AuthorizationService
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 from app.services.irreversible.service import IrreversiblePseudonymService
 from app.services.key_operations import KeyOperations
 from app.services.oprf.oprf_service import OprfService

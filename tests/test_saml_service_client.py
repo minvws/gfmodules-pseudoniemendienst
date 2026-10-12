@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from app.services.http_client import HttpService
+from app.services.http_service import HttpService
 from app.services.saml.client import SamlServiceClient, SamlServiceError
 
 
