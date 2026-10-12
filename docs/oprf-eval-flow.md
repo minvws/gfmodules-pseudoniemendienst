@@ -22,7 +22,7 @@ sequenceDiagram
     participant Ver as HsmKeyVersionService
     participant DB as Database
     participant HSM as HSM
-    participant JWE as BlindJwe
+    participant JWE as Jwe
 
     Client->>Router: POST /oprf/eval<br/>{encryptedPersonalId, recipientOrganization, recipientScope}
 

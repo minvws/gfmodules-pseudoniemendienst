@@ -16,7 +16,7 @@ from app.models.auth.data import AuthorizationScope
 from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.models.requests import ReversiblePseudonymExchangeRequest
 from app.services.authorization_service import AuthorizationService
-from app.services.oprf.jwe_token import BlindJwe
+from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.service import (
     ReversiblePseudonymError,
@@ -177,7 +177,7 @@ def exchange_reversible_pseudonym(
         status = 503 if e.error_type == "hsm_unreachable" else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 
-    jwe = BlindJwe.build(
+    jwe = Jwe.build(
         audience=doel_oin,
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
