@@ -16,6 +16,7 @@ from app.exceptions import (
     DomainAlreadyRegisteredError,
     DomainError,
     DomainNotRegisteredError,
+    ExchangeInputError,
     InvalidAudienceError,
     InvalidJwsError,
     KeyVersionNotFoundError,
@@ -46,6 +47,7 @@ STATUS_CODES: dict[type[DomainError], int] = {
     KeyVersionRemovedError: 409,
     NoKeyVersionError: 409,
     UnauthorizedRequestError: 403,
+    ExchangeInputError: 400,
 }
 
 

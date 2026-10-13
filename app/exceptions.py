@@ -92,3 +92,7 @@ class PseudonymOperationError(ValueError):
     def __init__(self, error_type: PseudonymErrorType, message: str) -> None:
         super().__init__(message)
         self.error_type = error_type
+
+
+class ExchangeInputError(DomainError):
+    message = "Exactly one of personalId or reversiblePseudonym must be provided"

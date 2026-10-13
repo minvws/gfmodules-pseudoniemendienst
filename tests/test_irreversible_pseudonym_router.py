@@ -45,6 +45,14 @@ BODY = {
 MakeRecipient = Callable[..., str]
 
 
+def _reversible_body(value: str) -> dict[str, str]:
+    return {
+        "reversiblePseudonym": value,
+        "recipientOrganization": RECIPIENT,
+        "recipientScope": SCOPE,
+    }
+
+
 @pytest.fixture
 def sender(make_organization: MakeOrganization) -> None:
     make_organization(SENDER_OIN, request=[PersonalIdType.IRREVERSIBLE_PSEUDONYM])
@@ -146,7 +154,16 @@ def test_pseudonym_differs_per_personal_id(
     assert _subject(one, priv_key)[1] != _subject(other, priv_key)[1]
 
 
+@pytest.mark.parametrize(
+    "as_input",
+    [
+        _reversible_body,
+        lambda value: _reversible_body(f"pseudonym:reversible:{value}"),
+    ],
+    ids=["bare", "as-received"],
+)
 def test_reversible_pseudonym_of_the_caller_is_accepted_as_input(
+    as_input: Callable[[str], dict[str, str]],
     client: TestClient,
     valid_headers: dict[str, str],
     make_organization: MakeOrganization,
@@ -167,7 +184,7 @@ def test_reversible_pseudonym_of_the_caller_is_accepted_as_input(
     from_personal_id = client.post(ENDPOINT, json=BODY, headers=valid_headers)
     from_pseudonym = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        json=as_input(reversible.value),
         headers=valid_headers,
     )
 
@@ -200,7 +217,7 @@ def test_reversible_pseudonym_of_another_organization_is_refused(
 
     response = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        json=_reversible_body(reversible.value),
         headers=valid_headers,
     )
 
@@ -238,7 +255,7 @@ def test_reversible_pseudonym_with_destroyed_key_version_is_gone(
 
     response = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": f"pseudonym:reversible:{reversible.value}"},
+        json=_reversible_body(reversible.value),
         headers=valid_headers,
     )
 
@@ -261,7 +278,7 @@ def test_garbage_reversible_pseudonym_is_refused(
 
     response = client.post(
         ENDPOINT,
-        json={**BODY, "personalId": "pseudonym:reversible:not-a-pseudonym"},
+        json=_reversible_body("not-a-pseudonym"),
         headers=valid_headers,
     )
 
@@ -377,11 +394,39 @@ def test_recipient_without_active_key_version_is_not_found(
 
 
 @pytest.mark.parametrize(
+    "fields",
+    [{}, {"personalId": f"NL:bsn:{BSN}", "reversiblePseudonym": "AQAB"}],
+    ids=["neither", "both"],
+)
+def test_not_exactly_one_input_is_rejected_without_echoing_it(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    sender: None,
+    make_recipient: MakeRecipient,
+    fields: dict[str, str],
+) -> None:
+    make_recipient()
+
+    response = client.post(
+        ENDPOINT,
+        json={**fields, "recipientOrganization": RECIPIENT, "recipientScope": SCOPE},
+        headers=valid_headers,
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Exactly one of personalId or reversiblePseudonym must be provided"
+    }
+    assert BSN not in response.text
+
+
+@pytest.mark.parametrize(
     "personal_id,kind",
     [
         ("NL:passport:950000012", "formaat"),
         ("NL:bsn:95000001", "lengte"),
         ("NL:bsn:950000013", "elfproef"),
+        ("pseudonym:reversible:AQAB", "formaat"),
     ],
 )
 def test_malformed_personal_id_is_rejected_and_audited_without_the_value(

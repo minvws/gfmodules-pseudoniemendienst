@@ -152,7 +152,30 @@ class BlindRequest(BaseModel):
         return normalized
 
 
-class ReversiblePseudonymExchangeRequest(BaseModel):
+_REVERSIBLE_PSEUDONYM_PREFIX = "pseudonym:reversible:"
+
+_PERSONAL_ID_DESCRIPTION = (
+    "Personal ID as `<landCode>:<type>:<value>` or as an object with "
+    "`landCode`, `type` and `value`."
+)
+
+_EXACTLY_ONE_INPUT_DESCRIPTION = (
+    "Exactly one of `personalId` or `reversiblePseudonym` must be provided."
+)
+
+
+class _PseudonymExchangeRequest(BaseModel):
+    recipientOrganization: RecipientOrganizationOin
+    recipientScope: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        pattern=r"^[^|]+$",
+        description="Scope of the recipient organization the pseudonym is bound to.",
+    )
+
+
+class ReversiblePseudonymExchangeRequest(_PseudonymExchangeRequest):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -177,24 +200,10 @@ class ReversiblePseudonymExchangeRequest(BaseModel):
     # Kept as received: the endpoint parses it after the authorization checks,
     # so a malformed value is reported as a 400 with an audit event instead of
     # a validation error that echoes the input back.
-    personalId: str | dict[str, str] = Field(
-        ...,
-        description=(
-            "Personal ID as `<landCode>:<type>:<value>` or as an object with "
-            "`landCode`, `type` and `value`."
-        ),
-    )
-    recipientOrganization: RecipientOrganizationOin
-    recipientScope: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        pattern=r"^[^|]+$",
-        description="Scope of the recipient organization the pseudonym is bound to.",
-    )
+    personalId: str | dict[str, str] = Field(..., description=_PERSONAL_ID_DESCRIPTION)
 
 
-class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
+class IrreversiblePseudonymExchangeRequest(_PseudonymExchangeRequest):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -204,7 +213,7 @@ class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
                     "recipientScope": "nvi",
                 },
                 {
-                    "personalId": "pseudonym:reversible:AQAB....",
+                    "reversiblePseudonym": "AQAB....",
                     "recipientOrganization": "oin:00000099000000001000",
                     "recipientScope": "nvi",
                 },
@@ -212,14 +221,26 @@ class IrreversiblePseudonymExchangeRequest(ReversiblePseudonymExchangeRequest):
         },
     )
 
-    personalId: str | dict[str, str] = Field(
-        ...,
+    personalId: str | dict[str, str] | None = Field(
+        default=None,
+        description=f"{_PERSONAL_ID_DESCRIPTION} {_EXACTLY_ONE_INPUT_DESCRIPTION}",
+    )
+    reversiblePseudonym: str | None = Field(
+        default=None,
         description=(
-            "Personal ID as `<landCode>:<type>:<value>` or as an object with "
-            "`landCode`, `type` and `value`; or a reversible pseudonym "
-            "(`pseudonym:reversible:<...>`) issued to the calling organization."
+            "A reversible pseudonym issued to the calling organization, as the "
+            "bare value or as received in the JWE `subject` "
+            "(`pseudonym:reversible:<value>`). The PRS reverses it first. "
+            f"{_EXACTLY_ONE_INPUT_DESCRIPTION}"
         ),
     )
+
+    @field_validator("reversiblePseudonym")
+    @classmethod
+    def strip_reversible_prefix(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.removeprefix(_REVERSIBLE_PSEUDONYM_PREFIX)
 
 
 class JweReceiverRequest(BaseModel):
