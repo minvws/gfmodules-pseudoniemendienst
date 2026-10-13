@@ -3,7 +3,7 @@ import secrets
 
 import pytest
 
-from app.container import _load_master_key
+from app.services.key_operations import _load_master_key
 
 
 def test_load_master_key_rejects_empty() -> None:

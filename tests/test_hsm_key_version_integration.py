@@ -15,7 +15,7 @@ import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from conftest import generate_rsa_keypair
+from conftest import generate_rsa_keypair, hsm_client
 from fastapi import FastAPI
 from jwcrypto import jwe as jwelib
 from jwcrypto import jwk
@@ -23,7 +23,6 @@ from jwcrypto.jwk import JWK
 from starlette.testclient import TestClient
 
 from app import container
-from app.config import ConfigOprf
 from app.db.db import Database
 from app.db.models import OrganizationEntity, OrganizationPublicKeyEntity
 from app.db.session import DbSession
@@ -101,7 +100,7 @@ def test_new_key_version_is_added_to_jwe(
     # versions from the same database the endpoint writes to.
     hsm_oprf = OprfService(
         evaluator=HsmOprfEvaluator(
-            hsm_config=ConfigOprf(hsm_url="https://hsm.local"),
+            client=hsm_client(),
             hsm_key_version_service=HsmKeyVersionService(database),
         )
     )

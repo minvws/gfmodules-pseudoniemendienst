@@ -9,7 +9,7 @@ import gfmodules.logging as gflog
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from app.logging.events import SLEUTELTYPE_REVERSIBLE_KEY, Log
+from app.logging.events import KEY_TYPE_REVERSIBLE_KEY, Log
 from app.models.oin import Oin
 from app.services.hkdf import hkdf_derive
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
@@ -126,7 +126,7 @@ class HsmReversibleKeyOperations(ReversibleKeyOperations):
                 Log.KEY_GENERATED,
                 "reversible pseudonym key generated in HSM",
                 fields={
-                    "sleuteltype": SLEUTELTYPE_REVERSIBLE_KEY,
+                    "key_type": KEY_TYPE_REVERSIBLE_KEY,
                     "organisatie_oin": oin.value,
                     "secret_id": str(label),
                     "sleutel_versie": version,

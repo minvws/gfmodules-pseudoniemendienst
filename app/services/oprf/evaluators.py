@@ -5,8 +5,7 @@ from typing import Protocol
 import gfmodules.logging as gflog
 import pyoprf
 
-from app.config import ConfigOprf
-from app.logging.events import SLEUTELTYPE_OPRF_SECRET, Log
+from app.logging.events import KEY_TYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -50,10 +49,10 @@ class LocalOprfEvaluator(OprfEvaluator):
 class HsmOprfEvaluator(OprfEvaluator):
     def __init__(
         self,
-        hsm_config: ConfigOprf,
+        client: HsmClient,
         hsm_key_version_service: HsmKeyVersionService,
     ):
-        self._client = HsmClient(hsm_config)
+        self._client = client
         self._hsm_key_version_service = hsm_key_version_service
 
     def evaluate(
@@ -90,7 +89,7 @@ class HsmOprfEvaluator(OprfEvaluator):
             Log.KEY_GENERATED,
             "OPRF secret generated in HSM",
             fields={
-                "sleuteltype": SLEUTELTYPE_OPRF_SECRET,
+                "key_type": KEY_TYPE_OPRF_SECRET,
                 "organisatie_oin": label.oin.value,
                 "secret_id": str(label),
                 "sleutel_versie": label.version,
