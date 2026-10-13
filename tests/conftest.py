@@ -14,7 +14,7 @@ from app.enums.personal_id_type import PersonalIdType
 from app.models.oin import Oin
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
-os.environ["FASTAPI_CONFIG_PATH"] = "./app.test.conf"
+os.environ.setdefault("FASTAPI_CONFIG_PATH", "./app.test.conf")
 
 import base64
 import secrets
