@@ -29,6 +29,25 @@ DETAIL_TEXT = "Unable to evaluate blind"
     "/oprf/eval",
     summary="Evaluate OPRF blind and returns an encrypted JWE for the organization",
     tags=["OPRF Services"],
+    responses={
+        400: {"description": "The blinded input is invalid."},
+        403: {
+            "description": (
+                "Insufficient scope (the token requires `prs:oprf-pseudonym`), the "
+                "calling organization is not registered, or it is not allowed to "
+                "request OPRF pseudonyms."
+            )
+        },
+        404: {
+            "description": (
+                "The recipient organization is unknown, is not allowed to receive "
+                "OPRF pseudonyms, has no public key registered for the scope, or "
+                "has no active HSM key version."
+            )
+        },
+        500: {"description": "The evaluation failed on the server side."},
+        503: {"description": "The HSM could not be reached; retry later."},
+    },
 )
 def post_eval(
     req: BlindRequest,
