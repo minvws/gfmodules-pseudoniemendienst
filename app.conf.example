@@ -52,28 +52,28 @@ ssl_key_file = server.key
 # The root path if behind a proxy
 root_path =
 
-[oprf]
-# Local key fallback: file with base64 server key (used when hsm_url is not set)
-server_key_file=secrets/oprf-server.key
-# HSM API: when set, evaluation is delegated to the HSM API instead of the local key
-# hsm_url=https://localhost:8443
-# hsm_module=softhsm
-# hsm_slot=SoftHSMLabel
-# hsm_cert_file=secrets/prs-use.crt
-# hsm_key_file=secrets/prs-use.key
-# hsm_ca_cert_file=secrets/hsm-ca.crt
+[hsm]
+# When url is set HSM is used instead of the local keys
+url=https://localhost:8443
+module=softhsm
+slot=SoftHSMLabel
+timeout=10
+# cert_file=secrets/prs-use.crt
+# key_file=secrets/prs-use.key
+# ca_cert_file=secrets/hsm-ca.crt
 
-[pseudonym]
+[local_keys]
+# Keys for dev and testing, used when [hsm] url is not set
 # Master key for hkdf
 master_key=
+# File with base64 OPRF server key
+oprf_server_key_file=secrets/oprf-server.key
 
 [saml_service]
 # Base URL of the internal PRS-SAML service; required when enable_saml_exchange_routes is set
 url=http://localhost:8504
 timeout=5
-# mTLS towards the PRS-SAML service: client certificate/key presented to the
-# service, and the internal CA its server certificate must chain to.
-# Leave unset for plain HTTP in local development.
+# Leave mTLS unset for plain HTTP in local development.
 # cert_file=secrets/prs-saml/client.crt
 # key_file=secrets/prs-saml/client.key
 # ca_cert_file=secrets/prs-saml/ca.crt

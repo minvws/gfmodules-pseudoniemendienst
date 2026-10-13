@@ -19,7 +19,7 @@ not yet marked `removed`, the program:
 2. Marks the version as `removed` in the database.
 
 If the HSM call fails for a version, that version is left untouched so the next
-run retries it. When the HSM is not configured (`oprf.hsm_url` unset) the program
+run retries it. When the HSM is not configured (`hsm.url` unset) the program
 does nothing and exits successfully.
 
 ## Running it

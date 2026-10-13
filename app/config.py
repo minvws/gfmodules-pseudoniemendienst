@@ -6,7 +6,7 @@ from typing import Any
 
 from gfmodules.logging import ConfigLogging as GFConfigLogging
 from gfmodules.logging.ini import split_comma_separated
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 _PATH = "app.conf"
 _ENVIRONMENT_CONFIG_PATH_NAME = "FASTAPI_CONFIG_PATH"
@@ -81,19 +81,24 @@ class ConfigUvicorn(BaseModel):
     root_path: str = Field(default="")
 
 
-class ConfigOprf(BaseModel):
-    server_key_file: str = Field(default="")
-    hsm_url: str | None = Field(default=None)
-    hsm_module: str = Field(default="softhsm")
-    hsm_slot: str = Field(default="SoftHSMLabel")
-    hsm_cert_file: str | None = Field(default=None)
-    hsm_key_file: str | None = Field(default=None)
-    hsm_ca_cert_file: str | None = Field(default=None)
+class ConfigHsm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str | None = Field(default=None)
+    module: str = Field(default="softhsm")
+    slot: str = Field(default="SoftHSMLabel")
+    timeout: float = Field(default=10.0, gt=0)
+    cert_file: str | None = Field(default=None)
+    key_file: str | None = Field(default=None)
+    ca_cert_file: str | None = Field(default=None)
 
 
-class ConfigPseudonym(BaseModel):
+class ConfigLocalKeys(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # SecretStr so the key material never appears in reprs or logs
     master_key: SecretStr = Field(default=SecretStr(""))
+    oprf_server_key_file: str = Field(default="")
 
 
 class ConfigSamlService(BaseModel):
@@ -101,10 +106,8 @@ class ConfigSamlService(BaseModel):
     # when enable_saml_exchange_routes is set.
     url: str | None = Field(default=None)
     timeout: float = Field(default=5.0, gt=0)
-    # mTLS towards the PRS-SAML service, mirroring the [oprf] hsm_* fields:
-    # client certificate/key presented to the service, and the internal CA used
-    # to verify its server certificate. Leave unset for plain HTTP in local
-    # development.
+    # mTLS towards the PRS-SAML service.
+    # Leave unset for plain HTTP in local development.
     cert_file: str | None = Field(default=None)
     key_file: str | None = Field(default=None)
     ca_cert_file: str | None = Field(default=None)
@@ -132,12 +135,14 @@ class ConfigLogging(GFConfigLogging):
 
 
 class Config(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     app: ConfigApp
     logging: ConfigLogging = Field(default_factory=ConfigLogging)
     database: ConfigDatabase
     uvicorn: ConfigUvicorn
-    oprf: ConfigOprf
-    pseudonym: ConfigPseudonym
+    hsm: ConfigHsm = Field(default_factory=ConfigHsm)
+    local_keys: ConfigLocalKeys = Field(default_factory=ConfigLocalKeys)
     authorization_headers: ConfigAuthorizationHeaders
     saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
 
