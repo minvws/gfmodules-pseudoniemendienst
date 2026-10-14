@@ -1,6 +1,5 @@
 [app]
 loglevel=debug
-mtls_override_cert=
 # Enable the /test routes
 enable_test_routes=True
 # Enable the exchange service routes (/exchange/*)
