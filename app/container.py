@@ -40,7 +40,7 @@ def container_config(binder: inject.Binder) -> None:
     key_operations = KeyOperations.from_config(config, hsm_key_version_service)
 
     jwe = Jwe(
-        JwtSigningKeys.from_config(config.jwt_signing)
+        JwtSigningKeys.from_config(config.jwt_signing, key_operations.hsm_client)
         if config.app.enable_jwt_signing
         else None
     )

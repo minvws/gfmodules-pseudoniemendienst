@@ -152,6 +152,32 @@ class HsmClient:
         )
         return base64.b64decode(result["result"]["data"])
 
+    def public_key_pem(self, label: str) -> str:
+        """The PEM public key of the key pair with this label."""
+        data = self.post("", {"label": label, "objtype": "PUBLIC_KEY"}, "lookup")
+        objects = data["objects"] or []
+        if not objects or "publickey" not in objects[0]:
+            raise HsmKeyNotFound(f"No public key with label {label!r}")
+        return str(objects[0]["publickey"])
+
+    def sign_rsa_pss_sha256(self, label: str, digest: bytes) -> bytes:
+        """
+        RSA-PSS over a SHA-256 digest computed by the caller; the HSM API uses
+        MGF1-SHA256 and a 32 byte salt for hashmethod sha256, as PS256 needs.
+        """
+        result = self.post(
+            "/sign",
+            {
+                "label": label,
+                "objtype": "PRIVATE_KEY",
+                "data": base64.b64encode(digest).decode(),
+                "mechanism": "RSA_PKCS_PSS",
+                "hashmethod": "sha256",
+            },
+            "sign",
+        )
+        return base64.b64decode(result["result"])
+
     def encrypt(self, label: str, iv: bytes, data: bytes) -> bytes:
         """AES-CBC with PKCS#7 padding, the HSM API default."""
         result = self.post(

@@ -117,13 +117,20 @@ class ConfigJwtSigning(BaseModel):
     # The `iss` claim in signed pseudonym JWTs. Receivers map it to the PRS
     # JWKS URL in their own configuration. Required when enable_jwt_signing is set.
     issuer: str = Field(default="")
-    # PEM files with the RSA private keys for signing pseudonym JWTs. All of
-    # them are published for verification; only active_key_file signs.
-    # Required when enable_jwt_signing is set.
+    # Signing keys: PEM files with RSA private keys and/or labels of RSA key
+    # pairs in the HSM. key_files and hsm_key_labels are comma separated lists
+    # in the conf file. All keys are published for verification; only the one
+    # named by active_key_file or active_key_label (a single entry from its
+    # list) signs. At least one key is required when enable_jwt_signing is set.
     key_files: list[str] = Field(default=[])
     active_key_file: str = Field(default="")
+    hsm_key_labels: list[str] = Field(default=[])
+    active_key_label: str = Field(default="")
 
     _split_key_files = field_validator("key_files", mode="before")(
+        split_comma_separated()
+    )
+    _split_hsm_key_labels = field_validator("hsm_key_labels", mode="before")(
         split_comma_separated()
     )
 
