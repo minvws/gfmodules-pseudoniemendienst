@@ -105,6 +105,7 @@ def exchange_personal_id(
         ReversiblePseudonymService,
         Depends(container.get_reversible_pseudonym_service),
     ],
+    jwe: Annotated[Jwe, Depends(container.get_jwe)],
 ) -> Response:
     authorize_exchange(
         logger,
@@ -138,7 +139,7 @@ def exchange_personal_id(
         )
         raise
 
-    jwe = Jwe.build(
+    token = jwe.build(
         audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=reversed_pseudonym.personal_id.as_str(),
@@ -156,4 +157,4 @@ def exchange_personal_id(
             "ontvanger_pubkey_id": public_key.jwk.get("kid"),
         },
     )
-    return Response(status_code=201, content=jwe, media_type="application/jwe")
+    return Response(status_code=201, content=token, media_type="application/jwe")

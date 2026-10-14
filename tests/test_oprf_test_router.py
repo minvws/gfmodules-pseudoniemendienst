@@ -1,11 +1,17 @@
 from dataclasses import dataclass
 
 import pytest
-from conftest import generate_rsa_keypair, setup_org_and_key
+from conftest import (
+    JWT_ISSUER,
+    decrypt_signed,
+    generate_rsa_keypair,
+    setup_org_and_key,
+)
 from starlette.testclient import TestClient
 
 from app.db.models import OrganizationEntity
 from app.models.oin import Oin
+from app.services.jwt_signer import JwtSigningKeys
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 
@@ -93,6 +99,58 @@ def test_test_oprf_client_and_receiver_roundtrip(
     assert body["jwe"]["decrypted"]["scope"] == oprf_test_router_context.recipient_scope
     assert body["eval_subject"]
     assert body["final_pseudonym"]
+    assert body["jwe"]["headers"]["cty"] == "application/json"
+    assert body["jws"] is None
+
+
+def test_with_jwt_signing_oprf_eval_is_signed_and_test_routes_verify_it(
+    client: TestClient,
+    oprf_test_router_context: OprfTestRouterContext,
+    valid_headers: dict[str, str],
+    jwt_signing: JwtSigningKeys,
+) -> None:
+    ctx = oprf_test_router_context
+    blinded = client.post(
+        "/test/oprf/client", json={"personalId": ctx.oprf_input}, headers=valid_headers
+    ).json()
+    eval_response = client.post(
+        "/oprf/eval",
+        json={
+            "encryptedPersonalId": blinded["blinded_input"],
+            "recipientOrganization": ctx.recipient_organization,
+            "recipientScope": ctx.recipient_scope,
+        },
+        headers=valid_headers,
+    )
+    assert eval_response.status_code == 200
+    jwe_token = eval_response.json()["jwe"]
+
+    _, _, claims = decrypt_signed(jwe_token, ctx.private_key_pem, jwt_signing)
+    assert claims["iss"] == JWT_ISSUER
+    assert claims["subject"].startswith("pseudonym:eval:")
+
+    receiver = client.post(
+        "/test/oprf/receiver",
+        json={
+            "blind_factor": blinded["blind_factor"],
+            "jwe": jwe_token,
+            "priv_key_pem": ctx.private_key_pem,
+        },
+        headers=valid_headers,
+    ).json()
+    assert receiver["jwe"]["headers"]["cty"] == "JWT"
+    assert receiver["jws"]["headers"]["kid"] == jwt_signing.active.kid
+    assert receiver["jws"]["signature"] == "valid"
+    assert receiver["jwe"]["decrypted"]["iss"] == JWT_ISSUER
+    assert receiver["final_pseudonym"]
+
+    decoded = client.post(
+        "/test/jwe/decode",
+        json={"jwe": jwe_token, "priv_key_pem": ctx.private_key_pem},
+        headers=valid_headers,
+    ).json()
+    assert decoded["jws"]["signature"] == "valid"
+    assert decoded["jwe"]["decrypted"]["subject"] == claims["subject"]
 
 
 def test_test_oprf_receiver_incorrect_private_key(

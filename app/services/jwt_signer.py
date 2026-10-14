@@ -90,11 +90,17 @@ class JwtSigningKeys:
     published so tokens they signed can still be verified during rotation.
     """
 
+    issuer: str
     active: JwtSigner
     signers: tuple[JwtSigner, ...]
 
     @classmethod
     def from_config(cls, config: ConfigJwtSigning) -> Self:
+        if not config.issuer:
+            raise ValueError(
+                "jwt_signing.issuer is not configured. It is required when "
+                "enable_jwt_signing is set."
+            )
         if not config.key_files:
             raise ValueError(
                 "jwt_signing.key_files is not configured. It is required when "
@@ -120,7 +126,7 @@ class JwtSigningKeys:
             len(signers),
             active.kid,
         )
-        return cls(active=active, signers=tuple(signers.values()))
+        return cls(issuer=config.issuer, active=active, signers=tuple(signers.values()))
 
     def public_jwks(self) -> list[dict[str, Any]]:
         return [signer.public_jwk() for signer in self.signers]

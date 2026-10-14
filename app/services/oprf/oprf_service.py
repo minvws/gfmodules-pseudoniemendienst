@@ -43,8 +43,9 @@ class OprfEvalResult:
 
 
 class OprfService:
-    def __init__(self, evaluator: OprfEvaluator):
+    def __init__(self, evaluator: OprfEvaluator, jwe: Jwe | None = None):
         self.__evaluator = evaluator
+        self.__jwe = jwe or Jwe()
 
     @staticmethod
     def generate_server_key() -> str:
@@ -106,7 +107,7 @@ class OprfService:
             if version != latest
         }
 
-        jwe = Jwe.build(
+        jwe = self.__jwe.build(
             audience=str(req.recipientOrganization),
             scope=req.recipientScope,
             subject=subject,

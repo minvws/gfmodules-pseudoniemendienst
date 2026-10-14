@@ -116,6 +116,7 @@ def exchange_reversible_pseudonym(
         ReversiblePseudonymService,
         Depends(container.get_reversible_pseudonym_service),
     ],
+    jwe: Annotated[Jwe, Depends(container.get_jwe)],
 ) -> Response:
     authorize_exchange(
         logger,
@@ -154,7 +155,7 @@ def exchange_reversible_pseudonym(
         log_pseudonym_failure(logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED)
         raise
 
-    jwe = Jwe.build(
+    token = jwe.build(
         audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=REVERSIBLE_PSEUDONYM_PREFIX + pseudonym.value,
@@ -172,4 +173,4 @@ def exchange_reversible_pseudonym(
             "sleutel_versie": pseudonym.version,
         },
     )
-    return Response(status_code=201, content=jwe, media_type="application/jwe")
+    return Response(status_code=201, content=token, media_type="application/jwe")
