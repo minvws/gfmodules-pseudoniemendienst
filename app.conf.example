@@ -54,10 +54,10 @@ root_path =
 
 [hsm]
 # When url is set HSM is used instead of the local keys
-url=https://localhost:8443
-module=softhsm
-slot=SoftHSMLabel
-timeout=10
+# url=https://localhost:8443
+# module=softhsm
+# slot=SoftHSMLabel
+# timeout=10
 # cert_file=secrets/prs-use.crt
 # key_file=secrets/prs-use.key
 # ca_cert_file=secrets/hsm-ca.crt

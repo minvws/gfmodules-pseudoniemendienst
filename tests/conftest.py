@@ -70,6 +70,8 @@ def hsm_key_cleanup_service(database: Database) -> HsmKeyCleanupService:
 
 conf = get_config()
 oprf_path = conf.local_keys.oprf_server_key_file
+if oprf_path is None:
+    raise ValueError("Set oprf_server_key_file in test config")
 if not os.path.exists(oprf_path):
     os.makedirs("secrets", exist_ok=True)
     with open(oprf_path, "w") as f:

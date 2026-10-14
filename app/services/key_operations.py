@@ -45,7 +45,9 @@ def _load_master_key(raw: str) -> bytes:
     return key
 
 
-def _load_server_key(path: str) -> bytes:
+def _load_server_key(path: str | None) -> bytes:
+    if path is None:
+        raise ValueError("OPRF server key path is empty.")
     try:
         with open(path, "r") as f:
             key = f.read().strip()
