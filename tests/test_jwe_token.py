@@ -83,8 +83,9 @@ def test_signature_does_not_verify_with_another_key(
 
     inner = jws.JWS()
     inner.deserialize(outer.payload.decode("ascii"))
+    other_public = jwk.JWK(**other.export_public(as_dict=True))
     with pytest.raises(jws.InvalidJWSSignature):
-        inner.verify(jwk.JWK(**other.export_public(as_dict=True)), alg="PS256")
+        inner.verify(other_public, alg="PS256")
 
 
 def test_extra_claims_cannot_override_the_issuer(

@@ -22,11 +22,11 @@ the plaintext is the claims as JSON.
 
 The inner JWS header:
 
-| Header | Value                                                                              |
-|--------|------------------------------------------------------------------------------------|
-| `alg`  | Always `PS256`                                                                     |
-| `kid`  | The RFC 7638 thumbprint of the signing key; selects the key in the JWKS            |
-| `typ`  | `JWT`                                                                              |
+| Header | Value                                                                   |
+| ------ | ----------------------------------------------------------------------- |
+| `alg`  | Always `PS256`                                                          |
+| `kid`  | The RFC 7638 thumbprint of the signing key; selects the key in the JWKS |
+| `typ`  | `JWT`                                                                   |
 
 The claims are the same as in an unsigned token, plus `iss`:
 
@@ -43,14 +43,14 @@ The claims are the same as in an unsigned token, plus `iss`:
 }
 ```
 
-| Claim           | Meaning                                                                                              |
-|-----------------|------------------------------------------------------------------------------------------------------|
-| `iss`           | The PRS, from `jwt_signing.issuer`. Set by the PRS last, so no other claim can override it          |
-| `aud`           | The recipient organization, `oin:<20 digits>`                                                        |
-| `scope`         | The recipient scope the token was made for                                                           |
-| `subject`       | The pseudonym: `pseudonym:eval:`, `pseudonym:reversible:` or `pseudonym:irreversible:` plus the value |
-| `iat`, `exp`    | Issued at and expiry; tokens are valid for five minutes                                              |
-| `keyVersion`    | The recipient's key version the pseudonym was made with (exchange endpoints)                         |
+| Claim           | Meaning                                                                                                     |
+| --------------- | ----------------------------------------------------------------------------------------------------------- |
+| `iss`           | The PRS, from `jwt_signing.issuer`. Set by the PRS last, so no other claim can override it                  |
+| `aud`           | The recipient organization, `oin:<20 digits>`                                                               |
+| `scope`         | The recipient scope the token was made for                                                                  |
+| `subject`       | The pseudonym: `pseudonym:eval:`, `pseudonym:reversible:` or `pseudonym:irreversible:` plus the value       |
+| `iat`, `exp`    | Issued at and expiry; tokens are valid for five minutes                                                     |
+| `keyVersion`    | The recipient's key version the pseudonym was made with (exchange endpoints)                                |
 | `extraVersions` | During a key rotation, the pseudonym or evaluation per older key version (see [endpoints.md](endpoints.md)) |
 
 ## Why PS256
@@ -194,10 +194,10 @@ In the HSM, through the HSM API (as an administrator):
 
 ```shell
 POST {hsm_url}/hsm/{module}/{slot}/generate/rsa
-{"label": "prs-jwt-2026-10", "bits": 3072}
+{"label": "prs-jwt-2026-10", "bits": 4096}
 ```
 
-Any size of at least 3072 bits works; larger keys make signing slower.
+Any size of at least 4096 bits works; larger keys make signing slower.
 
 The PRS reads the public key from the HSM at startup and signs through `/sign` with `RSA_PKCS_PSS`; the private key
 never leaves the HSM.
