@@ -79,7 +79,7 @@ oprf_server_key_file=secrets/oprf-server.key
 # signs. Set exactly one of the two.
 #
 # key_files: comma separated list of PEM files with RSA private keys, e.g. from
-# `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096`.
+# `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072`.
 # active_key_file: one path, exactly as written in key_files.
 # key_files=secrets/jwt-signing-1.pem, secrets/jwt-signing-2.pem
 # active_key_file=secrets/jwt-signing-2.pem
