@@ -8,6 +8,8 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
 from app.services.irreversible.service import IrreversiblePseudonymService
+from app.services.jwks.keys import JwksLocalKeyService
+from app.services.jwks.service import JwksService
 from app.services.key_operations import KeyOperations
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -26,6 +28,10 @@ def container_config(binder: inject.Binder) -> None:
 
     authorization_service = AuthorizationService(db)
     binder.bind(AuthorizationService, authorization_service)
+
+    jwks_key_service = JwksLocalKeyService.from_config(config.jwks)
+    jwks_service = JwksService(jwks_key_service=jwks_key_service)
+    binder.bind(JwksService, jwks_service)
 
     hsm_key_version_service = HsmKeyVersionService(db)
     binder.bind(HsmKeyVersionService, hsm_key_version_service)
@@ -82,6 +88,10 @@ def get_organization_public_key_service() -> OrganizationPublicKeyService:
 
 def get_authorization_service() -> AuthorizationService:
     return inject.instance(AuthorizationService)
+
+
+def get_jwks_service() -> JwksService:
+    return inject.instance(JwksService)
 
 
 def get_reversible_pseudonym_service() -> ReversiblePseudonymService:

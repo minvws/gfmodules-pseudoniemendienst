@@ -28,6 +28,7 @@ from app.routers.oprf import router as oprf_router
 from app.routers.reversible_pseudonym import router as reversible_pseudonym_router
 from app.routers.saml_exchange import router as saml_exchange_router
 from app.routers.test_oprf import router as test_oprf_router
+from app.routers.well_known import router as well_known_router
 from app.utils.version import load_version_json
 
 logger = logging.getLogger(__name__)
@@ -351,10 +352,7 @@ def setup_fastapi() -> FastAPI:
     install_domain_error_handler(fastapi)
 
     # Non-OAuth routes
-    public_routers = [
-        default_router,
-        health_router,
-    ]
+    public_routers = [default_router, health_router, well_known_router]
     for router in public_routers:
         fastapi.include_router(router)
 

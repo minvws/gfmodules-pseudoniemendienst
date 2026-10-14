@@ -112,6 +112,11 @@ class ConfigSamlService(BaseModel):
     ca_cert_file: str | None = Field(default=None)
 
 
+class ConfigJkws(BaseModel):
+    signing_cert_path: str | None = Field(default=None)
+    decryption_cert_path: str | None = Field(default=None)
+
+
 class ConfigAuthorizationHeaders(BaseModel):
     expected_audiences: list[str]
 
@@ -144,6 +149,7 @@ class Config(BaseModel):
     local_keys: ConfigLocalKeys = Field(default_factory=ConfigLocalKeys)
     authorization_headers: ConfigAuthorizationHeaders
     saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
+    jwks: ConfigJkws
 
 
 def read_ini_file(path: str) -> Any:
