@@ -98,7 +98,7 @@ class ConfigLocalKeys(BaseModel):
 
     # SecretStr so the key material never appears in reprs or logs
     master_key: SecretStr = Field(default=SecretStr(""))
-    oprf_server_key_file: str = Field(default="")
+    oprf_server_key_file: str | None = Field(default=None)
 
 
 class ConfigSamlService(BaseModel):
