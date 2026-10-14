@@ -69,14 +69,16 @@ def hsm_key_cleanup_service(database: Database) -> HsmKeyCleanupService:
 
 
 conf = get_config()
-oprf_path = conf.oprf.server_key_file
+oprf_path = conf.local_keys.oprf_server_key_file
+if oprf_path is None:
+    raise ValueError("Set oprf_server_key_file in test config")
 if not os.path.exists(oprf_path):
     os.makedirs("secrets", exist_ok=True)
     with open(oprf_path, "w") as f:
         f.write(genkey(32))
 
-if not conf.pseudonym.master_key.get_secret_value():
-    conf.pseudonym.master_key = SecretStr(genkey(32))
+if not conf.local_keys.master_key.get_secret_value():
+    conf.local_keys.master_key = SecretStr(genkey(32))
 set_config(conf)
 
 
