@@ -72,11 +72,21 @@ master_key=
 [jwt_signing]
 # The `iss` claim in signed pseudonym JWTs; receivers map it to the PRS JWKS URL
 # issuer=https://pseudoniemendienst.example.nl
-# Comma separated PEM files with RSA private keys (at least 3072 bits), e.g.
-# `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096`. All keys are
-# published for verification; only active_key_file signs.
-# key_files=secrets/jwt-signing-1.pem
-# active_key_file=secrets/jwt-signing-1.pem
+# Signing keys, RSA of at least 3072 bits. Every key in key_files and
+# hsm_key_labels is published at /.well-known/jwks (one entry per key, each with
+# its own kid); only the single key named by active_key_file OR active_key_label
+# signs. Set exactly one of the two.
+#
+# key_files: comma separated list of PEM files with RSA private keys, e.g. from
+# `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096`.
+# active_key_file: one path, exactly as written in key_files.
+# key_files=secrets/jwt-signing-1.pem, secrets/jwt-signing-2.pem
+# active_key_file=secrets/jwt-signing-2.pem
+#
+# hsm_key_labels: comma separated list of labels of RSA key pairs in the HSM.
+# active_key_label: one label from hsm_key_labels.
+# hsm_key_labels=prs-jwt-2026-10, prs-jwt-2027-01
+# active_key_label=prs-jwt-2027-01
 
 [saml_service]
 # Base URL of the internal PRS-SAML service; required when enable_saml_exchange_routes is set

@@ -65,6 +65,7 @@ class KeyOperations:
     oprf_evaluator: OprfEvaluator
     reversible_keys: ReversibleKeyOperations
     irreversible_keys: IrreversibleKeyOperations
+    hsm_client: HsmClient | None = None
 
     @classmethod
     def from_config(cls, config: Config, version_service: HsmKeyVersionService) -> Self:
@@ -87,6 +88,7 @@ class KeyOperations:
             oprf_evaluator=HsmOprfEvaluator(hsm_client, version_service),
             reversible_keys=HsmReversibleKeyOperations(hsm_client),
             irreversible_keys=HsmIrreversibleKeyOperations(hsm_client),
+            hsm_client=hsm_client,
         )
 
     @classmethod
