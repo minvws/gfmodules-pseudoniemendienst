@@ -70,6 +70,8 @@ server_key_file=secrets/oprf-server.key
 master_key=
 
 [jwt_signing]
+# The `iss` claim in signed pseudonym JWTs; receivers map it to the PRS JWKS URL
+# issuer=https://pseudoniemendienst.example.nl
 # Comma separated PEM files with RSA private keys (at least 3072 bits), e.g.
 # `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096`. All keys are
 # published for verification; only active_key_file signs.

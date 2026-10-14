@@ -90,10 +90,15 @@ def test_from_config_uses_active_key_and_publishes_all(
 
     keys = JwtSigningKeys.from_config(
         ConfigJwtSigning.model_validate(
-            {"key_files": f"{old}, {new}", "active_key_file": new}
+            {
+                "issuer": "https://prs.test",
+                "key_files": f"{old}, {new}",
+                "active_key_file": new,
+            }
         )
     )
 
+    assert keys.issuer == "https://prs.test"
     assert keys.active.kid == LocalJwtSigner(other_rsa_key).kid
     assert [k["kid"] for k in keys.public_jwks()] == [
         LocalJwtSigner(rsa_key).kid,
@@ -101,9 +106,14 @@ def test_from_config_uses_active_key_and_publishes_all(
     ]
 
 
+def test_from_config_requires_issuer() -> None:
+    with pytest.raises(ValueError, match="issuer is not configured"):
+        JwtSigningKeys.from_config(ConfigJwtSigning())
+
+
 def test_from_config_requires_key_files() -> None:
     with pytest.raises(ValueError, match="key_files is not configured"):
-        JwtSigningKeys.from_config(ConfigJwtSigning())
+        JwtSigningKeys.from_config(ConfigJwtSigning(issuer="https://prs.test"))
 
 
 def test_from_config_requires_active_key_in_key_files(
@@ -112,7 +122,11 @@ def test_from_config_requires_active_key_in_key_files(
     path = _write_pem(tmp_path / "key.pem", rsa_key)
     with pytest.raises(ValueError, match="active_key_file must be one of"):
         JwtSigningKeys.from_config(
-            ConfigJwtSigning(key_files=[path], active_key_file="other.pem")
+            ConfigJwtSigning(
+                issuer="https://prs.test",
+                key_files=[path],
+                active_key_file="other.pem",
+            )
         )
 
 
@@ -123,5 +137,9 @@ def test_from_config_rejects_same_key_twice(
     second = _write_pem(tmp_path / "b.pem", rsa_key)
     with pytest.raises(ValueError, match="configured more than once"):
         JwtSigningKeys.from_config(
-            ConfigJwtSigning(key_files=[first, second], active_key_file=first)
+            ConfigJwtSigning(
+                issuer="https://prs.test",
+                key_files=[first, second],
+                active_key_file=first,
+            )
         )

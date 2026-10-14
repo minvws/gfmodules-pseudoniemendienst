@@ -112,6 +112,9 @@ class ConfigSamlService(BaseModel):
 
 
 class ConfigJwtSigning(BaseModel):
+    # The `iss` claim in signed pseudonym JWTs. Receivers map it to the PRS
+    # JWKS URL in their own configuration. Required when enable_jwt_signing is set.
+    issuer: str = Field(default="")
     # PEM files with the RSA private keys for signing pseudonym JWTs. All of
     # them are published for verification; only active_key_file signs.
     # Required when enable_jwt_signing is set.

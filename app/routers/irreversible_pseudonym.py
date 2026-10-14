@@ -123,6 +123,7 @@ def exchange_irreversible_pseudonym(
         ReversiblePseudonymService,
         Depends(container.get_reversible_pseudonym_service),
     ],
+    jwe: Annotated[Jwe, Depends(container.get_jwe)],
 ) -> Response:
     handelende_oin = str(auth.claims.client_organization_id)
     namens_oin = str(auth.claims.organization_id)
@@ -231,7 +232,7 @@ def exchange_irreversible_pseudonym(
         extra_claims["extraVersions"] = {
             str(version): value for version, value in sorted(pseudonym.older)
         }
-    jwe = Jwe.build(
+    token = jwe.build(
         audience=doel_oin,
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
@@ -264,4 +265,4 @@ def exchange_irreversible_pseudonym(
                 "sleutel_versie": pseudonym.version,
             },
         )
-    return Response(status_code=201, content=jwe, media_type="application/jwe")
+    return Response(status_code=201, content=token, media_type="application/jwe")
