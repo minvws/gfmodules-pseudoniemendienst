@@ -8,6 +8,7 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
 from app.services.irreversible.service import IrreversiblePseudonymService
+from app.services.jwt_signer import JwtSigningKeys
 from app.services.key_operations import KeyOperations
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -74,6 +75,9 @@ def container_config(binder: inject.Binder) -> None:
             )
         )
         binder.bind(SamlServiceClient, saml_service_client)
+
+    if config.app.enable_jwt_signing:
+        binder.bind(JwtSigningKeys, JwtSigningKeys.from_config(config.jwt_signing))
 
 
 def get_organization_public_key_service() -> OrganizationPublicKeyService:

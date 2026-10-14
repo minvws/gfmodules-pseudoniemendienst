@@ -67,6 +67,14 @@ FEATURES: list[Feature] = [
     ),
     Feature(
         info=FeatureInfo(
+            id="jwt_signing",
+            title="Signed pseudonyms",
+            description="Pseudonyms in the JWE are signed by the PRS (nested JWT, PS256)",
+        ),
+        enabled=lambda config: config.app.enable_jwt_signing,
+    ),
+    Feature(
+        info=FeatureInfo(
             id="test_routes",
             title="OPRF test endpoints",
             description="Helper endpoints for testing the OPRF and JWE flows",

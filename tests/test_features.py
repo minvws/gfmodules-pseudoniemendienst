@@ -19,6 +19,7 @@ def test_oprf_is_always_enabled() -> None:
     config = _config(
         enable_exchange_services_routes=False,
         enable_saml_exchange_routes=False,
+        enable_jwt_signing=False,
         enable_test_routes=False,
     )
 
@@ -29,6 +30,7 @@ def test_all_features_enabled() -> None:
     config = _config(
         enable_exchange_services_routes=True,
         enable_saml_exchange_routes=True,
+        enable_jwt_signing=True,
         enable_test_routes=True,
     )
 
@@ -42,6 +44,7 @@ def test_all_features_enabled() -> None:
         ("enable_exchange_services_routes", "irreversible_pseudonym"),
         ("enable_exchange_services_routes", "personal_id"),
         ("enable_saml_exchange_routes", "saml_exchange"),
+        ("enable_jwt_signing", "jwt_signing"),
         ("enable_test_routes", "test_routes"),
     ],
 )
