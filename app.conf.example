@@ -7,6 +7,8 @@ enable_test_routes=True
 enable_exchange_services_routes=True
 # Enable the mock SAML exchange routes (/saml-exchange/*); test environments only
 enable_saml_exchange_routes=False
+# Sign the pseudonym inside the JWE (nested JWT, PS256); needs [jwt_signing]
+enable_jwt_signing=False
 
 [logging]
 # Single syslog channel (host:port, UDP); leave empty to log to stdout only.
@@ -66,6 +68,13 @@ server_key_file=secrets/oprf-server.key
 [pseudonym]
 # Master key for hkdf
 master_key=
+
+[jwt_signing]
+# Comma separated PEM files with RSA private keys (at least 3072 bits), e.g.
+# `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096`. All keys are
+# published for verification; only active_key_file signs.
+# key_files=secrets/jwt-signing-1.pem
+# active_key_file=secrets/jwt-signing-1.pem
 
 [saml_service]
 # Base URL of the internal PRS-SAML service; required when enable_saml_exchange_routes is set

@@ -27,6 +27,7 @@ class ConfigApp(BaseModel):
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
     enable_saml_exchange_routes: bool = Field(default=False)
+    enable_jwt_signing: bool = Field(default=False)
 
 
 def _int_or_default(default: int) -> Callable[[Any, Any], int]:
@@ -110,6 +111,18 @@ class ConfigSamlService(BaseModel):
     ca_cert_file: str | None = Field(default=None)
 
 
+class ConfigJwtSigning(BaseModel):
+    # PEM files with the RSA private keys for signing pseudonym JWTs. All of
+    # them are published for verification; only active_key_file signs.
+    # Required when enable_jwt_signing is set.
+    key_files: list[str] = Field(default=[])
+    active_key_file: str = Field(default="")
+
+    _split_key_files = field_validator("key_files", mode="before")(
+        split_comma_separated()
+    )
+
+
 class ConfigAuthorizationHeaders(BaseModel):
     expected_audiences: list[str]
 
@@ -140,6 +153,7 @@ class Config(BaseModel):
     pseudonym: ConfigPseudonym
     authorization_headers: ConfigAuthorizationHeaders
     saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
+    jwt_signing: ConfigJwtSigning = Field(default_factory=ConfigJwtSigning)
 
 
 def read_ini_file(path: str) -> Any:
