@@ -118,47 +118,45 @@ def test_from_config_uses_active_key_and_publishes_all(
 
 
 def test_from_config_requires_issuer() -> None:
+    config = ConfigJwtSigning()
     with pytest.raises(ValueError, match="issuer is not configured"):
-        JwtSigningKeys.from_config(ConfigJwtSigning(), None)
+        JwtSigningKeys.from_config(config, None)
 
 
 def test_from_config_requires_a_key() -> None:
+    config = _config()
     with pytest.raises(ValueError, match="key_files or jwt_signing.hsm_key_labels"):
-        JwtSigningKeys.from_config(_config(), None)
+        JwtSigningKeys.from_config(config, None)
 
 
 @pytest.mark.parametrize(
     "active", [{}, {"active_key_file": "a", "active_key_label": "b"}]
 )
 def test_from_config_requires_exactly_one_active_key(active: dict[str, str]) -> None:
+    config = _config(key_files=["a"], hsm_key_labels=["b"], **active)
     with pytest.raises(ValueError, match="exactly one of"):
-        JwtSigningKeys.from_config(
-            _config(key_files=["a"], hsm_key_labels=["b"], **active), None
-        )
+        JwtSigningKeys.from_config(config, None)
 
 
 def test_from_config_requires_active_key_in_key_files(
     tmp_path: Path, rsa_key: rsa.RSAPrivateKey
 ) -> None:
     path = _write_pem(tmp_path / "key.pem", rsa_key)
+    config = _config(key_files=[path], active_key_file="other.pem")
     with pytest.raises(ValueError, match="active_key_file must be one of"):
-        JwtSigningKeys.from_config(
-            _config(key_files=[path], active_key_file="other.pem"), None
-        )
+        JwtSigningKeys.from_config(config, None)
 
 
 def test_from_config_requires_active_label_in_hsm_key_labels() -> None:
+    config = _config(hsm_key_labels=["a"], active_key_label="b")
     with pytest.raises(ValueError, match="active_key_label must be one of"):
-        JwtSigningKeys.from_config(
-            _config(hsm_key_labels=["a"], active_key_label="b"), None
-        )
+        JwtSigningKeys.from_config(config, None)
 
 
 def test_from_config_hsm_labels_need_the_hsm() -> None:
+    config = _config(hsm_key_labels=["a"], active_key_label="a")
     with pytest.raises(ValueError, match="needs the HSM"):
-        JwtSigningKeys.from_config(
-            _config(hsm_key_labels=["a"], active_key_label="a"), None
-        )
+        JwtSigningKeys.from_config(config, None)
 
 
 def test_from_config_rejects_same_key_twice(
@@ -166,10 +164,9 @@ def test_from_config_rejects_same_key_twice(
 ) -> None:
     first = _write_pem(tmp_path / "a.pem", rsa_key)
     second = _write_pem(tmp_path / "b.pem", rsa_key)
+    config = _config(key_files=[first, second], active_key_file=first)
     with pytest.raises(ValueError, match="configured more than once"):
-        JwtSigningKeys.from_config(
-            _config(key_files=[first, second], active_key_file=first), None
-        )
+        JwtSigningKeys.from_config(config, None)
 
 
 # --- HSM-backed signing, against a fake HSM API

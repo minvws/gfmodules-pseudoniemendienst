@@ -123,33 +123,7 @@ class JwtSigningKeys:
 
     @classmethod
     def from_config(cls, config: ConfigJwtSigning, hsm: HsmClient | None) -> Self:
-        if not config.issuer:
-            raise ValueError(
-                "jwt_signing.issuer is not configured. It is required when "
-                "enable_jwt_signing is set."
-            )
-        if not config.key_files and not config.hsm_key_labels:
-            raise ValueError(
-                "jwt_signing.key_files or jwt_signing.hsm_key_labels is not "
-                "configured. It is required when enable_jwt_signing is set."
-            )
-        if bool(config.active_key_file) == bool(config.active_key_label):
-            raise ValueError(
-                "Set exactly one of jwt_signing.active_key_file and "
-                "jwt_signing.active_key_label."
-            )
-        if config.active_key_file and config.active_key_file not in config.key_files:
-            raise ValueError(
-                "jwt_signing.active_key_file must be one of jwt_signing.key_files."
-            )
-        if (
-            config.active_key_label
-            and config.active_key_label not in config.hsm_key_labels
-        ):
-            raise ValueError(
-                "jwt_signing.active_key_label must be one of "
-                "jwt_signing.hsm_key_labels."
-            )
+        _check_config(config)
 
         signers: dict[str, JwtSigner] = {}
 
@@ -180,3 +154,29 @@ class JwtSigningKeys:
 
     def public_jwks(self) -> list[dict[str, Any]]:
         return [signer.public_jwk() for signer in self.signers]
+
+
+def _check_config(config: ConfigJwtSigning) -> None:
+    if not config.issuer:
+        raise ValueError(
+            "jwt_signing.issuer is not configured. It is required when "
+            "enable_jwt_signing is set."
+        )
+    if not config.key_files and not config.hsm_key_labels:
+        raise ValueError(
+            "jwt_signing.key_files or jwt_signing.hsm_key_labels is not "
+            "configured. It is required when enable_jwt_signing is set."
+        )
+    if bool(config.active_key_file) == bool(config.active_key_label):
+        raise ValueError(
+            "Set exactly one of jwt_signing.active_key_file and "
+            "jwt_signing.active_key_label."
+        )
+    if config.active_key_file and config.active_key_file not in config.key_files:
+        raise ValueError(
+            "jwt_signing.active_key_file must be one of jwt_signing.key_files."
+        )
+    if config.active_key_label and config.active_key_label not in config.hsm_key_labels:
+        raise ValueError(
+            "jwt_signing.active_key_label must be one of jwt_signing.hsm_key_labels."
+        )

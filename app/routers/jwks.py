@@ -41,7 +41,8 @@ JWKS_MAX_AGE_SECONDS = 15 * 60
                     }
                 }
             },
-        }
+        },
+        404: {"description": "JWT signing is disabled"},
     },
 )
 def get_jwks(
