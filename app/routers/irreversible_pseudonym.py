@@ -10,7 +10,7 @@ from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
 from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.exceptions import DomainError, ExchangeInputError, RecipientNotFoundError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
@@ -34,7 +34,6 @@ router = APIRouter()
 _ENDPOINT = "/exchange/irreversible-pseudonym"
 _OPERATION = "exchange:irreversible-pseudonym"
 _SUBJECT_PREFIX = "pseudonym:irreversible:"
-_REVERSIBLE_PREFIX = "pseudonym:reversible:"
 
 
 @router.post(
@@ -89,9 +88,10 @@ organization and scope. The pseudonym is a keyed one-way function
 (HMAC-SHA256 under the recipient's key version) of the personal ID: it is
 deterministic for the same input, and nobody, the PRS included, can reverse it.
 
-Instead of a personal ID, `personalId` may hold a reversible pseudonym
-(`pseudonym:reversible:<...>`) that was issued to the calling organization;
-the PRS reverses it first and never returns the personal ID.
+Instead of `personalId`, `reversiblePseudonym` may hold a reversible pseudonym
+that was issued to the calling organization, as the bare value or as received
+(`pseudonym:reversible:<...>`); the PRS reverses it first and never returns the
+personal ID.
 
 Requires the `prs:pseudonym` OAuth scope. Before the input is processed, two
 administrator-managed authorizations are checked: the calling organization
@@ -169,14 +169,11 @@ def exchange_irreversible_pseudonym(
         deny("recipient_may_not_receive_irreversible_pseudonym", e)
         raise
 
-    if isinstance(req.personalId, str) and req.personalId.startswith(
-        _REVERSIBLE_PREFIX
-    ):
+    if req.reversiblePseudonym is not None and req.personalId is None:
         # A reversible pseudonym issued to the caller; reverse it for them.
         try:
             reversed_pseudonym = reversible_service.reverse(
-                req.personalId.removeprefix(_REVERSIBLE_PREFIX),
-                auth.claims.organization_id,
+                req.reversiblePseudonym, auth.claims.organization_id
             )
         except ReversiblePseudonymError as e:
             failed(e.error_type, e)
@@ -190,7 +187,7 @@ def exchange_irreversible_pseudonym(
                 ) from e
             raise HTTPException(status_code=400, detail="Invalid pseudonym") from e
         personal_id = reversed_pseudonym.personal_id
-    else:
+    elif req.personalId is not None and req.reversiblePseudonym is None:
         try:
             personal_id = PersonalId.parse(req.personalId)
         except PersonalIdValidationError as e:
@@ -206,6 +203,8 @@ def exchange_irreversible_pseudonym(
                 },
             )
             raise HTTPException(status_code=400, detail="Invalid personal ID")
+    else:
+        raise ExchangeInputError()
 
     # Raises 404 when the recipient has no public key for the scope.
     public_key = organization_public_key_service.get_by_org_and_domain(

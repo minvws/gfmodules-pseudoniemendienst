@@ -10,6 +10,7 @@ from app.models.requests import (
     BlindRequest,
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
+    IrreversiblePseudonymExchangeRequest,
     ReversiblePseudonymExchangeRequest,
 )
 
@@ -109,6 +110,50 @@ def test_reversible_pseudonym_request_rejects_invalid_scope(scope: str) -> None:
             personalId="NL:bsn:950000012",
             recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
             recipientScope=scope,
+        )
+
+
+RECIPIENT = RecipientOrganizationOin("oin:00000099000000003000")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"reversiblePseudonym": "AQAB"},
+        {"reversiblePseudonym": "pseudonym:reversible:AQAB"},
+    ],
+    ids=["bare", "as-received"],
+)
+def test_irreversible_request_accepts_a_reversible_pseudonym(
+    fields: dict[str, str],
+) -> None:
+    request = IrreversiblePseudonymExchangeRequest.model_validate(
+        {**fields, "recipientOrganization": RECIPIENT, "recipientScope": "scope"}
+    )
+
+    assert request.personalId is None
+    assert request.reversiblePseudonym == "AQAB"
+
+
+def test_irreversible_request_keeps_a_personal_id() -> None:
+    request = IrreversiblePseudonymExchangeRequest(
+        personalId="NL:bsn:950000012",
+        recipientOrganization=RECIPIENT,
+        recipientScope="scope",
+    )
+
+    assert request.personalId == "NL:bsn:950000012"
+    assert request.reversiblePseudonym is None
+
+
+def test_reversible_request_does_not_take_a_reversible_pseudonym() -> None:
+    with pytest.raises(ValidationError, match="personalId"):
+        ReversiblePseudonymExchangeRequest.model_validate(
+            {
+                "reversiblePseudonym": "AQAB",
+                "recipientOrganization": RECIPIENT,
+                "recipientScope": "scope",
+            }
         )
 
 
