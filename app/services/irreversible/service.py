@@ -14,6 +14,7 @@ import base64
 import logging
 from dataclasses import dataclass
 
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
@@ -64,7 +65,7 @@ class IrreversiblePseudonymService:
         )
         if not active:
             raise IrreversiblePseudonymError(
-                "no_active_key_version",
+                PseudonymErrorType.NO_ACTIVE_KEY_VERSION,
                 f"organization '{recipient.value}' has no active HSM key version",
             )
 
@@ -75,12 +76,13 @@ class IrreversiblePseudonymService:
             }
         except HSM_UNREACHABLE_ERRORS as e:
             raise IrreversiblePseudonymError(
-                "hsm_unreachable", "HSM unreachable"
+                PseudonymErrorType.HSM_UNREACHABLE, "HSM unreachable"
             ) from e
         except Exception as e:
             logger.exception("irreversible pseudonym computation failed")
             raise IrreversiblePseudonymError(
-                "crypto_failure", "irreversible pseudonym computation failed"
+                PseudonymErrorType.CRYPTO_FAILURE,
+                "irreversible pseudonym computation failed",
             ) from e
 
         # digests is ordered by version, so the last one is the latest
@@ -98,4 +100,6 @@ class IrreversiblePseudonymService:
         try:
             return pseudonym_subject(personal_id, recipient, recipient_scope)
         except ValueError as e:
-            raise IrreversiblePseudonymError("crypto_failure", str(e)) from e
+            raise IrreversiblePseudonymError(
+                PseudonymErrorType.CRYPTO_FAILURE, str(e)
+            ) from e

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pyoprf
 from jwcrypto import jwk
 
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, PseudonymOperationError, RecipientNotFoundError
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
@@ -50,7 +51,8 @@ class OprfService:
         except Exception as e:
             logger.exception("unable to decode blinded input")
             raise OprfEvaluationError(
-                "invalid_blinded_input", f"unable to decode blinded input: {e}"
+                PseudonymErrorType.INVALID_BLINDED_INPUT,
+                f"unable to decode blinded input: {e}",
             )
 
         try:
@@ -60,13 +62,15 @@ class OprfService:
             # status code; only unexpected failures become evaluation errors.
             raise
         except HSM_UNREACHABLE_ERRORS as e:
-            raise OprfEvaluationError("hsm_unreachable", f"HSM unreachable: {e}") from e
+            raise OprfEvaluationError(
+                PseudonymErrorType.HSM_UNREACHABLE, f"HSM unreachable: {e}"
+            ) from e
         except Exception as e:
             logger.exception("unable to evaluate blind")
             error_type = (
-                "invalid_blinded_input"
+                PseudonymErrorType.INVALID_BLINDED_INPUT
                 if isinstance(self.__evaluator, LocalOprfEvaluator)
-                else "crypto_evaluation_failure"
+                else PseudonymErrorType.CRYPTO_EVALUATION_FAILURE
             )
             raise OprfEvaluationError(
                 error_type=error_type,

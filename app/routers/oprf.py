@@ -9,6 +9,7 @@ from starlette.responses import JSONResponse
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, PseudonymOperationError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
@@ -107,7 +108,7 @@ def post_eval(
             "OPRF evaluation failed",
             fields={**audit_oins, "error_type": e.error_type},
         )
-        if e.error_type == "hsm_unreachable":
+        if e.error_type == PseudonymErrorType.HSM_UNREACHABLE:
             # Like the reversible exchange: the request may be retried later.
             raise HTTPException(
                 status_code=503, detail="Unable to evaluate blind"

@@ -3,6 +3,7 @@ Domain exceptions raised by the service layer.
 """
 
 from app.enums.personal_id_type import PersonalIdType
+from app.enums.pseudonym_error_type import PseudonymErrorType
 
 
 class DomainError(Exception):
@@ -88,6 +89,6 @@ class PseudonymOperationError(ValueError):
     A failed key operation.
     """
 
-    def __init__(self, error_type: str, message: str) -> None:
+    def __init__(self, error_type: PseudonymErrorType, message: str) -> None:
         super().__init__(message)
         self.error_type = error_type

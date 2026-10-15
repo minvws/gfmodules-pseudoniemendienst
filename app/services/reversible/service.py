@@ -14,6 +14,7 @@ import hmac
 import logging
 from dataclasses import dataclass
 
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
@@ -75,7 +76,7 @@ class ReversiblePseudonymService:
         )
         if not active:
             raise ReversiblePseudonymError(
-                "no_active_key_version",
+                PseudonymErrorType.NO_ACTIVE_KEY_VERSION,
                 f"organization '{recipient.value}' has no active HSM key version",
             )
         version = max(active)
@@ -84,11 +85,14 @@ class ReversiblePseudonymService:
             iv = self._derive_iv(recipient, version, subject)
             ciphertext = self._keys.encrypt(recipient, version, iv, subject)
         except HSM_UNREACHABLE_ERRORS as e:
-            raise ReversiblePseudonymError("hsm_unreachable", "HSM unreachable") from e
+            raise ReversiblePseudonymError(
+                PseudonymErrorType.HSM_UNREACHABLE, "HSM unreachable"
+            ) from e
         except Exception as e:
             logger.exception("reversible pseudonym encryption failed")
             raise ReversiblePseudonymError(
-                "crypto_failure", "reversible pseudonym encryption failed"
+                PseudonymErrorType.CRYPTO_FAILURE,
+                "reversible pseudonym encryption failed",
             ) from e
 
         blob = bytes([FORMAT_VERSION]) + version.to_bytes(2, "big") + ciphertext + iv
@@ -101,7 +105,7 @@ class ReversiblePseudonymService:
 
         if not self._version_available(recipient, version):
             raise ReversiblePseudonymError(
-                "version_destroyed",
+                PseudonymErrorType.VERSION_DESTROYED,
                 f"key version {version} is not available for organization "
                 f"'{recipient.value}'",
             )
@@ -110,25 +114,28 @@ class ReversiblePseudonymService:
             subject = self._keys.decrypt(recipient, version, iv, ciphertext)
             expected_iv = self._derive_iv(recipient, version, subject)
         except HSM_UNREACHABLE_ERRORS as e:
-            raise ReversiblePseudonymError("hsm_unreachable", "HSM unreachable") from e
+            raise ReversiblePseudonymError(
+                PseudonymErrorType.HSM_UNREACHABLE, "HSM unreachable"
+            ) from e
         except Exception as e:
             # wrong key, bad padding or corrupted data
             logger.warning(
                 "reversible pseudonym decryption failed: %s", type(e).__name__
             )
             raise ReversiblePseudonymError(
-                "invalid_pseudonym", "pseudonym could not be decrypted"
+                PseudonymErrorType.INVALID_PSEUDONYM, "pseudonym could not be decrypted"
             ) from e
 
         if not hmac.compare_digest(iv, expected_iv):
             raise ReversiblePseudonymError(
-                "invalid_pseudonym", "pseudonym integrity check failed"
+                PseudonymErrorType.INVALID_PSEUDONYM, "pseudonym integrity check failed"
             )
 
         parts = subject.decode("utf-8").split(DELIMITER)
         if len(parts) != 3 or parts[1] != recipient_organization(recipient):
             raise ReversiblePseudonymError(
-                "invalid_pseudonym", "pseudonym was not issued for this organization"
+                PseudonymErrorType.INVALID_PSEUDONYM,
+                "pseudonym was not issued for this organization",
             )
 
         return ReversedPseudonym(
@@ -145,7 +152,9 @@ class ReversiblePseudonymService:
         try:
             return pseudonym_subject(personal_id, recipient, recipient_scope)
         except ValueError as e:
-            raise ReversiblePseudonymError("crypto_failure", str(e)) from e
+            raise ReversiblePseudonymError(
+                PseudonymErrorType.CRYPTO_FAILURE, str(e)
+            ) from e
 
     def _derive_iv(self, recipient: Oin, version: int, subject: bytes) -> bytes:
         inner = self._keys.hmac(recipient, version, subject)
@@ -164,17 +173,17 @@ class ReversiblePseudonymService:
             blob = base64.urlsafe_b64decode(value)
         except Exception as e:
             raise ReversiblePseudonymError(
-                "invalid_pseudonym", "pseudonym is not base64url"
+                PseudonymErrorType.INVALID_PSEUDONYM, "pseudonym is not base64url"
             ) from e
 
         if len(blob) < _MIN_LENGTH or blob[0] != FORMAT_VERSION:
             raise ReversiblePseudonymError(
-                "invalid_pseudonym", "pseudonym has an unknown format"
+                PseudonymErrorType.INVALID_PSEUDONYM, "pseudonym has an unknown format"
             )
         body = blob[_HEADER_LENGTH:]
         if (len(body) - IV_LENGTH) % AES_BLOCK != 0:
             raise ReversiblePseudonymError(
-                "invalid_pseudonym", "pseudonym has an invalid length"
+                PseudonymErrorType.INVALID_PSEUDONYM, "pseudonym has an invalid length"
             )
         version = int.from_bytes(blob[1:_HEADER_LENGTH], "big")
         return version, body[:-IV_LENGTH], body[-IV_LENGTH:]
