@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-from conftest import hsm_client
+from conftest import blinded_input, hsm_client
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from gfmodules.logging.testing import capture_records
@@ -29,7 +29,7 @@ RecordLogs = Callable[[str], list[logging.LogRecord]]
 
 def _blind_request() -> BlindRequest:
     return BlindRequest(
-        encryptedPersonalId="Zm9vYmFy",
+        encryptedPersonalId=blinded_input(),
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000001000"),
         recipientScope="nvi",
     )

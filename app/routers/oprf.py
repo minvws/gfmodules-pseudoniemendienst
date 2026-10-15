@@ -22,7 +22,11 @@ from app.services.organization_public_key_service import OrganizationPublicKeySe
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-DETAIL_TEXT = "Unable to evaluate blind"
+EVAL_FAILURE_STATUS_CODES = {
+    PseudonymErrorType.INVALID_BLINDED_INPUT: 400,
+    PseudonymErrorType.CRYPTO_EVALUATION_FAILURE: 500,
+    PseudonymErrorType.HSM_UNREACHABLE: 503,
+}
 
 
 @router.post(
@@ -129,12 +133,9 @@ def post_eval(
             "OPRF evaluation failed",
             fields={**audit_oins, "error_type": e.error_type},
         )
-        if e.error_type == PseudonymErrorType.HSM_UNREACHABLE:
-            # Like the reversible exchange: the request may be retried later.
-            raise HTTPException(status_code=503, detail=DETAIL_TEXT) from e
-        if e.error_type == "invalid_blinded_input":
-            raise HTTPException(status_code=400, detail=DETAIL_TEXT) from e
-        raise HTTPException(status_code=500, detail=DETAIL_TEXT) from e
+        raise HTTPException(
+            status_code=EVAL_FAILURE_STATUS_CODES[e.error_type], detail="Unable to evaluate blind"
+        ) from e
 
     # PRS-OPRF-001
     gflog.emit(

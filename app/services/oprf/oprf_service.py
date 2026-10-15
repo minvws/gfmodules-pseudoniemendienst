@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass
 
 import pyoprf
+import pysodium
 from jwcrypto import jwk
 
 from app.enums.pseudonym_error_type import PseudonymErrorType
@@ -10,13 +11,23 @@ from app.exceptions import DomainError, PseudonymOperationError, RecipientNotFou
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.jwe_token import Jwe
-from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
+from app.services.oprf.evaluators import OprfEvaluator
 
 logger = logging.getLogger(__name__)
+
+_RISTRETTO255_IDENTITY = bytes(pysodium.crypto_core_ristretto255_BYTES)
 
 
 class OprfEvaluationError(PseudonymOperationError):
     pass
+
+
+def _is_ristretto255_element(element: bytes) -> bool:
+    return (
+        len(element) == len(_RISTRETTO255_IDENTITY)
+        and element != _RISTRETTO255_IDENTITY
+        and bool(pysodium.crypto_core_ristretto255_is_valid_point(element))
+    )
 
 
 @dataclass(frozen=True)
@@ -54,6 +65,11 @@ class OprfService:
                 PseudonymErrorType.INVALID_BLINDED_INPUT,
                 f"unable to decode blinded input: {e}",
             )
+        if not _is_ristretto255_element(bi):
+            raise OprfEvaluationError(
+                PseudonymErrorType.INVALID_BLINDED_INPUT,
+                "blinded input is not a ristretto255 element",
+            )
 
         try:
             evals = self.__evaluator.evaluate(req.recipientOrganization, bi)
@@ -67,15 +83,10 @@ class OprfService:
             ) from e
         except Exception as e:
             logger.exception("unable to evaluate blind")
-            error_type = (
-                PseudonymErrorType.INVALID_BLINDED_INPUT
-                if isinstance(self.__evaluator, LocalOprfEvaluator)
-                else PseudonymErrorType.CRYPTO_EVALUATION_FAILURE
-            )
             raise OprfEvaluationError(
-                error_type=error_type,
-                message=f"unable to evaluate blind: {e}",
-            )
+                PseudonymErrorType.CRYPTO_EVALUATION_FAILURE,
+                f"unable to evaluate blind: {e}",
+            ) from e
 
         if not evals:
             # The recipient has no active HSM key version. Reported like an

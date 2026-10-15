@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 
 import gfmodules.logging as gflog
 import inject
+import pyoprf
 import pytest
 from cryptography.hazmat.primitives import serialization
 from fastapi import FastAPI
@@ -44,6 +45,11 @@ from app.services.http_service import HttpService
 from app.services.irreversible.keys import HsmIrreversibleKeyOperations
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.reversible.keys import HsmReversibleKeyOperations
+
+
+def blinded_input() -> str:
+    _, blinded = pyoprf.blind(b"personal-id")
+    return base64.urlsafe_b64encode(blinded).decode("ascii")
 
 
 def genkey(len: int) -> str:

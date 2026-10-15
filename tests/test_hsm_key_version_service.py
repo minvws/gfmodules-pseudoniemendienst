@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from conftest import create_organization, hsm_client
+from conftest import blinded_input, create_organization, hsm_client
 from jwcrypto import jwk
 
 from app.db.db import Database
@@ -319,7 +319,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
         return resp
 
     req = BlindRequest(
-        encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+        encryptedPersonalId=blinded_input(),
         recipientOrganization=RecipientOrganizationOin("oin:00000000012345678000"),
         recipientScope="scope",
     )
@@ -416,7 +416,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
         return resp
 
     req = BlindRequest(
-        encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+        encryptedPersonalId=blinded_input(),
         recipientOrganization=RecipientOrganizationOin(TEST_OIN_WITH_PREFIX),
         recipientScope="scope",
     )
@@ -481,10 +481,10 @@ def test_local_mode_without_server_key_raises() -> None:
         service = OprfService(LocalOprfEvaluator(b""))
         service.eval_blind(
             BlindRequest(
-                encryptedPersonalId=base64.urlsafe_b64encode(b"blinded").decode(),
+                encryptedPersonalId=blinded_input(),
                 recipientOrganization=RecipientOrganizationOin(TEST_OIN_WITH_PREFIX),
                 recipientScope="scope",
             ),
             pub_key=jwk.JWK.generate(kty="RSA", size=2048),
         )
-    assert exc.value.error_type == "invalid_blinded_input"
+    assert exc.value.error_type == "crypto_evaluation_failure"

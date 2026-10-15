@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import gfmodules.logging as gflog
 import pytest
-from conftest import hsm_client
+from conftest import blinded_input, hsm_client
 from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 from gfmodules.logging.testing import assert_catalogue_complete, capture_records
 from jwcrypto import jwk
@@ -101,9 +101,9 @@ def pub_key() -> jwk.JWK:
     return jwk.JWK.from_json(key.export_public())
 
 
-def _blind_request() -> BlindRequest:
+def _blind_request(encrypted_personal_id: str) -> BlindRequest:
     return BlindRequest(
-        encryptedPersonalId=base64.urlsafe_b64encode(b"not-a-valid-point").decode(),
+        encryptedPersonalId=encrypted_personal_id,
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000001000"),
         recipientScope="nvi",
     )
@@ -119,7 +119,10 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     )
 
     with pytest.raises(OprfEvaluationError) as exc:
-        service.eval_blind(_blind_request(), pub_key)
+        service.eval_blind(
+            _blind_request(base64.urlsafe_b64encode(b"not-a-valid-point").decode()),
+            pub_key,
+        )
 
     assert exc.value.error_type == "invalid_blinded_input"
 
@@ -145,6 +148,6 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
         ),
         pytest.raises(OprfEvaluationError) as exc,
     ):
-        service.eval_blind(_blind_request(), pub_key)
+        service.eval_blind(_blind_request(blinded_input()), pub_key)
 
     assert exc.value.error_type == "crypto_evaluation_failure"

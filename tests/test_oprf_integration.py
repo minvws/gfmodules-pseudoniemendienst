@@ -449,7 +449,9 @@ def test_oprf_eval_when_evaluation_crashes_returns_server_error(
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError("crypto_evaluation_failure", "boom")
+            raise OprfEvaluationError(
+                PseudonymErrorType.CRYPTO_EVALUATION_FAILURE, "boom"
+            )
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
     try:
