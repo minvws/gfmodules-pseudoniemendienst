@@ -134,7 +134,8 @@ def post_eval(
             fields={**audit_oins, "error_type": e.error_type},
         )
         raise HTTPException(
-            status_code=EVAL_FAILURE_STATUS_CODES[e.error_type], detail="Unable to evaluate blind"
+            status_code=EVAL_FAILURE_STATUS_CODES[e.error_type],
+            detail="Unable to evaluate blind",
         ) from e
 
     # PRS-OPRF-001
