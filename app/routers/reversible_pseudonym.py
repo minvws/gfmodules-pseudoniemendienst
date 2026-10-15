@@ -10,12 +10,13 @@ from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
 from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.exceptions import RecipientNotFoundError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.models.requests import ReversiblePseudonymExchangeRequest
+from app.routers.exchange_support import authorize_exchange
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -97,39 +98,14 @@ def exchange_reversible_pseudonym(
         Depends(container.get_reversible_pseudonym_service),
     ],
 ) -> Response:
-    handelende_oin = str(auth.claims.client_organization_id)
-    namens_oin = str(auth.claims.organization_id)
-    doel_oin = str(req.recipientOrganization)
-
-    def deny(reason: str, error: DomainError) -> None:
-        gflog.emit(
-            logger,
-            Log.AUTHORIZATION_DENIED,
-            f"Authorization denied ({reason}): {error.message}",
-            fields={
-                "handelende_oin": handelende_oin,
-                "namens_oin": namens_oin,
-                "doel_oin": doel_oin,
-                "requested_operation": _OPERATION,
-            },
-        )
-
-    personal_id_type = PersonalIdType.REVERSIBLE_PSEUDONYM
-    try:
-        authorization_service.validate_allowed_to_request(
-            auth.claims.organization_id, personal_id_type
-        )
-    except DomainError as e:
-        deny("sender_may_not_request_reversible_pseudonym", e)
-        raise
-
-    try:
-        authorization_service.validate_allowed_to_receive(
-            req.recipientOrganization, personal_id_type
-        )
-    except DomainError as e:
-        deny("recipient_may_not_receive_reversible_pseudonym", e)
-        raise
+    audit = authorize_exchange(
+        logger,
+        authorization_service,
+        auth,
+        req.recipientOrganization,
+        PersonalIdType.REVERSIBLE_PSEUDONYM,
+        _OPERATION,
+    )
 
     try:
         personal_id = PersonalId.parse(req.personalId)
@@ -140,8 +116,8 @@ def exchange_reversible_pseudonym(
             Log.PERSONAL_ID_VALIDATION_FAILED,
             "Personal ID validation failed",
             fields={
-                "handelende_oin": handelende_oin,
-                "namens_oin": namens_oin,
+                "handelende_oin": audit.handelende_oin,
+                "namens_oin": audit.namens_oin,
                 "validation_error": e.kind,
             },
         )
@@ -165,9 +141,7 @@ def exchange_reversible_pseudonym(
             "Reversible pseudonym creation failed",
             exc_info=e,
             fields={
-                "handelende_oin": handelende_oin,
-                "namens_oin": namens_oin,
-                "doel_oin": doel_oin,
+                **audit.fields(),
                 "error_type": e.error_type,
             },
         )
@@ -179,7 +153,7 @@ def exchange_reversible_pseudonym(
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 
     jwe = Jwe.build(
-        audience=doel_oin,
+        audience=audit.doel_oin,
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
         pub_key=JWK(**public_key.jwk),
@@ -191,9 +165,7 @@ def exchange_reversible_pseudonym(
         Log.PSEUDONYM_REVERSIBLE_CREATED,
         "Reversible pseudonym created",
         fields={
-            "handelende_oin": handelende_oin,
-            "namens_oin": namens_oin,
-            "doel_oin": doel_oin,
+            **audit.fields(),
             "domein": req.recipientScope,
             "sleutel_versie": pseudonym.version,
         },
