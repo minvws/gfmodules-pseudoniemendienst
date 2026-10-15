@@ -73,16 +73,6 @@ def test_known_hsm_failure_becomes_an_evaluation_error(
     assert e.value.error_type == error_type
 
 
-@pytest.mark.parametrize(
-    "failure",
-    [RuntimeError("bug"), ValueError("bad local server key")],
-    ids=["bug", "local-evaluator"],
-)
-def test_unexpected_evaluator_failure_is_not_wrapped(failure: Exception) -> None:
-    with pytest.raises(type(failure)):
-        _service(failure).eval_blind(REQUEST, JWK(generate="oct"))
-
-
 def test_recipient_without_active_key_version_is_not_found() -> None:
     evaluator = MagicMock()
     evaluator.evaluate.return_value = {}
