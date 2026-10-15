@@ -112,9 +112,19 @@ class ConfigSamlService(BaseModel):
     ca_cert_file: str | None = Field(default=None)
 
 
-class ConfigJkws(BaseModel):
-    signing_cert_path: str | None = Field(default=None)
-    decryption_cert_path: str | None = Field(default=None)
+class ConfigJwks(BaseModel):
+    issuer: str = Field(default="")
+    key_files: list[str] = Field(default_factory=list)
+    active_key_file: str = Field(default="")
+    hsm_key_labels: list[str] = Field(default_factory=list)
+    active_hsm_key_label: str = Field(default="")
+
+    _split_key_files = field_validator("key_files", mode="before")(
+        split_comma_separated()
+    )
+    _split_hsm_key_labels = field_validator("hsm_key_labels", mode="before")(
+        split_comma_separated()
+    )
 
 
 class ConfigAuthorizationHeaders(BaseModel):
@@ -149,7 +159,7 @@ class Config(BaseModel):
     local_keys: ConfigLocalKeys = Field(default_factory=ConfigLocalKeys)
     authorization_headers: ConfigAuthorizationHeaders
     saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
-    jwks: ConfigJkws
+    jwks: ConfigJwks
 
 
 def read_ini_file(path: str) -> Any:

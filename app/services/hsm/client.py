@@ -131,6 +131,14 @@ class HsmClient:
         logger.info("destroyed HSM key %r", label)
         return True
 
+    def get_public_key_pem(self, label: str) -> str:
+        """The PEM public key of the key pair with this label."""
+        data = self.post("", {"label": label, "objtype": "PUBLIC_KEY"}, "lookup")
+        objects = data["objects"] or []
+        if not objects or "publickey" not in objects[0]:
+            raise HsmKeyNotFound(f"No public key with label {label!r}")
+        return objects[0]["publickey"]
+
     def oprf_evaluate(self, label: str, blinded: bytes) -> bytes:
         data = self.post(
             "/oprf/evaluate",

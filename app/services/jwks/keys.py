@@ -1,11 +1,15 @@
 import base64
-from typing import Any, Protocol, Self
+from typing import Any, Protocol, Self, cast
 
 from cryptography import x509
-from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.hazmat.bindings._rust import PublicFormat
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, load_pem_public_key
 from jwcrypto.jwk import JWK
 
-from app.config import ConfigJkws
+from app.config import ConfigJwks
+from app.services.hsm.client import HsmClient
+from app.services.http_service import HttpService
 from app.utils.certs import load_cert
 
 
@@ -23,40 +27,62 @@ class JwksKeyService(Protocol):
     def get_jwks(self) -> dict[str, Any]: ...
 
     @staticmethod
-    def from_pem(data: bytes, use: str, alg: str) -> JWK: ...
+    def make_jwk(data: list[x509.Certificate], use: str, alg: str) -> JWK: ...
 
 
 class JwksLocalKeyService:
-    def __init__(
-        self,
-        signing_cert_path: str,
-        decryption_cert_path: str,
-    ) -> None:
-        self.signing_cert = load_cert(signing_cert_path)
-        self.decryption_cert = load_cert(decryption_cert_path)
+    def __init__(self, active_key_file: str) -> None:
+        self.active_key_files = active_key_file
 
     def get_jwks(self) -> Any:
-        jwks = []
-        signing_jwk = self.from_pem(self.signing_cert, "sig", "RSA256")
-        jwks.append(signing_jwk)
+        cert_file = self.active_key_files
+        cert = load_cert(cert_file)
+        jwk = self.make_jwk(cert, "sig", "RSA-PSS")
 
-        decryption_jwk = self.from_pem(self.decryption_cert, "enc", "RSA256")
-        jwks.append(decryption_jwk)
-
-        return {"keys": jwks}
+        return {"keys": [jwk]}
 
     @staticmethod
-    def from_pem(data: bytes, use: str, alg: str) -> JWK:
-        return _from_pem(data, use, alg)
+    def make_jwk(cert: list[x509.Certificate], use: str, alg: str) -> JWK:
+        leaf, *intermediate = cert
+        pub_key = leaf.public_key()
+        jwk = JWK.from_pyca(cast(RSAPrivateKey, pub_key))
+        jwk.update(use=use)
+        jwk.update(alg=alg)
+        x5c = [
+            base64.b64encode(c.public_bytes(Encoding.DER)).decode()
+            for c in [leaf, *intermediate]
+        ]
+        jwk.update(x5c=x5c)
+
+        return jwk
 
     @classmethod
-    def from_config(cls, config: ConfigJkws) -> Self:
-        if config.signing_cert_path is None or config.decryption_cert_path is None:
+    def from_config(cls, config: ConfigJwks) -> Self:
+        if not config.key_files and not config.active_key_file:
             raise RuntimeError(
-                "`signing_cert_path` or `decryption_cert_path` cannot be empty when using local key setting for JWKS"
+                "JwksLocalKeyService cannot be instantianted without at key_files available"
             )
 
-        return cls(
-            signing_cert_path=config.signing_cert_path,
-            decryption_cert_path=config.decryption_cert_path,
-        )
+        return cls(active_key_file=config.active_key_file)
+
+
+class JwksHsmKeyService:
+    def __init__(self, http_service: HttpService, active_hsm_label: str) -> None:
+        self.hsm_client = HsmClient(http=http_service)
+        self.active_hsm_label = active_hsm_label
+
+    def get_jwks(self) -> Any:
+        signing_key = self.hsm_client.get_public_key_pem(self.active_hsm_label)
+
+        signing_jwk = self.make_jwk(signing_key.encode(), "sig", "RSA-PSS")
+
+        return {"keys": [signing_jwk]}
+
+    @staticmethod
+    def make_jwk(data: bytes, use: str, alg: str) -> JWK:
+        obj = JWK.from_pem(data)
+        key = load_pem_public_key(data)
+        der = key.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        x5c = base64.b64encode(der).decode()
+        obj.update(use=use, alg=alg, x5c=[x5c])
+        return obj

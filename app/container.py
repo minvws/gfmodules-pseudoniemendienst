@@ -30,6 +30,18 @@ def container_config(binder: inject.Binder) -> None:
     binder.bind(AuthorizationService, authorization_service)
 
     jwks_key_service = JwksLocalKeyService.from_config(config.jwks)
+    # jwks_hsm_key_service = JwksHsmKeyService(
+    #     signing_key_label="test_signing",
+    #     encryption_key_label="test_encryption",
+    #     http_service=HttpService(
+    #         endpoint=f"{config.hsm.url}/hsm/{config.hsm.module}/{config.hsm.slot}",
+    #         timeout=config.hsm.timeout,
+    #         mtls_cert=config.hsm.cert_file,
+    #         mtls_key=config.hsm.key_file,
+    #         verify_ca=config.hsm.ca_cert_file,
+    #     ),
+    # )
+
     jwks_service = JwksService(jwks_key_service=jwks_key_service)
     binder.bind(JwksService, jwks_service)
 
