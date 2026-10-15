@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import pyoprf
 from jwcrypto import jwk
 
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.enums.pseudonym_error_type import PseudonymErrorType
+from app.exceptions import DomainError, PseudonymOperationError, RecipientNotFoundError
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
 from app.services.jwe_token import Jwe
@@ -14,18 +15,8 @@ from app.services.oprf.evaluators import LocalOprfEvaluator, OprfEvaluator
 logger = logging.getLogger(__name__)
 
 
-class OprfEvaluationError(ValueError):
-    """
-    Raised when an OPRF evaluation fails. The error_type matches the audit
-    logging values used by this service, such as invalid_blinded_input and
-    crypto_evaluation_failure.
-    """
-
-    def __init__(
-        self, message: str, error_type: str = "crypto_evaluation_failure"
-    ) -> None:
-        super().__init__(message)
-        self.error_type = error_type
+class OprfEvaluationError(PseudonymOperationError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -60,8 +51,8 @@ class OprfService:
         except Exception as e:
             logger.exception("unable to decode blinded input")
             raise OprfEvaluationError(
+                PseudonymErrorType.INVALID_BLINDED_INPUT,
                 f"unable to decode blinded input: {e}",
-                error_type="invalid_blinded_input",
             )
 
         try:
@@ -72,17 +63,18 @@ class OprfService:
             raise
         except HSM_UNREACHABLE_ERRORS as e:
             raise OprfEvaluationError(
-                f"HSM unreachable: {e}", error_type="hsm_unreachable"
+                PseudonymErrorType.HSM_UNREACHABLE, f"HSM unreachable: {e}"
             ) from e
         except Exception as e:
             logger.exception("unable to evaluate blind")
+            error_type = (
+                PseudonymErrorType.INVALID_BLINDED_INPUT
+                if isinstance(self.__evaluator, LocalOprfEvaluator)
+                else PseudonymErrorType.CRYPTO_EVALUATION_FAILURE
+            )
             raise OprfEvaluationError(
-                f"unable to evaluate blind: {e}",
-                error_type=(
-                    "invalid_blinded_input"
-                    if isinstance(self.__evaluator, LocalOprfEvaluator)
-                    else "crypto_evaluation_failure"
-                ),
+                error_type=error_type,
+                message=f"unable to evaluate blind: {e}",
             )
 
         if not evals:

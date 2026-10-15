@@ -18,6 +18,7 @@ from starlette.testclient import TestClient
 from app import container
 from app.db.models import OrganizationEntity
 from app.enums.personal_id_type import PersonalIdType
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import NotAllowedToRequestError, RecipientNotFoundError
 from app.logging.events import Log
 from app.models.oin import Oin
@@ -382,7 +383,7 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
             raise OprfEvaluationError(
-                "invalid blinded input", error_type="invalid_blinded_input"
+                PseudonymErrorType.INVALID_BLINDED_INPUT, "invalid blinded input"
             )
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
@@ -418,7 +419,9 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise ValueError("invalid blinded input")
+            raise OprfEvaluationError(
+                PseudonymErrorType.INVALID_BLINDED_INPUT, "invalid blinded input"
+            )
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
     try:
@@ -482,7 +485,9 @@ def test_unreachable_hsm_answers_503_and_is_audited(
 ) -> None:
     class UnreachableOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError("HSM unreachable", error_type="hsm_unreachable")
+            raise OprfEvaluationError(
+                PseudonymErrorType.HSM_UNREACHABLE, "HSM unreachable"
+            )
 
     app.dependency_overrides[container.get_oprf_service] = lambda: (
         UnreachableOprfService()

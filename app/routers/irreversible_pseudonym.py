@@ -9,6 +9,7 @@ from starlette.responses import Response
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, RecipientNotFoundError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
@@ -141,7 +142,7 @@ def exchange_irreversible_pseudonym(
             fields={**audit, "requested_operation": _OPERATION},
         )
 
-    def failed(error_type: str, exc: Exception | None = None) -> None:
+    def failed(error_type: PseudonymErrorType, exc: Exception | None = None) -> None:
         # PRS-PSE-004
         gflog.emit(
             logger,
@@ -179,11 +180,11 @@ def exchange_irreversible_pseudonym(
             )
         except ReversiblePseudonymError as e:
             failed(e.error_type, e)
-            if e.error_type == "hsm_unreachable":
+            if e.error_type == PseudonymErrorType.HSM_UNREACHABLE:
                 raise HTTPException(
                     status_code=503, detail="Pseudonym exchange failed"
                 ) from e
-            if e.error_type == "version_destroyed":
+            if e.error_type == PseudonymErrorType.VERSION_DESTROYED:
                 raise HTTPException(
                     status_code=410, detail="Pseudonym key version no longer available"
                 ) from e
@@ -219,11 +220,11 @@ def exchange_irreversible_pseudonym(
         )
     except IrreversiblePseudonymError as e:
         failed(e.error_type, e)
-        if e.error_type == "no_active_key_version":
+        if e.error_type == PseudonymErrorType.NO_ACTIVE_KEY_VERSION:
             # Same message as for an unknown recipient, so a caller cannot tell
             # the two apart.
             raise RecipientNotFoundError()
-        status = 503 if e.error_type == "hsm_unreachable" else 500
+        status = 503 if e.error_type == PseudonymErrorType.HSM_UNREACHABLE else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 
     extra_claims: dict[str, object] = {"keyVersion": pseudonym.version}

@@ -9,6 +9,7 @@ from starlette.responses import Response
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
+from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, RecipientNotFoundError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
@@ -170,11 +171,11 @@ def exchange_reversible_pseudonym(
                 "error_type": e.error_type,
             },
         )
-        if e.error_type == "no_active_key_version":
+        if e.error_type == PseudonymErrorType.NO_ACTIVE_KEY_VERSION:
             # Must be the same message as for when we don't find the server, so we cannot
             # differentiate between the two cases and leak information about the recipient organization.
             raise RecipientNotFoundError()
-        status = 503 if e.error_type == "hsm_unreachable" else 500
+        status = 503 if e.error_type == PseudonymErrorType.HSM_UNREACHABLE else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 
     jwe = Jwe.build(
