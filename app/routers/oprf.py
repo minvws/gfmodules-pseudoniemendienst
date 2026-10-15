@@ -80,6 +80,10 @@ def post_eval(
             req.recipientOrganization, req.recipientScope
         )
         result = oprf_service.eval_blind(req, JWK(**organization_public_key.jwk))
+    except PseudonymOperationError as e:
+        raise_pseudonym_error(
+            logger, audit, e, Log.OPRF_EVAL_FAILED, "OPRF evaluation failed"
+        )
     except DomainError as e:
         gflog.emit(
             logger,
@@ -88,15 +92,6 @@ def post_eval(
             fields=audit.fields(),
         )
         raise
-    except PseudonymOperationError as e:
-        raise_pseudonym_error(
-            logger,
-            audit,
-            e,
-            Log.OPRF_EVAL_FAILED,
-            "OPRF evaluation failed",
-            "Unable to evaluate blind",
-        )
 
     # PRS-OPRF-001
     gflog.emit(

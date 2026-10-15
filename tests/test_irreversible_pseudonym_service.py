@@ -10,6 +10,7 @@ import requests
 from conftest import hsm_client
 from test_reversible_pseudonym_service import FakeHsm, _with_fake_hsm
 
+from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.personal_id import PersonalId
 from app.services.irreversible.keys import (
@@ -17,10 +18,7 @@ from app.services.irreversible.keys import (
     IrreversibleKeyLabel,
     LocalIrreversibleKeyOperations,
 )
-from app.services.irreversible.service import (
-    IrreversiblePseudonymError,
-    IrreversiblePseudonymService,
-)
+from app.services.irreversible.service import IrreversiblePseudonymService
 from app.services.reversible.keys import LocalReversibleKeyOperations
 
 OIN = Oin("00000099000000001000")
@@ -138,14 +136,14 @@ def test_no_active_key_version_is_reported(master_key: bytes) -> None:
         LocalIrreversibleKeyOperations(master_key), _key_versions({OIN: []})
     )
 
-    with pytest.raises(IrreversiblePseudonymError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         service.generate(PID, OIN, SCOPE)
 
     assert e.value.error_type == "no_active_key_version"
 
 
 def test_scope_with_delimiter_is_refused(service: IrreversiblePseudonymService) -> None:
-    with pytest.raises(IrreversiblePseudonymError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         service.generate(PID, OIN, "a|b")
 
     assert e.value.error_type == "crypto_failure"
@@ -188,7 +186,7 @@ def test_hsm_unreachable_is_reported(
 
     with _with_fake_hsm(FakeHsm()) as post:
         post.side_effect = refuse
-        with pytest.raises(IrreversiblePseudonymError) as e:
+        with pytest.raises(PseudonymOperationError) as e:
             hsm_service.generate(PID, OIN, SCOPE)
 
     assert e.value.error_type == "hsm_unreachable"

@@ -3,38 +3,19 @@ from dataclasses import asdict, dataclass
 from typing import NoReturn, Self
 
 import gfmodules.logging as gflog
-from fastapi import HTTPException
 from gfmodules.logging import LogEvent
 
 from app.enums.personal_id_type import PersonalIdType
-from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import (
     DomainError,
-    InvalidBlindedInputError,
     InvalidPersonalIdError,
-    InvalidPseudonymError,
     PseudonymOperationError,
-    PseudonymVersionDestroyedError,
-    RecipientNotFoundError,
 )
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.services.authorization_service import AuthorizationService
-
-_CLIENT_ERROR_TYPES: dict[PseudonymErrorType, type[DomainError]] = {
-    PseudonymErrorType.VERSION_DESTROYED: PseudonymVersionDestroyedError,
-    PseudonymErrorType.INVALID_PSEUDONYM: InvalidPseudonymError,
-    PseudonymErrorType.INVALID_BLINDED_INPUT: InvalidBlindedInputError,
-}
-
-_SERVER_ERROR_STATUS_CODES = {
-    PseudonymErrorType.CRYPTO_FAILURE: 500,
-    PseudonymErrorType.HSM_OPERATION_FAILED: 502,
-    PseudonymErrorType.HSM_UNREACHABLE: 503,
-    PseudonymErrorType.HSM_TIMEOUT: 504,
-}
 
 
 @dataclass(frozen=True)
@@ -115,7 +96,6 @@ def raise_pseudonym_error(
     error: PseudonymOperationError,
     event: LogEvent,
     message: str,
-    detail: str = "Pseudonym exchange failed",
 ) -> NoReturn:
     gflog.emit(
         logger,
@@ -124,10 +104,4 @@ def raise_pseudonym_error(
         exc_info=error,
         fields={**audit.fields(), "error_type": error.error_type},
     )
-    if error.error_type == PseudonymErrorType.NO_ACTIVE_KEY_VERSION:
-        raise RecipientNotFoundError() from error
-    if error.error_type in _CLIENT_ERROR_TYPES:
-        raise _CLIENT_ERROR_TYPES[error.error_type]() from error
-    raise HTTPException(
-        status_code=_SERVER_ERROR_STATUS_CODES[error.error_type], detail=detail
-    ) from error
+    raise error

@@ -13,10 +13,14 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.exceptions import (
+    CryptoFailureError,
     DomainAlreadyRegisteredError,
     DomainError,
     DomainNotRegisteredError,
     ExchangeInputError,
+    HsmOperationFailedError,
+    HsmTimeoutError,
+    HsmUnreachableError,
     InvalidAudienceError,
     InvalidBlindedInputError,
     InvalidJwsError,
@@ -24,6 +28,7 @@ from app.exceptions import (
     InvalidPseudonymError,
     KeyVersionNotFoundError,
     KeyVersionRemovedError,
+    NoActiveKeyVersionError,
     NoKeyVersionError,
     NotAllowedToRequestError,
     OrganizationNotRegisteredError,
@@ -56,6 +61,11 @@ STATUS_CODES: dict[type[DomainError], int] = {
     InvalidPseudonymError: 400,
     InvalidBlindedInputError: 400,
     PseudonymVersionDestroyedError: 410,
+    NoActiveKeyVersionError: 404,
+    CryptoFailureError: 500,
+    HsmOperationFailedError: 502,
+    HsmUnreachableError: 503,
+    HsmTimeoutError: 504,
 }
 
 
@@ -67,8 +77,7 @@ def status_code_for(exc: DomainError) -> int:
     return 500
 
 
-def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    assert isinstance(exc, DomainError)
+def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     status_code = status_code_for(exc)
     logger.warning(
         "%s %s refused with %d: %s",
@@ -81,4 +90,4 @@ def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
 
 
 def install_domain_error_handler(fastapi: FastAPI) -> None:
-    fastapi.add_exception_handler(DomainError, domain_error_handler)
+    fastapi.exception_handler(DomainError)(domain_error_handler)

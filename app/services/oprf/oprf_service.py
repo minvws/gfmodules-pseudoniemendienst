@@ -8,8 +8,13 @@ import pysodium
 import requests
 from jwcrypto import jwk
 
-from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import PseudonymOperationError, RecipientNotFoundError
+from app.exceptions import (
+    HsmOperationFailedError,
+    HsmTimeoutError,
+    HsmUnreachableError,
+    InvalidBlindedInputError,
+    RecipientNotFoundError,
+)
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
 from app.services.jwe_token import Jwe
@@ -20,10 +25,6 @@ logger = logging.getLogger(__name__)
 _RISTRETTO255_IDENTITY = bytes(pysodium.crypto_core_ristretto255_BYTES)
 
 _HSM_REFUSALS = (requests.HTTPError, HsmKeyNotFound)
-
-
-class OprfEvaluationError(PseudonymOperationError):
-    pass
 
 
 def _is_ristretto255_element(element: bytes) -> bool:
@@ -65,32 +66,21 @@ class OprfService:
             bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
         except binascii.Error as e:
             logger.exception("unable to decode blinded input")
-            raise OprfEvaluationError(
-                PseudonymErrorType.INVALID_BLINDED_INPUT,
-                f"unable to decode blinded input: {e}",
-            )
+            raise InvalidBlindedInputError(f"unable to decode blinded input: {e}")
         if not _is_ristretto255_element(bi):
-            raise OprfEvaluationError(
-                PseudonymErrorType.INVALID_BLINDED_INPUT,
-                "blinded input is not a ristretto255 element",
+            raise InvalidBlindedInputError(
+                "blinded input is not a ristretto255 element"
             )
 
         try:
             evals = self.__evaluator.evaluate(req.recipientOrganization, bi)
         except requests.ConnectionError as e:
-            raise OprfEvaluationError(
-                PseudonymErrorType.HSM_UNREACHABLE, f"HSM unreachable: {e}"
-            ) from e
+            raise HsmUnreachableError(f"HSM unreachable: {e}") from e
         except requests.Timeout as e:
-            raise OprfEvaluationError(
-                PseudonymErrorType.HSM_TIMEOUT, f"HSM timed out: {e}"
-            ) from e
+            raise HsmTimeoutError(f"HSM timed out: {e}") from e
         except _HSM_REFUSALS as e:
             logger.exception("unable to evaluate blind")
-            raise OprfEvaluationError(
-                PseudonymErrorType.HSM_OPERATION_FAILED,
-                f"HSM refused the evaluation: {e}",
-            ) from e
+            raise HsmOperationFailedError(f"HSM refused the evaluation: {e}") from e
 
         if not evals:
             # The recipient has no active HSM key version. Reported like an
