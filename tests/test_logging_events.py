@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import gfmodules.logging as gflog
 import pytest
+import requests
 from conftest import blinded_input, hsm_client
 from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 from gfmodules.logging.testing import assert_catalogue_complete, capture_records
@@ -127,9 +128,11 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     assert exc.value.error_type == "invalid_blinded_input"
 
 
-def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
+def test_eval_blind_hsm_refusal_raises_crypto_evaluation_failure(
     pub_key: jwk.JWK,
 ) -> None:
+    refusal = requests.Response()
+    refusal.status_code = 500
     hsm_key_version_service = MagicMock()
     hsm_key_version_service.get_active_version_numbers_by_organization_oin.return_value = [
         1
@@ -144,7 +147,7 @@ def test_eval_blind_hsm_failure_raises_crypto_evaluation_failure(
     with (
         patch(
             "requests.Session.request",
-            side_effect=RuntimeError("HSM unreachable"),
+            return_value=refusal,
         ),
         pytest.raises(OprfEvaluationError) as exc,
     ):

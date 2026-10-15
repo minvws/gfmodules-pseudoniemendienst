@@ -1,9 +1,10 @@
-"""OprfService wraps unexpected evaluator failures, but not domain errors."""
+"""OprfService wraps known evaluator failures, but not domain errors or unexpected ones."""
 
 import base64
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 from conftest import blinded_input
 from jwcrypto.jwk import JWK
 
@@ -51,16 +52,21 @@ def test_domain_error_from_the_evaluator_passes_through_unwrapped() -> None:
         _service(RecipientNotFoundError()).eval_blind(REQUEST, JWK(generate="oct"))
 
 
-def test_unexpected_evaluator_failure_becomes_an_evaluation_error() -> None:
+def test_hsm_refusal_becomes_an_evaluation_error() -> None:
     with pytest.raises(OprfEvaluationError) as e:
-        _service(RuntimeError("hsm exploded")).eval_blind(REQUEST, JWK(generate="oct"))
+        _service(requests.HTTPError("500 Server Error")).eval_blind(
+            REQUEST, JWK(generate="oct")
+        )
 
     assert e.value.error_type == "crypto_evaluation_failure"
 
 
-def test_unreachable_hsm_becomes_a_retryable_evaluation_error() -> None:
-    import requests
+def test_unexpected_evaluator_failure_is_not_wrapped() -> None:
+    with pytest.raises(RuntimeError):
+        _service(RuntimeError("bug")).eval_blind(REQUEST, JWK(generate="oct"))
 
+
+def test_unreachable_hsm_becomes_a_retryable_evaluation_error() -> None:
     with pytest.raises(OprfEvaluationError) as e:
         _service(requests.exceptions.ConnectionError("refused")).eval_blind(
             REQUEST, JWK(generate="oct")

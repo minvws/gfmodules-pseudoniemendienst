@@ -1,21 +1,25 @@
 import base64
+import binascii
 import logging
 from dataclasses import dataclass
 
 import pyoprf
 import pysodium
+import requests
 from jwcrypto import jwk
 
 from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import DomainError, PseudonymOperationError, RecipientNotFoundError
+from app.exceptions import PseudonymOperationError, RecipientNotFoundError
 from app.models.requests import BlindRequest
-from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
+from app.services.hsm.client import HSM_UNREACHABLE_ERRORS, HsmKeyNotFound
 from app.services.jwe_token import Jwe
 from app.services.oprf.evaluators import OprfEvaluator
 
 logger = logging.getLogger(__name__)
 
 _RISTRETTO255_IDENTITY = bytes(pysodium.crypto_core_ristretto255_BYTES)
+
+_EVALUATION_ERRORS = (requests.HTTPError, HsmKeyNotFound, KeyError, ValueError)
 
 
 class OprfEvaluationError(PseudonymOperationError):
@@ -59,7 +63,7 @@ class OprfService:
         """
         try:
             bi = base64.urlsafe_b64decode(req.encryptedPersonalId)
-        except Exception as e:
+        except binascii.Error as e:
             logger.exception("unable to decode blinded input")
             raise OprfEvaluationError(
                 PseudonymErrorType.INVALID_BLINDED_INPUT,
@@ -73,15 +77,11 @@ class OprfService:
 
         try:
             evals = self.__evaluator.evaluate(req.recipientOrganization, bi)
-        except (OprfEvaluationError, DomainError):
-            # Domain errors (e.g. an unknown recipient) keep their meaning and
-            # status code; only unexpected failures become evaluation errors.
-            raise
         except HSM_UNREACHABLE_ERRORS as e:
             raise OprfEvaluationError(
                 PseudonymErrorType.HSM_UNREACHABLE, f"HSM unreachable: {e}"
             ) from e
-        except Exception as e:
+        except _EVALUATION_ERRORS as e:
             logger.exception("unable to evaluate blind")
             raise OprfEvaluationError(
                 PseudonymErrorType.CRYPTO_EVALUATION_FAILURE,
