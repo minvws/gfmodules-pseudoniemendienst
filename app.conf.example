@@ -83,6 +83,11 @@ timeout=5
 expected_audiences = https://localhost:6502
 
 [jwks]
-# path for local signing and decryption certificates
-# signing_cert_path = secrets/signing.crt
-# decryption_cert_path = secrets/decrypt.crt
+# comma separated field for singing certificates path
+# signing_key_files = /secrets/signing_certificate_1.crt, /secrets/signing_certificate_2.crt
+#
+# comma separated field for active signing certificates
+# active_signing_key_files = /secrets/test_signing_certificate_1.crt
+#
+# hsm_key_labels =
+# active_hsm_key_labels =
