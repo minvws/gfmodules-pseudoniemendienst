@@ -8,10 +8,10 @@ import requests
 from conftest import blinded_input
 from jwcrypto.jwk import JWK
 
-from app.exceptions import RecipientNotFoundError
+from app.exceptions import PseudonymOperationError, RecipientNotFoundError
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.oprf_service import OprfService
 
 REQUEST = BlindRequest.model_validate(
     {
@@ -41,7 +41,7 @@ def test_blind_that_is_not_a_ristretto255_element_is_rejected_before_evaluation(
         update={"encryptedPersonalId": base64.urlsafe_b64encode(element).decode()}
     )
 
-    with pytest.raises(OprfEvaluationError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         OprfService(evaluator).eval_blind(request, JWK(generate="oct"))
 
     assert e.value.error_type == "invalid_blinded_input"
@@ -67,7 +67,7 @@ def test_domain_error_from_the_evaluator_passes_through_unwrapped() -> None:
 def test_known_hsm_failure_becomes_an_evaluation_error(
     failure: Exception, error_type: str
 ) -> None:
-    with pytest.raises(OprfEvaluationError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         _service(failure).eval_blind(REQUEST, JWK(generate="oct"))
 
     assert e.value.error_type == error_type

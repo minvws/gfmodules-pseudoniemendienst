@@ -13,6 +13,7 @@ from conftest import hsm_client
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from app.exceptions import PseudonymOperationError
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.personal_id import PersonalId
 from app.services.reversible.keys import (
@@ -24,7 +25,6 @@ from app.services.reversible.keys import (
 from app.services.reversible.service import (
     FORMAT_VERSION,
     IV_LENGTH,
-    ReversiblePseudonymError,
     ReversiblePseudonymService,
 )
 
@@ -181,7 +181,7 @@ def test_without_active_version_generation_fails(
 ) -> None:
     service = ReversiblePseudonymService(local_keys, _key_versions({recipient: []}))
 
-    with pytest.raises(ReversiblePseudonymError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         service.generate(PID, recipient, SCOPE)
     assert e.value.error_type == "no_active_key_version"
 
@@ -194,7 +194,7 @@ def test_reverse_for_another_organization_fails(
     )
     pseudonym = service.generate(PID, OIN, SCOPE)
 
-    with pytest.raises(ReversiblePseudonymError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         service.reverse(pseudonym.value, OTHER_OIN)
     assert e.value.error_type == "invalid_pseudonym"
 
@@ -210,7 +210,7 @@ def test_reverse_with_destroyed_version_fails(
         local_keys,
         _key_versions({recipient: [2]}, {recipient: [(1, True), (2, False)]}),
     )
-    with pytest.raises(ReversiblePseudonymError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         later.reverse(pseudonym.value, recipient)
     assert e.value.error_type == "version_destroyed"
 
@@ -228,7 +228,7 @@ def test_tampered_pseudonym_is_rejected(
     length = len(base64.urlsafe_b64decode(value))
 
     for index in (3, length - IV_LENGTH - 1, length - 1):
-        with pytest.raises(ReversiblePseudonymError) as e:
+        with pytest.raises(PseudonymOperationError) as e:
             service.reverse(_flip(value, index), recipient)
         assert e.value.error_type == "invalid_pseudonym"
 
@@ -245,7 +245,7 @@ def test_tampered_pseudonym_is_rejected(
 def test_malformed_pseudonym_is_rejected(
     service: ReversiblePseudonymService, recipient: Oin, value: str
 ) -> None:
-    with pytest.raises(ReversiblePseudonymError) as e:
+    with pytest.raises(PseudonymOperationError) as e:
         service.reverse(value, recipient)
     assert e.value.error_type == "invalid_pseudonym"
 
@@ -253,7 +253,7 @@ def test_malformed_pseudonym_is_rejected(
 def test_scope_with_separator_is_refused(
     service: ReversiblePseudonymService, recipient: Oin
 ) -> None:
-    with pytest.raises(ReversiblePseudonymError):
+    with pytest.raises(PseudonymOperationError):
         service.generate(PID, recipient, "a|b")
 
 
@@ -402,7 +402,7 @@ def test_reverse_never_creates_keys(
     blob = bytes([1]) + (1).to_bytes(2, "big") + b"\x00" * 32
     value = base64.urlsafe_b64encode(blob).decode()
 
-    with _with_fake_hsm(fake_hsm), pytest.raises(ReversiblePseudonymError) as e:
+    with _with_fake_hsm(fake_hsm), pytest.raises(PseudonymOperationError) as e:
         service.reverse(value, recipient)
 
     assert e.value.error_type == "invalid_pseudonym"
@@ -445,7 +445,7 @@ def test_hsm_unreachable_is_reported_as_such(
             "requests.Session.request",
             side_effect=requests.exceptions.ConnectionError("down"),
         ),
-        pytest.raises(ReversiblePseudonymError) as e,
+        pytest.raises(PseudonymOperationError) as e,
     ):
         service.generate(PID, recipient, SCOPE)
     assert e.value.error_type == "hsm_unreachable"
@@ -460,7 +460,7 @@ def test_hsm_error_is_reported_as_crypto_failure(
 
     with (
         patch("requests.Session.request", return_value=failing),
-        pytest.raises(ReversiblePseudonymError) as e,
+        pytest.raises(PseudonymOperationError) as e,
     ):
         service.generate(PID, recipient, SCOPE)
     assert e.value.error_type == "crypto_failure"

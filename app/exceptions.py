@@ -84,14 +84,63 @@ class UnauthorizedRequestError(DomainError):
     message = "Unauthorized request"
 
 
-class PseudonymOperationError(ValueError):
+class InvalidPersonalIdError(DomainError):
+    message = "Invalid personal ID"
+
+
+class PseudonymOperationError(DomainError):
     """
     A failed key operation.
     """
 
-    def __init__(self, error_type: PseudonymErrorType, message: str) -> None:
-        super().__init__(message)
-        self.error_type = error_type
+    error_type: PseudonymErrorType
+
+    def __init__(self, reason: str) -> None:
+        super().__init__()
+        self.reason = reason
+
+    def __str__(self) -> str:
+        return self.reason
+
+
+class InvalidPseudonymError(PseudonymOperationError):
+    error_type = PseudonymErrorType.INVALID_PSEUDONYM
+    message = "Invalid pseudonym"
+
+
+class InvalidBlindedInputError(PseudonymOperationError):
+    error_type = PseudonymErrorType.INVALID_BLINDED_INPUT
+    message = "Invalid blinded input"
+
+
+class PseudonymVersionDestroyedError(PseudonymOperationError):
+    error_type = PseudonymErrorType.VERSION_DESTROYED
+    message = "Pseudonym key version no longer available"
+
+
+class NoActiveKeyVersionError(PseudonymOperationError):
+    error_type = PseudonymErrorType.NO_ACTIVE_KEY_VERSION
+    message = RecipientNotFoundError.message
+
+
+class CryptoFailureError(PseudonymOperationError):
+    error_type = PseudonymErrorType.CRYPTO_FAILURE
+    message = "Pseudonym exchange failed"
+
+
+class HsmOperationFailedError(PseudonymOperationError):
+    error_type = PseudonymErrorType.HSM_OPERATION_FAILED
+    message = "Pseudonym operation failed"
+
+
+class HsmUnreachableError(PseudonymOperationError):
+    error_type = PseudonymErrorType.HSM_UNREACHABLE
+    message = "Service temporarily unavailable"
+
+
+class HsmTimeoutError(PseudonymOperationError):
+    error_type = PseudonymErrorType.HSM_TIMEOUT
+    message = "Service temporarily unavailable"
 
 
 class ExchangeInputError(DomainError):

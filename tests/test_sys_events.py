@@ -17,12 +17,13 @@ from app import container
 from app.config import get_config
 from app.db.db import Database
 from app.db.models import OrganizationEntity
+from app.exceptions import PseudonymOperationError
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.oprf_service import OprfService
 
 RecordLogs = Callable[[str], list[logging.LogRecord]]
 
@@ -171,7 +172,7 @@ def test_hsm_unreachable_emits_sys_event(
             "requests.Session.request",
             side_effect=requests.exceptions.ConnectionError("connection refused"),
         ),
-        pytest.raises(OprfEvaluationError) as exc,
+        pytest.raises(PseudonymOperationError) as exc,
     ):
         service.eval_blind(_blind_request(), pub)
 

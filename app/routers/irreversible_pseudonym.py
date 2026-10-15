@@ -2,32 +2,28 @@ import logging
 from typing import Annotated
 
 import gfmodules.logging as gflog
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, Security
 from jwcrypto.jwk import JWK
 from starlette.responses import Response
 
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import ExchangeInputError, RecipientNotFoundError
+from app.exceptions import ExchangeInputError, PseudonymOperationError
 from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.models.requests import IrreversiblePseudonymExchangeRequest
-from app.routers.exchange_support import authorize_exchange
-from app.services.authorization_service import AuthorizationService
-from app.services.irreversible.service import (
-    IrreversiblePseudonymError,
-    IrreversiblePseudonymService,
+from app.routers.exchange_support import (
+    authorize_exchange,
+    parse_personal_id,
+    raise_pseudonym_error,
 )
+from app.services.authorization_service import AuthorizationService
+from app.services.irreversible.service import IrreversiblePseudonymService
 from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
-from app.services.reversible.service import (
-    ReversiblePseudonymError,
-    ReversiblePseudonymService,
-)
+from app.services.reversible.service import ReversiblePseudonymService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,6 +31,7 @@ router = APIRouter()
 _ENDPOINT = "/exchange/irreversible-pseudonym"
 _OPERATION = "exchange:irreversible-pseudonym"
 _SUBJECT_PREFIX = "pseudonym:irreversible:"
+_FAILED = "Irreversible pseudonym creation failed"
 
 
 @router.post(
@@ -135,50 +132,17 @@ def exchange_irreversible_pseudonym(
         _OPERATION,
     )
 
-    def failed(error_type: PseudonymErrorType, exc: Exception | None = None) -> None:
-        # PRS-PSE-004
-        gflog.emit(
-            logger,
-            Log.PSEUDONYM_CREATE_FAILED,
-            "Irreversible pseudonym creation failed",
-            exc_info=exc,
-            fields={**audit.fields(), "error_type": error_type},
-        )
-
     if req.reversiblePseudonym is not None and req.personalId is None:
-        # A reversible pseudonym issued to the caller; reverse it for them.
         try:
-            reversed_pseudonym = reversible_service.reverse(
+            personal_id = reversible_service.reverse(
                 req.reversiblePseudonym, auth.claims.organization_id
+            ).personal_id
+        except PseudonymOperationError as e:
+            raise_pseudonym_error(
+                logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED
             )
-        except ReversiblePseudonymError as e:
-            failed(e.error_type, e)
-            if e.error_type == PseudonymErrorType.HSM_UNREACHABLE:
-                raise HTTPException(
-                    status_code=503, detail="Pseudonym exchange failed"
-                ) from e
-            if e.error_type == PseudonymErrorType.VERSION_DESTROYED:
-                raise HTTPException(
-                    status_code=410, detail="Pseudonym key version no longer available"
-                ) from e
-            raise HTTPException(status_code=400, detail="Invalid pseudonym") from e
-        personal_id = reversed_pseudonym.personal_id
     elif req.personalId is not None and req.reversiblePseudonym is None:
-        try:
-            personal_id = PersonalId.parse(req.personalId)
-        except PersonalIdValidationError as e:
-            # PRS-PSE-005: only the kind of failure, never the value.
-            gflog.emit(
-                logger,
-                Log.PERSONAL_ID_VALIDATION_FAILED,
-                "Personal ID validation failed",
-                fields={
-                    "handelende_oin": audit.handelende_oin,
-                    "namens_oin": audit.namens_oin,
-                    "validation_error": e.kind,
-                },
-            )
-            raise HTTPException(status_code=400, detail="Invalid personal ID")
+        personal_id = parse_personal_id(logger, req.personalId, audit)
     else:
         raise ExchangeInputError()
 
@@ -193,14 +157,8 @@ def exchange_irreversible_pseudonym(
             recipient=req.recipientOrganization,
             recipient_scope=req.recipientScope,
         )
-    except IrreversiblePseudonymError as e:
-        failed(e.error_type, e)
-        if e.error_type == PseudonymErrorType.NO_ACTIVE_KEY_VERSION:
-            # Same message as for an unknown recipient, so a caller cannot tell
-            # the two apart.
-            raise RecipientNotFoundError()
-        status = 503 if e.error_type == PseudonymErrorType.HSM_UNREACHABLE else 500
-        raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
+    except PseudonymOperationError as e:
+        raise_pseudonym_error(logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED)
 
     extra_claims: dict[str, object] = {"keyVersion": pseudonym.version}
     if pseudonym.older:

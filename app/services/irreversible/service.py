@@ -14,8 +14,11 @@ import base64
 import logging
 from dataclasses import dataclass
 
-from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import PseudonymOperationError
+from app.exceptions import (
+    CryptoFailureError,
+    HsmUnreachableError,
+    NoActiveKeyVersionError,
+)
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
 from app.services.hsm.client import HSM_UNREACHABLE_ERRORS
@@ -24,10 +27,6 @@ from app.services.irreversible.keys import IrreversibleKeyOperations
 from app.services.pseudonym_subject import pseudonym_subject
 
 logger = logging.getLogger(__name__)
-
-
-class IrreversiblePseudonymError(PseudonymOperationError):
-    pass
 
 
 def _encode(digest: bytes) -> str:
@@ -64,9 +63,8 @@ class IrreversiblePseudonymService:
             recipient
         )
         if not active:
-            raise IrreversiblePseudonymError(
-                PseudonymErrorType.NO_ACTIVE_KEY_VERSION,
-                f"organization '{recipient.value}' has no active HSM key version",
+            raise NoActiveKeyVersionError(
+                f"organization '{recipient.value}' has no active HSM key version"
             )
 
         try:
@@ -75,15 +73,10 @@ class IrreversiblePseudonymService:
                 for version in sorted(active)
             }
         except HSM_UNREACHABLE_ERRORS as e:
-            raise IrreversiblePseudonymError(
-                PseudonymErrorType.HSM_UNREACHABLE, "HSM unreachable"
-            ) from e
+            raise HsmUnreachableError("HSM unreachable") from e
         except Exception as e:
             logger.exception("irreversible pseudonym computation failed")
-            raise IrreversiblePseudonymError(
-                PseudonymErrorType.CRYPTO_FAILURE,
-                "irreversible pseudonym computation failed",
-            ) from e
+            raise CryptoFailureError("irreversible pseudonym computation failed") from e
 
         # digests is ordered by version, so the last one is the latest
         *older, (latest, digest) = digests.items()
@@ -100,6 +93,4 @@ class IrreversiblePseudonymService:
         try:
             return pseudonym_subject(personal_id, recipient, recipient_scope)
         except ValueError as e:
-            raise IrreversiblePseudonymError(
-                PseudonymErrorType.CRYPTO_FAILURE, str(e)
-            ) from e
+            raise CryptoFailureError(str(e)) from e
