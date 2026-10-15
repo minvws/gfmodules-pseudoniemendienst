@@ -24,8 +24,9 @@ router = APIRouter()
 
 EVAL_FAILURE_STATUS_CODES = {
     PseudonymErrorType.INVALID_BLINDED_INPUT: 400,
-    PseudonymErrorType.CRYPTO_EVALUATION_FAILURE: 500,
+    PseudonymErrorType.HSM_OPERATION_FAILED: 502,
     PseudonymErrorType.HSM_UNREACHABLE: 503,
+    PseudonymErrorType.HSM_TIMEOUT: 504,
 }
 
 
@@ -49,8 +50,9 @@ EVAL_FAILURE_STATUS_CODES = {
                 "has no active HSM key version."
             )
         },
-        500: {"description": "The evaluation failed on the server side."},
+        502: {"description": "The HSM refused the evaluation."},
         503: {"description": "The HSM could not be reached; retry later."},
+        504: {"description": "The HSM did not answer in time; retry later."},
     },
 )
 def post_eval(

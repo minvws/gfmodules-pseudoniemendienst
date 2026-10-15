@@ -20,7 +20,7 @@ from app.services.oprf.evaluators import (
     LocalOprfEvaluator,
     OprfHsmKeyLabel,
 )
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.oprf_service import OprfService
 
 TEST_OIN = Oin("00000099000000001000")
 TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
@@ -477,7 +477,7 @@ def test_eval_generate_key_without_result_raises_value_error() -> None:
 
 
 def test_local_mode_without_server_key_raises() -> None:
-    with pytest.raises(OprfEvaluationError) as exc:
+    with pytest.raises(ValueError):
         service = OprfService(LocalOprfEvaluator(b""))
         service.eval_blind(
             BlindRequest(
@@ -487,4 +487,3 @@ def test_local_mode_without_server_key_raises() -> None:
             ),
             pub_key=jwk.JWK.generate(kty="RSA", size=2048),
         )
-    assert exc.value.error_type == "crypto_evaluation_failure"

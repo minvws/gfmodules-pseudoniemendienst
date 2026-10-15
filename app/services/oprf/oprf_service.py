@@ -11,7 +11,7 @@ from jwcrypto import jwk
 from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import PseudonymOperationError, RecipientNotFoundError
 from app.models.requests import BlindRequest
-from app.services.hsm.client import HSM_UNREACHABLE_ERRORS, HsmKeyNotFound
+from app.services.hsm.client import HsmKeyNotFound
 from app.services.jwe_token import Jwe
 from app.services.oprf.evaluators import OprfEvaluator
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 _RISTRETTO255_IDENTITY = bytes(pysodium.crypto_core_ristretto255_BYTES)
 
-_EVALUATION_ERRORS = (requests.HTTPError, HsmKeyNotFound, KeyError, ValueError)
+_HSM_REFUSALS = (requests.HTTPError, HsmKeyNotFound)
 
 
 class OprfEvaluationError(PseudonymOperationError):
@@ -77,15 +77,19 @@ class OprfService:
 
         try:
             evals = self.__evaluator.evaluate(req.recipientOrganization, bi)
-        except HSM_UNREACHABLE_ERRORS as e:
+        except requests.ConnectionError as e:
             raise OprfEvaluationError(
                 PseudonymErrorType.HSM_UNREACHABLE, f"HSM unreachable: {e}"
             ) from e
-        except _EVALUATION_ERRORS as e:
+        except requests.Timeout as e:
+            raise OprfEvaluationError(
+                PseudonymErrorType.HSM_TIMEOUT, f"HSM timed out: {e}"
+            ) from e
+        except _HSM_REFUSALS as e:
             logger.exception("unable to evaluate blind")
             raise OprfEvaluationError(
-                PseudonymErrorType.CRYPTO_EVALUATION_FAILURE,
-                f"unable to evaluate blind: {e}",
+                PseudonymErrorType.HSM_OPERATION_FAILED,
+                f"HSM refused the evaluation: {e}",
             ) from e
 
         if not evals:

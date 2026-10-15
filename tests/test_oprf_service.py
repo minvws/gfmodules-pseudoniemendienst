@@ -10,6 +10,7 @@ from jwcrypto.jwk import JWK
 
 from app.exceptions import RecipientNotFoundError
 from app.models.requests import BlindRequest
+from app.services.hsm.client import HsmKeyNotFound
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
 REQUEST = BlindRequest.model_validate(
@@ -52,27 +53,34 @@ def test_domain_error_from_the_evaluator_passes_through_unwrapped() -> None:
         _service(RecipientNotFoundError()).eval_blind(REQUEST, JWK(generate="oct"))
 
 
-def test_hsm_refusal_becomes_an_evaluation_error() -> None:
+@pytest.mark.parametrize(
+    "failure,error_type",
+    [
+        (requests.HTTPError("500 Server Error"), "hsm_operation_failed"),
+        (HsmKeyNotFound("No such key"), "hsm_operation_failed"),
+        (requests.ConnectionError("refused"), "hsm_unreachable"),
+        (requests.ConnectTimeout("no connection in time"), "hsm_unreachable"),
+        (requests.ReadTimeout("no answer in time"), "hsm_timeout"),
+    ],
+    ids=["refused", "key-missing", "unreachable", "connect-timeout", "read-timeout"],
+)
+def test_known_hsm_failure_becomes_an_evaluation_error(
+    failure: Exception, error_type: str
+) -> None:
     with pytest.raises(OprfEvaluationError) as e:
-        _service(requests.HTTPError("500 Server Error")).eval_blind(
-            REQUEST, JWK(generate="oct")
-        )
+        _service(failure).eval_blind(REQUEST, JWK(generate="oct"))
 
-    assert e.value.error_type == "crypto_evaluation_failure"
+    assert e.value.error_type == error_type
 
 
-def test_unexpected_evaluator_failure_is_not_wrapped() -> None:
-    with pytest.raises(RuntimeError):
-        _service(RuntimeError("bug")).eval_blind(REQUEST, JWK(generate="oct"))
-
-
-def test_unreachable_hsm_becomes_a_retryable_evaluation_error() -> None:
-    with pytest.raises(OprfEvaluationError) as e:
-        _service(requests.exceptions.ConnectionError("refused")).eval_blind(
-            REQUEST, JWK(generate="oct")
-        )
-
-    assert e.value.error_type == "hsm_unreachable"
+@pytest.mark.parametrize(
+    "failure",
+    [RuntimeError("bug"), ValueError("bad local server key")],
+    ids=["bug", "local-evaluator"],
+)
+def test_unexpected_evaluator_failure_is_not_wrapped(failure: Exception) -> None:
+    with pytest.raises(type(failure)):
+        _service(failure).eval_blind(REQUEST, JWK(generate="oct"))
 
 
 def test_recipient_without_active_key_version_is_not_found() -> None:

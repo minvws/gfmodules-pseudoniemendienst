@@ -441,17 +441,24 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
     assert eval_response.json() == {"detail": "Unable to evaluate blind"}
 
 
-def test_oprf_eval_when_evaluation_crashes_returns_server_error(
+@pytest.mark.parametrize(
+    "error_type,status_code",
+    [
+        (PseudonymErrorType.HSM_OPERATION_FAILED, 502),
+        (PseudonymErrorType.HSM_TIMEOUT, 504),
+    ],
+)
+def test_oprf_eval_when_hsm_fails_returns_gateway_error(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
     valid_headers: dict[str, str],
+    error_type: PseudonymErrorType,
+    status_code: int,
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError(
-                PseudonymErrorType.CRYPTO_EVALUATION_FAILURE, "boom"
-            )
+            raise OprfEvaluationError(error_type, "boom")
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
     try:
@@ -467,7 +474,7 @@ def test_oprf_eval_when_evaluation_crashes_returns_server_error(
     finally:
         app.dependency_overrides.pop(container.get_oprf_service, None)
 
-    assert eval_response.status_code == 500
+    assert eval_response.status_code == status_code
     assert eval_response.json() == {"detail": "Unable to evaluate blind"}
 
 

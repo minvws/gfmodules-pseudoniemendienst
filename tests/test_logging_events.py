@@ -128,7 +128,7 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
     assert exc.value.error_type == "invalid_blinded_input"
 
 
-def test_eval_blind_hsm_refusal_raises_crypto_evaluation_failure(
+def test_eval_blind_hsm_refusal_raises_hsm_operation_failed(
     pub_key: jwk.JWK,
 ) -> None:
     refusal = requests.Response()
@@ -153,4 +153,4 @@ def test_eval_blind_hsm_refusal_raises_crypto_evaluation_failure(
     ):
         service.eval_blind(_blind_request(blinded_input()), pub_key)
 
-    assert exc.value.error_type == "crypto_evaluation_failure"
+    assert exc.value.error_type == "hsm_operation_failed"
