@@ -15,7 +15,7 @@ import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from conftest import generate_rsa_keypair, hsm_client
+from conftest import blinded_input, generate_rsa_keypair, hsm_client
 from fastapi import FastAPI
 from jwcrypto import jwe as jwelib
 from jwcrypto import jwk
@@ -68,11 +68,10 @@ def _decrypt_jwe(jwe_str: str, private_key_pem: str) -> dict[str, Any]:
 
 
 def _eval(client: TestClient, recipient_id: Oin, valid_headers: dict[str, str]) -> Any:
-    blinded = base64.urlsafe_b64encode(b"blinded").decode("ascii")
     return client.post(
         "/oprf/eval",
         json={
-            "encryptedPersonalId": blinded,
+            "encryptedPersonalId": blinded_input(),
             "recipientOrganization": "oin:" + recipient_id.value,
             "recipientScope": SCOPE,
         },

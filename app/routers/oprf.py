@@ -22,11 +22,38 @@ from app.services.organization_public_key_service import OrganizationPublicKeySe
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+EVAL_FAILURE_STATUS_CODES = {
+    PseudonymErrorType.INVALID_BLINDED_INPUT: 400,
+    PseudonymErrorType.HSM_OPERATION_FAILED: 502,
+    PseudonymErrorType.HSM_UNREACHABLE: 503,
+    PseudonymErrorType.HSM_TIMEOUT: 504,
+}
+
 
 @router.post(
     "/oprf/eval",
     summary="Evaluate OPRF blind and returns an encrypted JWE for the organization",
     tags=["OPRF Services"],
+    responses={
+        400: {"description": "The blinded input is invalid."},
+        403: {
+            "description": (
+                "Insufficient scope (the token requires `prs:oprf-pseudonym`), the "
+                "calling organization is not registered, or it is not allowed to "
+                "request OPRF pseudonyms."
+            )
+        },
+        404: {
+            "description": (
+                "The recipient organization is unknown, is not allowed to receive "
+                "OPRF pseudonyms, has no public key registered for the scope, or "
+                "has no active HSM key version."
+            )
+        },
+        502: {"description": "The HSM refused the evaluation."},
+        503: {"description": "The HSM could not be reached; retry later."},
+        504: {"description": "The HSM did not answer in time; retry later."},
+    },
 )
 def post_eval(
     req: BlindRequest,
@@ -108,12 +135,10 @@ def post_eval(
             "OPRF evaluation failed",
             fields={**audit_oins, "error_type": e.error_type},
         )
-        if e.error_type == PseudonymErrorType.HSM_UNREACHABLE:
-            # Like the reversible exchange: the request may be retried later.
-            raise HTTPException(
-                status_code=503, detail="Unable to evaluate blind"
-            ) from e
-        raise HTTPException(status_code=400, detail="Unable to evaluate blind") from e
+        raise HTTPException(
+            status_code=EVAL_FAILURE_STATUS_CODES[e.error_type],
+            detail="Unable to evaluate blind",
+        ) from e
 
     # PRS-OPRF-001
     gflog.emit(
