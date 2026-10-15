@@ -6,6 +6,8 @@ enable_test_routes=True
 enable_exchange_services_routes=True
 # Enable the mock SAML exchange routes (/saml-exchange/*); test environments only
 enable_saml_exchange_routes=False
+# Sign the pseudonym inside the JWE (nested JWT, PS256); needs [jwt_signing]
+enable_jwt_signing=False
 
 [logging]
 # Single syslog channel (host:port, UDP); leave empty to log to stdout only.
@@ -67,6 +69,25 @@ root_path =
 master_key=
 # File with base64 OPRF server key
 oprf_server_key_file=secrets/oprf-server.key
+
+[jwt_signing]
+# The `iss` claim in signed pseudonym JWTs; receivers map it to the PRS JWKS URL
+# issuer=https://pseudoniemendienst.example.nl
+# Signing keys, RSA of at least 3072 bits. Every key in key_files and
+# hsm_key_labels is published at /.well-known/jwks (one entry per key, each with
+# its own kid); only the single key named by active_key_file OR active_key_label
+# signs. Set exactly one of the two.
+#
+# key_files: comma separated list of PEM files with RSA private keys, e.g. from
+# `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072`.
+# active_key_file: one path, exactly as written in key_files.
+# key_files=secrets/jwt-signing-1.pem, secrets/jwt-signing-2.pem
+# active_key_file=secrets/jwt-signing-2.pem
+#
+# hsm_key_labels: comma separated list of labels of RSA key pairs in the HSM.
+# active_key_label: one label from hsm_key_labels.
+# hsm_key_labels=prs-jwt-2026-10, prs-jwt-2027-01
+# active_key_label=prs-jwt-2027-01
 
 [saml_service]
 # Base URL of the internal PRS-SAML service; required when enable_saml_exchange_routes is set

@@ -26,6 +26,7 @@ class ConfigApp(BaseModel):
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
     enable_saml_exchange_routes: bool = Field(default=False)
+    enable_jwt_signing: bool = Field(default=False)
 
 
 def _int_or_default(default: int) -> Callable[[Any, Any], int]:
@@ -112,6 +113,28 @@ class ConfigSamlService(BaseModel):
     ca_cert_file: str | None = Field(default=None)
 
 
+class ConfigJwtSigning(BaseModel):
+    # The `iss` claim in signed pseudonym JWTs. Receivers map it to the PRS
+    # JWKS URL in their own configuration. Required when enable_jwt_signing is set.
+    issuer: str = Field(default="")
+    # Signing keys: PEM files with RSA private keys and/or labels of RSA key
+    # pairs in the HSM. key_files and hsm_key_labels are comma separated lists
+    # in the conf file. All keys are published for verification; only the one
+    # named by active_key_file or active_key_label (a single entry from its
+    # list) signs. At least one key is required when enable_jwt_signing is set.
+    key_files: list[str] = Field(default=[])
+    active_key_file: str = Field(default="")
+    hsm_key_labels: list[str] = Field(default=[])
+    active_key_label: str = Field(default="")
+
+    _split_key_files = field_validator("key_files", mode="before")(
+        split_comma_separated()
+    )
+    _split_hsm_key_labels = field_validator("hsm_key_labels", mode="before")(
+        split_comma_separated()
+    )
+
+
 class ConfigAuthorizationHeaders(BaseModel):
     expected_audiences: list[str]
 
@@ -144,6 +167,7 @@ class Config(BaseModel):
     local_keys: ConfigLocalKeys = Field(default_factory=ConfigLocalKeys)
     authorization_headers: ConfigAuthorizationHeaders
     saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
+    jwt_signing: ConfigJwtSigning = Field(default_factory=ConfigJwtSigning)
 
 
 def read_ini_file(path: str) -> Any:
