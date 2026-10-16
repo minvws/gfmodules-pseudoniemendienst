@@ -81,3 +81,8 @@ timeout=5
 # space separated list of expected audiences, one should be present in the authorization authorization header
 # usually the value is the domain of the running application
 expected_audiences = https://localhost:6502
+
+[jwks]
+# path for local signing and decryption certificates
+# signing_cert_path = secrets/signing.crt
+# decryption_cert_path = secrets/decrypt.crt
