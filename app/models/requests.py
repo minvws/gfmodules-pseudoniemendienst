@@ -11,6 +11,8 @@ from app.utils.datetime import now_utc
 
 logger = logging.getLogger(__name__)
 
+REVERSIBLE_PSEUDONYM_PREFIX = "pseudonym:reversible:"
+
 
 class HsmKeyVersionRequest(BaseModel):
     model_config = ConfigDict(
@@ -152,21 +154,18 @@ class BlindRequest(BaseModel):
         return normalized
 
 
-REVERSIBLE_PSEUDONYM_PREFIX = "pseudonym:reversible:"
-
-
-class _PseudonymExchangeRequest(BaseModel):
+class PseudonymExchangeRequest(BaseModel):
     recipientOrganization: RecipientOrganizationOin
     recipientScope: str = Field(
         ...,
         min_length=1,
         max_length=100,
         pattern=r"^[^|]+$",
-        description="Scope of the recipient organization the pseudonym is bound to.",
+        description="Scope of the recipient organization which the pseudonym is bound to.",
     )
 
 
-class _PersonalIdExchangeRequest(_PseudonymExchangeRequest):
+class PersonalIdExchangeRequest(PseudonymExchangeRequest):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -197,15 +196,15 @@ class _PersonalIdExchangeRequest(_PseudonymExchangeRequest):
     )
 
 
-class ReversiblePseudonymExchangeRequest(_PersonalIdExchangeRequest):
+class ReversiblePseudonymExchangeRequest(PersonalIdExchangeRequest):
     pass
 
 
-class IrreversiblePseudonymFromPersonalIdRequest(_PersonalIdExchangeRequest):
+class IrreversiblePseudonymFromPersonalIdRequest(PersonalIdExchangeRequest):
     model_config = ConfigDict(extra="forbid")
 
 
-class IrreversiblePseudonymFromReversiblePseudonymRequest(_PseudonymExchangeRequest):
+class IrreversiblePseudonymFromReversiblePseudonymRequest(PseudonymExchangeRequest):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
