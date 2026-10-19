@@ -10,6 +10,7 @@ turns them into the same ``{"detail": ...}`` body FastAPI uses for
 import logging
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.exceptions import (
@@ -72,3 +73,21 @@ def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
 
 def install_domain_error_handler(fastapi: FastAPI) -> None:
     fastapi.add_exception_handler(DomainError, domain_error_handler)
+
+
+def validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [
+                {"type": error["type"], "loc": error["loc"], "msg": error["msg"]}
+                for error in exc.errors()
+            ]
+        },
+    )
+
+
+def install_validation_error_handler(fastapi: FastAPI) -> None:
+    fastapi.exception_handler(RequestValidationError)(validation_error_handler)
