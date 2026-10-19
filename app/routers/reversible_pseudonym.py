@@ -15,7 +15,10 @@ from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.personal_id import PersonalId, PersonalIdValidationError
-from app.models.requests import ReversiblePseudonymExchangeRequest
+from app.models.requests import (
+    REVERSIBLE_PSEUDONYM_PREFIX,
+    ReversiblePseudonymExchangeRequest,
+)
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -29,7 +32,6 @@ router = APIRouter()
 
 _ENDPOINT = "/exchange/reversible-pseudonym"
 _OPERATION = "exchange:reversible-pseudonym"
-_SUBJECT_PREFIX = "pseudonym:reversible:"
 
 
 @router.post(
@@ -181,7 +183,7 @@ def exchange_reversible_pseudonym(
     jwe = Jwe.build(
         audience=doel_oin,
         scope=req.recipientScope,
-        subject=_SUBJECT_PREFIX + pseudonym.value,
+        subject=REVERSIBLE_PSEUDONYM_PREFIX + pseudonym.value,
         pub_key=JWK(**public_key.jwk),
         extra_claims={"keyVersion": pseudonym.version},
     )

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.organization_public_key import OrganizationPublicKeyRequest
@@ -10,6 +10,9 @@ from app.models.requests import (
     BlindRequest,
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
+    IrreversiblePseudonymExchangeRequest,
+    IrreversiblePseudonymFromPersonalIdRequest,
+    IrreversiblePseudonymFromReversiblePseudonymRequest,
     ReversiblePseudonymExchangeRequest,
 )
 
@@ -109,6 +112,55 @@ def test_reversible_pseudonym_request_rejects_invalid_scope(scope: str) -> None:
             personalId="NL:bsn:950000012",
             recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
             recipientScope=scope,
+        )
+
+
+RECIPIENT = RecipientOrganizationOin("oin:00000099000000003000")
+
+
+def _irreversible_request(
+    fields: dict[str, str],
+) -> IrreversiblePseudonymExchangeRequest:
+    return TypeAdapter(IrreversiblePseudonymExchangeRequest).validate_python(
+        {**fields, "recipientOrganization": RECIPIENT, "recipientScope": "scope"}
+    )
+
+
+@pytest.mark.parametrize(
+    "value", ["AQAB", "pseudonym:reversible:AQAB"], ids=["bare", "as-received"]
+)
+def test_irreversible_request_accepts_a_reversible_pseudonym(value: str) -> None:
+    request = _irreversible_request({"reversiblePseudonym": value})
+
+    assert isinstance(request, IrreversiblePseudonymFromReversiblePseudonymRequest)
+    assert request.reversiblePseudonym == "AQAB"
+
+
+def test_irreversible_request_accepts_a_personal_id() -> None:
+    request = _irreversible_request({"personalId": "NL:bsn:950000012"})
+
+    assert isinstance(request, IrreversiblePseudonymFromPersonalIdRequest)
+    assert request.personalId == "NL:bsn:950000012"
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"personalId": "NL:bsn:950000012", "reversiblePseudonym": "AQAB"}, {}],
+    ids=["both", "neither"],
+)
+def test_irreversible_request_takes_exactly_one_input(fields: dict[str, str]) -> None:
+    with pytest.raises(ValidationError):
+        _irreversible_request(fields)
+
+
+def test_reversible_request_requires_a_personal_id() -> None:
+    with pytest.raises(ValidationError, match="personalId"):
+        ReversiblePseudonymExchangeRequest.model_validate(
+            {
+                "reversiblePseudonym": "AQAB",
+                "recipientOrganization": RECIPIENT,
+                "recipientScope": "scope",
+            }
         )
 
 

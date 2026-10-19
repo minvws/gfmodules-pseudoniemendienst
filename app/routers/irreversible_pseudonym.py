@@ -15,7 +15,10 @@ from app.logging.events import Log
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.personal_id import PersonalId, PersonalIdValidationError
-from app.models.requests import IrreversiblePseudonymExchangeRequest
+from app.models.requests import (
+    IrreversiblePseudonymExchangeRequest,
+    IrreversiblePseudonymFromReversiblePseudonymRequest,
+)
 from app.services.authorization_service import AuthorizationService
 from app.services.irreversible.service import (
     IrreversiblePseudonymError,
@@ -34,7 +37,6 @@ router = APIRouter()
 _ENDPOINT = "/exchange/irreversible-pseudonym"
 _OPERATION = "exchange:irreversible-pseudonym"
 _SUBJECT_PREFIX = "pseudonym:irreversible:"
-_REVERSIBLE_PREFIX = "pseudonym:reversible:"
 
 
 @router.post(
@@ -89,9 +91,10 @@ organization and scope. The pseudonym is a keyed one-way function
 (HMAC-SHA256 under the recipient's key version) of the personal ID: it is
 deterministic for the same input, and nobody, the PRS included, can reverse it.
 
-Instead of a personal ID, `personalId` may hold a reversible pseudonym
-(`pseudonym:reversible:<...>`) that was issued to the calling organization;
-the PRS reverses it first and never returns the personal ID.
+Instead of `personalId`, `reversiblePseudonym` may hold a reversible pseudonym
+that was issued to the calling organization, as the bare value or as received
+(`pseudonym:reversible:<...>`); the PRS reverses it first and never returns the
+personal ID.
 
 Requires the `prs:pseudonym` OAuth scope. Before the input is processed, two
 administrator-managed authorizations are checked: the calling organization
@@ -169,14 +172,10 @@ def exchange_irreversible_pseudonym(
         deny("recipient_may_not_receive_irreversible_pseudonym", e)
         raise
 
-    if isinstance(req.personalId, str) and req.personalId.startswith(
-        _REVERSIBLE_PREFIX
-    ):
-        # A reversible pseudonym issued to the caller; reverse it for them.
+    if isinstance(req, IrreversiblePseudonymFromReversiblePseudonymRequest):
         try:
             reversed_pseudonym = reversible_service.reverse(
-                req.personalId.removeprefix(_REVERSIBLE_PREFIX),
-                auth.claims.organization_id,
+                req.reversiblePseudonym, auth.claims.organization_id
             )
         except ReversiblePseudonymError as e:
             failed(e.error_type, e)

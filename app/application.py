@@ -21,7 +21,10 @@ from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
 from app.routers.administration.key import router as key_router
 from app.routers.default import router as default_router
-from app.routers.errors import install_domain_error_handler
+from app.routers.errors import (
+    install_domain_error_handler,
+    install_validation_error_handler,
+)
 from app.routers.health import router as health_router
 from app.routers.irreversible_pseudonym import router as irreversible_pseudonym_router
 from app.routers.oprf import router as oprf_router
@@ -349,6 +352,7 @@ def setup_fastapi() -> FastAPI:
     )
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
     install_domain_error_handler(fastapi)
+    install_validation_error_handler(fastapi)
 
     # Non-OAuth routes
     public_routers = [
