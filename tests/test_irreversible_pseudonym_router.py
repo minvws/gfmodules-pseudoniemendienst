@@ -36,7 +36,7 @@ from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 ENDPOINT = "/exchange/irreversible-pseudonym"
-LOGGER = "app.routers.irreversible_pseudonym"
+LOGGER = "app.routers.exchange.irreversible_pseudonym"
 BODY = {
     "personalId": f"NL:bsn:{BSN}",
     "recipientOrganization": RECIPIENT,
