@@ -98,6 +98,7 @@ def exchange_reversible_pseudonym(
         ReversiblePseudonymService,
         Depends(container.get_reversible_pseudonym_service),
     ],
+    jwe: Annotated[Jwe, Depends(container.get_jwe)],
 ) -> Response:
     handelende_oin = str(auth.claims.client_organization_id)
     namens_oin = str(auth.claims.organization_id)
@@ -180,7 +181,7 @@ def exchange_reversible_pseudonym(
         status = 503 if e.error_type == PseudonymErrorType.HSM_UNREACHABLE else 500
         raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 
-    jwe = Jwe.build(
+    token = jwe.build(
         audience=doel_oin,
         scope=req.recipientScope,
         subject=REVERSIBLE_PSEUDONYM_PREFIX + pseudonym.value,
@@ -200,4 +201,4 @@ def exchange_reversible_pseudonym(
             "sleutel_versie": pseudonym.version,
         },
     )
-    return Response(status_code=201, content=jwe, media_type="application/jwe")
+    return Response(status_code=201, content=token, media_type="application/jwe")

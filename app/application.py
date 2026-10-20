@@ -27,6 +27,7 @@ from app.routers.errors import (
 )
 from app.routers.health import router as health_router
 from app.routers.irreversible_pseudonym import router as irreversible_pseudonym_router
+from app.routers.jwks import router as jwks_router
 from app.routers.oprf import router as oprf_router
 from app.routers.reversible_pseudonym import router as reversible_pseudonym_router
 from app.routers.saml_exchange import router as saml_exchange_router
@@ -151,7 +152,8 @@ TAGS_METADATA = [
         "name": "Service Information",
         "description": (
             "Public, unauthenticated endpoints reporting the service version and "
-            "health status. Useful for load balancers, monitoring, and smoke tests."
+            "health status, and the keys for verifying signed pseudonyms. Useful "
+            "for load balancers, monitoring, smoke tests, and receivers."
         ),
     },
     {
@@ -359,6 +361,8 @@ def setup_fastapi() -> FastAPI:
         default_router,
         health_router,
     ]
+    if config.app.enable_jwt_signing:
+        public_routers.append(jwks_router)
     for router in public_routers:
         fastapi.include_router(router)
 

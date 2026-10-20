@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import Any
@@ -29,12 +30,13 @@ from cryptography.hazmat.primitives import serialization
 from fastapi import FastAPI
 from gfmodules.logging import ConfigLogging
 from gfmodules.logging.testing import reset_for_tests
+from jwcrypto import jwe, jws
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
 from pydantic import SecretStr
 from starlette.testclient import TestClient
 
-from app.config import get_config, set_config
+from app.config import ConfigJwtSigning, get_config, set_config
 from app.db.db import Database
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
@@ -43,6 +45,8 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
 from app.services.irreversible.keys import HsmIrreversibleKeyOperations
+from app.services.jwe_token import Jwe
+from app.services.jwt_signer import JwtSigningKeys
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.reversible.keys import HsmReversibleKeyOperations
 
@@ -351,3 +355,59 @@ def reset_version_cache() -> Generator[None, None, None]:
 
     yield
     app.utils.version._version_cache = False
+
+
+JWT_ISSUER = "https://prs.test"
+
+
+@pytest.fixture(scope="session")
+def jwt_signing_key_pem() -> str:
+    private_key_pem, _ = generate_rsa_keypair()
+    return private_key_pem
+
+
+@pytest.fixture
+def jwt_signing(
+    app: FastAPI, tmp_path: Any, jwt_signing_key_pem: str
+) -> Generator[JwtSigningKeys, None, None]:
+    """Turns on enable_jwt_signing and rebuilds the container, so requests
+    through `client` get signed pseudonyms from the real wiring."""
+    from app.container import container_config
+
+    key_file = tmp_path / "jwt-signing.pem"
+    key_file.write_text(jwt_signing_key_pem)
+    original = get_config()
+    config = original.model_copy(deep=True)
+    config.app.enable_jwt_signing = True
+    config.jwt_signing = ConfigJwtSigning(
+        issuer=JWT_ISSUER,
+        key_files=[str(key_file)],
+        active_key_file=str(key_file),
+    )
+    set_config(config)
+    try:
+        inject.configure(container_config, clear=True)
+        signing = inject.instance(Jwe).signing
+        assert signing is not None
+        yield signing
+    finally:
+        set_config(original)
+
+
+def decrypt_signed(
+    token: str, priv_key_pem: str, signing: JwtSigningKeys
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Decrypts a nested JWT and verifies the inner signature as a receiver
+    would. Returns the JWE header, the JWS header and the claims."""
+    outer = jwe.JWE()
+    outer.deserialize(token)
+    outer.decrypt(JWK.from_pem(priv_key_pem.encode("ascii")))
+
+    inner = jws.JWS()
+    inner.deserialize(outer.payload.decode("ascii"))
+    kid = inner.jose_header["kid"]
+    public = next(k for k in signing.public_jwks() if k["kid"] == kid)
+    inner.verify(JWK(**public), alg="PS256")
+
+    claims: dict[str, Any] = json.loads(inner.payload)
+    return dict(outer.jose_header), dict(inner.jose_header), claims
