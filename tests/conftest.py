@@ -1,50 +1,48 @@
+import base64
 import logging
 import os
-from typing import Any
-
-from cryptography.hazmat.primitives.asymmetric import rsa
-from sqlalchemy import select, text
-from sqlalchemy.orm import Session
-
-from app.db.models import HsmKeyVersionEntity, OrganizationEntity
-from app.db.models.base import Base
-from app.db.models.personal_id_type import PersonalIdTypeEntity
-from app.db.session import DbSession
-from app.enums.personal_id_type import PersonalIdType
-from app.models.oin import Oin
-from app.services.organization_public_key_service import OrganizationPublicKeyService
-
-os.environ.setdefault("FASTAPI_CONFIG_PATH", "./app.test.conf")
-
-import base64
 import secrets
 from collections.abc import Callable, Generator
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import gfmodules.logging as gflog
 import inject
 import pyoprf
 import pytest
-from cryptography.hazmat.primitives import serialization
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from gfmodules.logging import ConfigLogging
 from gfmodules.logging.testing import reset_for_tests
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
 from pydantic import SecretStr
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 from app.config import get_config, set_config
 from app.db.db import Database
+from app.db.models import HsmKeyVersionEntity, OrganizationEntity
+from app.db.models.base import Base
+from app.db.models.personal_id_type import PersonalIdTypeEntity
+from app.db.session import DbSession
+from app.enums.personal_id_type import PersonalIdType
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
+from app.models.oin import Oin
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
 from app.services.irreversible.keys import HsmIrreversibleKeyOperations
 from app.services.oprf.evaluators import HsmOprfEvaluator
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.keys import HsmReversibleKeyOperations
+
+os.environ.setdefault("FASTAPI_CONFIG_PATH", "./app.test.conf")
 
 
 def blinded_input() -> str:
@@ -85,6 +83,9 @@ if not os.path.exists(oprf_path):
 
 if not conf.local_keys.master_key.get_secret_value():
     conf.local_keys.master_key = SecretStr(genkey(32))
+
+# conf.jwks.signing_key_files = Mock(Path)
+# conf.jwks.active_signing_key_files = Mock(Path)
 set_config(conf)
 
 
@@ -136,10 +137,10 @@ def record_logs() -> Generator[Callable[[str], list[logging.LogRecord]], None, N
 
 @pytest.fixture
 def app(database: Database) -> Generator[FastAPI, None, None]:
+    # Configure the injector for each test, clear if already configured
     from app.application import create_fastapi_app
     from app.container import container_config
 
-    # Configure the injector for each test, clear if already configured
     if inject.is_configured():
         inject.configure(container_config, clear=True)
     else:
@@ -299,6 +300,32 @@ def generate_rsa_keypair() -> tuple[str, str]:
     ).decode("ascii")
 
     return private_key_pem, public_key_pem
+
+
+def generate_rsa_cert() -> tuple[str, x509.Certificate]:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)
+    public_key = private_key.public_key()
+
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(x509.NameOID.COUNTRY_NAME, "NL"),
+            x509.NameAttribute(x509.NameOID.ORGANIZATION_NAME, "Test Org"),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(public_key)
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
+        .sign(private_key, hashes.SHA256())
+    )
+
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
+
+    return cert_pem, cert
 
 
 def create_signed_jws(

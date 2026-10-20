@@ -31,7 +31,7 @@ def container_config(binder: inject.Binder) -> None:
     authorization_service = AuthorizationService(db)
     binder.bind(AuthorizationService, authorization_service)
 
-    jwks_key_service = JwksKeysServiceFactory.create(config)
+    jwks_key_service = JwksKeysServiceFactory.create(config.jwks, config.hsm)
     jwks_service = JwksService(jwks_key_service=jwks_key_service)
     binder.bind(JwksService, jwks_service)
 
