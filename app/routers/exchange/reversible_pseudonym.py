@@ -2,42 +2,41 @@ import logging
 from typing import Annotated
 
 import gfmodules.logging as gflog
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, Security
 from jwcrypto.jwk import JWK
 from starlette.responses import Response
 
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.exceptions import PseudonymOperationError
 from app.logging.events import Log
+from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.models.requests import (
     REVERSIBLE_PSEUDONYM_PREFIX,
     ReversiblePseudonymExchangeRequest,
 )
+from app.routers.exchange.support import (
+    authorize_exchange,
+    parse_personal_id,
+    raise_pseudonym_error,
+)
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
-from app.services.reversible.service import (
-    ReversiblePseudonymError,
-    ReversiblePseudonymService,
-)
+from app.services.reversible.service import ReversiblePseudonymService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_ENDPOINT = "/exchange/reversible-pseudonym"
 _OPERATION = "exchange:reversible-pseudonym"
 
 
 @router.post(
-    _ENDPOINT,
+    "/reversible-pseudonym",
     summary="Exchange a personal ID for a reversible pseudonym",
-    tags=["Exchange Services"],
     status_code=201,
     response_class=Response,
     responses={
@@ -99,55 +98,17 @@ def exchange_reversible_pseudonym(
         Depends(container.get_reversible_pseudonym_service),
     ],
 ) -> Response:
-    handelende_oin = str(auth.claims.client_organization_id)
-    namens_oin = str(auth.claims.organization_id)
-    doel_oin = str(req.recipientOrganization)
+    authorize_exchange(
+        logger,
+        authorization_service,
+        auth,
+        req.recipientOrganization,
+        PersonalIdType.REVERSIBLE_PSEUDONYM,
+        _OPERATION,
+    )
+    audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
-    def deny(reason: str, error: DomainError) -> None:
-        gflog.emit(
-            logger,
-            Log.AUTHORIZATION_DENIED,
-            f"Authorization denied ({reason}): {error.message}",
-            fields={
-                "handelende_oin": handelende_oin,
-                "namens_oin": namens_oin,
-                "doel_oin": doel_oin,
-                "requested_operation": _OPERATION,
-            },
-        )
-
-    personal_id_type = PersonalIdType.REVERSIBLE_PSEUDONYM
-    try:
-        authorization_service.validate_allowed_to_request(
-            auth.claims.organization_id, personal_id_type
-        )
-    except DomainError as e:
-        deny("sender_may_not_request_reversible_pseudonym", e)
-        raise
-
-    try:
-        authorization_service.validate_allowed_to_receive(
-            req.recipientOrganization, personal_id_type
-        )
-    except DomainError as e:
-        deny("recipient_may_not_receive_reversible_pseudonym", e)
-        raise
-
-    try:
-        personal_id = PersonalId.parse(req.personalId)
-    except PersonalIdValidationError as e:
-        # PRS-PSE-005: only the kind of failure, never the value.
-        gflog.emit(
-            logger,
-            Log.PERSONAL_ID_VALIDATION_FAILED,
-            "Personal ID validation failed",
-            fields={
-                "handelende_oin": handelende_oin,
-                "namens_oin": namens_oin,
-                "validation_error": e.kind,
-            },
-        )
-        raise HTTPException(status_code=400, detail="Invalid personal ID")
+    personal_id = parse_personal_id(logger, req.personalId, audit)
 
     # Raises 404 when the recipient has no public key for the scope.
     public_key = organization_public_key_service.get_by_org_and_domain(
@@ -160,28 +121,17 @@ def exchange_reversible_pseudonym(
             recipient=req.recipientOrganization,
             recipient_scope=req.recipientScope,
         )
-    except ReversiblePseudonymError as e:
-        gflog.emit(
+    except PseudonymOperationError as e:
+        raise_pseudonym_error(
             logger,
+            audit,
+            e,
             Log.PSEUDONYM_CREATE_FAILED,
             "Reversible pseudonym creation failed",
-            exc_info=e,
-            fields={
-                "handelende_oin": handelende_oin,
-                "namens_oin": namens_oin,
-                "doel_oin": doel_oin,
-                "error_type": e.error_type,
-            },
         )
-        if e.error_type == PseudonymErrorType.NO_ACTIVE_KEY_VERSION:
-            # Must be the same message as for when we don't find the server, so we cannot
-            # differentiate between the two cases and leak information about the recipient organization.
-            raise RecipientNotFoundError()
-        status = 503 if e.error_type == PseudonymErrorType.HSM_UNREACHABLE else 500
-        raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
 
     jwe = Jwe.build(
-        audience=doel_oin,
+        audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=REVERSIBLE_PSEUDONYM_PREFIX + pseudonym.value,
         pub_key=JWK(**public_key.jwk),
@@ -193,9 +143,7 @@ def exchange_reversible_pseudonym(
         Log.PSEUDONYM_REVERSIBLE_CREATED,
         "Reversible pseudonym created",
         fields={
-            "handelende_oin": handelende_oin,
-            "namens_oin": namens_oin,
-            "doel_oin": doel_oin,
+            **audit.fields(),
             "domein": req.recipientScope,
             "sleutel_versie": pseudonym.version,
         },

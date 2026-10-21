@@ -17,7 +17,7 @@ from app.models.oin import Oin
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 ENDPOINT = "/exchange/reversible-pseudonym"
-LOGGER = "app.routers.reversible_pseudonym"
+LOGGER = "app.routers.exchange.reversible_pseudonym"
 
 # The verified caller identity (x-gf-sub) in the valid_headers fixture.
 SENDER_OIN = Oin("00000099000000002000")

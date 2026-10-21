@@ -12,9 +12,11 @@ from app.enums.personal_id_type import PersonalIdType
 from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, PseudonymOperationError
 from app.logging.events import Log
+from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
+from app.routers.exchange.support import authorize_exchange
 from app.services.authorization_service import AuthorizationService
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -73,58 +75,27 @@ def post_eval(
         ),
     ],
 ) -> JSONResponse:
-    recipient_oin = req.recipientOrganization
-    personal_id_type = PersonalIdType.OPRF
-
-    # Audit identities (PRS-OPRF): the acting client and the organization it
-    # acts on behalf of come from the proxy-verified headers, the target from
-    # the request body.
-    audit_oins = {
-        "handelende_oin": str(auth_ctx.claims.client_organization_id),
-        "namens_oin": str(auth_ctx.claims.organization_id),
-        "doel_oin": str(recipient_oin),
-    }
+    authorize_exchange(
+        logger,
+        authorization_service,
+        auth_ctx,
+        req.recipientOrganization,
+        PersonalIdType.OPRF,
+        "oprf:eval",
+    )
+    audit = ExchangeAudit.from_auth(auth_ctx, req.recipientOrganization)
 
     try:
-        authorization_service.validate_allowed_to_request(
-            auth_ctx.claims.organization_id, personal_id_type
-        )
-    except DomainError as e:
-        gflog.emit(
-            logger,
-            Log.AUTHORIZATION_DENIED,
-            f"Authorization denied (sender_may_not_request_oprf): {e.message}",
-            fields={**audit_oins, "requested_operation": "oprf:eval"},
-        )
-        raise
-
-    try:
-        authorization_service.validate_allowed_to_receive(
-            recipient_oin, personal_id_type
-        )
         organization_public_key = organization_public_key_service.get_by_org_and_domain(
-            recipient_oin, req.recipientScope
+            req.recipientOrganization, req.recipientScope
         )
-    except DomainError as e:
-        # PRS-OPRF-004: the target organization is unknown, may not receive
-        # OPRF pseudonyms, or has no public key registered for the scope.
-        gflog.emit(
-            logger,
-            Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
-            f"OPRF refused: {e.message}",
-            fields=audit_oins,
-        )
-        raise
-
-    try:
         result = oprf_service.eval_blind(req, JWK(**organization_public_key.jwk))
     except DomainError as e:
-        # PRS-OPRF-004, raised past the checks above (e.g. by the evaluator).
         gflog.emit(
             logger,
             Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY,
             f"OPRF refused: {e.message}",
-            fields=audit_oins,
+            fields=audit.fields(),
         )
         raise
     except PseudonymOperationError as e:
@@ -133,7 +104,7 @@ def post_eval(
             logger,
             Log.OPRF_EVAL_FAILED,
             "OPRF evaluation failed",
-            fields={**audit_oins, "error_type": e.error_type},
+            fields={**audit.fields(), "error_type": e.error_type},
         )
         raise HTTPException(
             status_code=EVAL_FAILURE_STATUS_CODES[e.error_type],
@@ -146,7 +117,7 @@ def post_eval(
         Log.OPRF_EVAL_OK,
         "OPRF evaluation succeeded",
         fields={
-            **audit_oins,
+            **audit.fields(),
             "oprf_secret_versie": max(result.key_versions),
             "ontvanger_pubkey_id": organization_public_key.jwk.get("kid"),
         },

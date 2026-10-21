@@ -2,47 +2,44 @@ import logging
 from typing import Annotated
 
 import gfmodules.logging as gflog
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, Security
 from jwcrypto.jwk import JWK
 from starlette.responses import Response
 
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import DomainError, RecipientNotFoundError
+from app.exceptions import PseudonymOperationError
 from app.logging.events import Log
+from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.models.requests import (
     IrreversiblePseudonymExchangeRequest,
     IrreversiblePseudonymFromReversiblePseudonymRequest,
 )
-from app.services.authorization_service import AuthorizationService
-from app.services.irreversible.service import (
-    IrreversiblePseudonymError,
-    IrreversiblePseudonymService,
+from app.routers.exchange.support import (
+    authorize_exchange,
+    parse_personal_id,
+    raise_pseudonym_error,
 )
+from app.services.authorization_service import AuthorizationService
+from app.services.irreversible.service import IrreversiblePseudonymService
 from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
-from app.services.reversible.service import (
-    ReversiblePseudonymError,
-    ReversiblePseudonymService,
-)
+from app.services.reversible.service import ReversiblePseudonymService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_ENDPOINT = "/exchange/irreversible-pseudonym"
 _OPERATION = "exchange:irreversible-pseudonym"
 _SUBJECT_PREFIX = "pseudonym:irreversible:"
+_FAILED = "Irreversible pseudonym creation failed"
 
 
 @router.post(
-    _ENDPOINT,
+    "/irreversible-pseudonym",
     summary="Exchange a personal ID or reversible pseudonym for an irreversible pseudonym",
-    tags=["Exchange Services"],
     status_code=201,
     response_class=Response,
     responses={
@@ -128,83 +125,27 @@ def exchange_irreversible_pseudonym(
         Depends(container.get_reversible_pseudonym_service),
     ],
 ) -> Response:
-    handelende_oin = str(auth.claims.client_organization_id)
-    namens_oin = str(auth.claims.organization_id)
-    doel_oin = str(req.recipientOrganization)
-    audit = {
-        "handelende_oin": handelende_oin,
-        "namens_oin": namens_oin,
-        "doel_oin": doel_oin,
-    }
-
-    def deny(reason: str, error: DomainError) -> None:
-        gflog.emit(
-            logger,
-            Log.AUTHORIZATION_DENIED,
-            f"Authorization denied ({reason}): {error.message}",
-            fields={**audit, "requested_operation": _OPERATION},
-        )
-
-    def failed(error_type: PseudonymErrorType, exc: Exception | None = None) -> None:
-        # PRS-PSE-004
-        gflog.emit(
-            logger,
-            Log.PSEUDONYM_CREATE_FAILED,
-            "Irreversible pseudonym creation failed",
-            exc_info=exc,
-            fields={**audit, "error_type": error_type},
-        )
-
-    personal_id_type = PersonalIdType.IRREVERSIBLE_PSEUDONYM
-    try:
-        authorization_service.validate_allowed_to_request(
-            auth.claims.organization_id, personal_id_type
-        )
-    except DomainError as e:
-        deny("sender_may_not_request_irreversible_pseudonym", e)
-        raise
-
-    try:
-        authorization_service.validate_allowed_to_receive(
-            req.recipientOrganization, personal_id_type
-        )
-    except DomainError as e:
-        deny("recipient_may_not_receive_irreversible_pseudonym", e)
-        raise
+    authorize_exchange(
+        logger,
+        authorization_service,
+        auth,
+        req.recipientOrganization,
+        PersonalIdType.IRREVERSIBLE_PSEUDONYM,
+        _OPERATION,
+    )
+    audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
     if isinstance(req, IrreversiblePseudonymFromReversiblePseudonymRequest):
         try:
-            reversed_pseudonym = reversible_service.reverse(
+            personal_id = reversible_service.reverse(
                 req.reversiblePseudonym, auth.claims.organization_id
+            ).personal_id
+        except PseudonymOperationError as e:
+            raise_pseudonym_error(
+                logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED
             )
-        except ReversiblePseudonymError as e:
-            failed(e.error_type, e)
-            if e.error_type == PseudonymErrorType.HSM_UNREACHABLE:
-                raise HTTPException(
-                    status_code=503, detail="Pseudonym exchange failed"
-                ) from e
-            if e.error_type == PseudonymErrorType.VERSION_DESTROYED:
-                raise HTTPException(
-                    status_code=410, detail="Pseudonym key version no longer available"
-                ) from e
-            raise HTTPException(status_code=400, detail="Invalid pseudonym") from e
-        personal_id = reversed_pseudonym.personal_id
     else:
-        try:
-            personal_id = PersonalId.parse(req.personalId)
-        except PersonalIdValidationError as e:
-            # PRS-PSE-005: only the kind of failure, never the value.
-            gflog.emit(
-                logger,
-                Log.PERSONAL_ID_VALIDATION_FAILED,
-                "Personal ID validation failed",
-                fields={
-                    "handelende_oin": handelende_oin,
-                    "namens_oin": namens_oin,
-                    "validation_error": e.kind,
-                },
-            )
-            raise HTTPException(status_code=400, detail="Invalid personal ID")
+        personal_id = parse_personal_id(logger, req.personalId, audit)
 
     # Raises 404 when the recipient has no public key for the scope.
     public_key = organization_public_key_service.get_by_org_and_domain(
@@ -217,14 +158,8 @@ def exchange_irreversible_pseudonym(
             recipient=req.recipientOrganization,
             recipient_scope=req.recipientScope,
         )
-    except IrreversiblePseudonymError as e:
-        failed(e.error_type, e)
-        if e.error_type == PseudonymErrorType.NO_ACTIVE_KEY_VERSION:
-            # Same message as for an unknown recipient, so a caller cannot tell
-            # the two apart.
-            raise RecipientNotFoundError()
-        status = 503 if e.error_type == PseudonymErrorType.HSM_UNREACHABLE else 500
-        raise HTTPException(status_code=status, detail="Pseudonym exchange failed")
+    except PseudonymOperationError as e:
+        raise_pseudonym_error(logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED)
 
     extra_claims: dict[str, object] = {"keyVersion": pseudonym.version}
     if pseudonym.older:
@@ -232,7 +167,7 @@ def exchange_irreversible_pseudonym(
             str(version): value for version, value in sorted(pseudonym.older)
         }
     jwe = Jwe.build(
-        audience=doel_oin,
+        audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
         pub_key=JWK(**public_key.jwk),
@@ -246,7 +181,7 @@ def exchange_irreversible_pseudonym(
             Log.PSEUDONYM_IRREVERSIBLE_DUAL_CREATED,
             "Irreversible pseudonym created for old and current key version",
             fields={
-                **audit,
+                **audit.fields(),
                 "domein": req.recipientScope,
                 "sleutel_versie_oud": max(version for version, _ in pseudonym.older),
                 "sleutel_versie_actueel": pseudonym.version,
@@ -259,7 +194,7 @@ def exchange_irreversible_pseudonym(
             Log.PSEUDONYM_IRREVERSIBLE_CREATED,
             "Irreversible pseudonym created",
             fields={
-                **audit,
+                **audit.fields(),
                 "domein": req.recipientScope,
                 "sleutel_versie": pseudonym.version,
             },
