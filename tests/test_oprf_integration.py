@@ -18,11 +18,16 @@ from starlette.testclient import TestClient
 from app import container
 from app.db.models import OrganizationEntity
 from app.enums.personal_id_type import PersonalIdType
-from app.enums.pseudonym_error_type import PseudonymErrorType
-from app.exceptions import NotAllowedToRequestError, RecipientNotFoundError
+from app.exceptions.access import NotAllowedToRequestError, RecipientNotFoundError
+from app.exceptions.pseudonym import (
+    HsmOperationFailedError,
+    HsmTimeoutError,
+    HsmUnreachableError,
+    InvalidBlindedInputError,
+    PseudonymOperationError,
+)
 from app.logging.events import Log
 from app.models.oin import Oin
-from app.services.oprf.oprf_service import OprfEvaluationError
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 
@@ -383,9 +388,7 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError(
-                PseudonymErrorType.INVALID_BLINDED_INPUT, "invalid blinded input"
-            )
+            raise InvalidBlindedInputError()
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
     try:
@@ -420,9 +423,7 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError(
-                PseudonymErrorType.INVALID_BLINDED_INPUT, "invalid blinded input"
-            )
+            raise InvalidBlindedInputError()
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
     try:
@@ -439,27 +440,24 @@ def test_oprf_eval_when_service_rejects_blind_returns_bad_request(
         app.dependency_overrides.pop(container.get_oprf_service, None)
 
     assert eval_response.status_code == 400
-    assert eval_response.json() == {"detail": "Unable to evaluate blind"}
+    assert eval_response.json() == {"detail": "Invalid blinded input"}
 
 
 @pytest.mark.parametrize(
-    "error_type,status_code",
-    [
-        (PseudonymErrorType.HSM_OPERATION_FAILED, 502),
-        (PseudonymErrorType.HSM_TIMEOUT, 504),
-    ],
+    "failure,status_code",
+    [(HsmOperationFailedError, 502), (HsmTimeoutError, 504)],
 )
 def test_oprf_eval_when_hsm_fails_returns_gateway_error(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
     valid_headers: dict[str, str],
-    error_type: PseudonymErrorType,
+    failure: type[PseudonymOperationError],
     status_code: int,
 ) -> None:
     class FailingOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError(error_type, "boom")
+            raise failure()
 
     app.dependency_overrides[container.get_oprf_service] = lambda: FailingOprfService()
     try:
@@ -476,10 +474,10 @@ def test_oprf_eval_when_hsm_fails_returns_gateway_error(
         app.dependency_overrides.pop(container.get_oprf_service, None)
 
     assert eval_response.status_code == status_code
-    assert eval_response.json() == {"detail": "Unable to evaluate blind"}
+    assert eval_response.json() == {"detail": failure.message}
 
 
-def test_domain_error_from_evaluation_keeps_its_status_and_is_audited_as_refusal(
+def test_app_error_from_evaluation_keeps_its_status_and_is_audited_as_refusal(
     app: FastAPI,
     client: TestClient,
     oprf_context: OprfIntegrationContext,
@@ -523,9 +521,7 @@ def test_unreachable_hsm_answers_503_and_is_audited(
 ) -> None:
     class UnreachableOprfService:
         def eval_blind(self, req: object, pub_key_jwk: object) -> str:
-            raise OprfEvaluationError(
-                PseudonymErrorType.HSM_UNREACHABLE, "HSM unreachable"
-            )
+            raise HsmUnreachableError()
 
     app.dependency_overrides[container.get_oprf_service] = lambda: (
         UnreachableOprfService()

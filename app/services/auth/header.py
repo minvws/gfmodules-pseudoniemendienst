@@ -1,6 +1,6 @@
 import logging
 
-from app.exceptions import InvalidAudienceError
+from app.exceptions.access import InvalidAudienceError
 from app.models.auth.headers import AuthHeaders
 
 logger = logging.getLogger(__name__)

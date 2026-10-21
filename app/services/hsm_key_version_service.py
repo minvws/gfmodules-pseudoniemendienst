@@ -9,11 +9,11 @@ from app.db.db import Database
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.repositories.hsm_key_version_repository import HsmKeyVersionRepository
 from app.db.repositories.organization_repository import OrganizationRepository
-from app.exceptions import (
+from app.exceptions.access import RecipientNotFoundError
+from app.exceptions.registration import (
     KeyVersionNotFoundError,
     KeyVersionRemovedError,
     NoKeyVersionError,
-    RecipientNotFoundError,
 )
 from app.logging.events import KEY_TYPE_OPRF_SECRET, Log
 from app.models.oin import Oin
