@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityS
 from starlette.requests import Request
 
 from app import container
-from app.exceptions import UnauthorizedRequestError
+from app.exceptions.access import UnauthorizedRequestError
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
