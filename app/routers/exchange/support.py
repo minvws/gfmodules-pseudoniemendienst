@@ -1,6 +1,5 @@
 import logging
-from dataclasses import asdict, dataclass
-from typing import NoReturn, Self
+from typing import NoReturn
 
 import gfmodules.logging as gflog
 from fastapi import HTTPException
@@ -14,6 +13,7 @@ from app.exceptions import (
     RecipientNotFoundError,
 )
 from app.logging.events import Log
+from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId, PersonalIdValidationError
@@ -30,24 +30,6 @@ _PSEUDONYM_FAILURES = {
 }
 
 
-@dataclass(frozen=True)
-class ExchangeAudit:
-    handelende_oin: str
-    namens_oin: str
-    doel_oin: str
-
-    @classmethod
-    def from_auth(cls, auth: AuthContext, recipient: Oin) -> Self:
-        return cls(
-            handelende_oin=str(auth.claims.client_organization_id),
-            namens_oin=str(auth.claims.organization_id),
-            doel_oin=str(recipient),
-        )
-
-    def fields(self) -> dict[str, str]:
-        return asdict(self)
-
-
 def authorize_exchange(
     logger: logging.Logger,
     authorization_service: AuthorizationService,
@@ -55,15 +37,16 @@ def authorize_exchange(
     recipient: Oin,
     personal_id_type: PersonalIdType,
     operation: str,
-) -> ExchangeAudit:
-    audit = ExchangeAudit.from_auth(auth, recipient)
-
+) -> None:
     def deny(reason: str, error: DomainError) -> None:
         gflog.emit(
             logger,
             Log.AUTHORIZATION_DENIED,
             f"Authorization denied ({reason}): {error.message}",
-            fields={**audit.fields(), "requested_operation": operation},
+            fields={
+                **ExchangeAudit.from_auth(auth, recipient).fields(),
+                "requested_operation": operation,
+            },
         )
 
     try:
@@ -79,8 +62,6 @@ def authorize_exchange(
     except DomainError as e:
         deny(f"recipient_may_not_receive_{personal_id_type}", e)
         raise
-
-    return audit
 
 
 def parse_personal_id(

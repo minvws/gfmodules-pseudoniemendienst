@@ -11,6 +11,7 @@ from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
 from app.exceptions import PseudonymOperationError
 from app.logging.events import Log
+from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import (
@@ -124,7 +125,7 @@ def exchange_irreversible_pseudonym(
         Depends(container.get_reversible_pseudonym_service),
     ],
 ) -> Response:
-    audit = authorize_exchange(
+    authorize_exchange(
         logger,
         authorization_service,
         auth,
@@ -132,6 +133,7 @@ def exchange_irreversible_pseudonym(
         PersonalIdType.IRREVERSIBLE_PSEUDONYM,
         _OPERATION,
     )
+    audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
     if isinstance(req, IrreversiblePseudonymFromReversiblePseudonymRequest):
         try:
@@ -165,7 +167,7 @@ def exchange_irreversible_pseudonym(
             str(version): value for version, value in sorted(pseudonym.older)
         }
     jwe = Jwe.build(
-        audience=audit.doel_oin,
+        audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=_SUBJECT_PREFIX + pseudonym.value,
         pub_key=JWK(**public_key.jwk),

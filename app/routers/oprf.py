@@ -12,6 +12,7 @@ from app.enums.personal_id_type import PersonalIdType
 from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import DomainError, PseudonymOperationError
 from app.logging.events import Log
+from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests import BlindRequest
@@ -74,7 +75,7 @@ def post_eval(
         ),
     ],
 ) -> JSONResponse:
-    audit = authorize_exchange(
+    authorize_exchange(
         logger,
         authorization_service,
         auth_ctx,
@@ -82,6 +83,7 @@ def post_eval(
         PersonalIdType.OPRF,
         "oprf:eval",
     )
+    audit = ExchangeAudit.from_auth(auth_ctx, req.recipientOrganization)
 
     try:
         organization_public_key = organization_public_key_service.get_by_org_and_domain(
