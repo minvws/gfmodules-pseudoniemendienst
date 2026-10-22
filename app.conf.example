@@ -81,3 +81,15 @@ timeout=5
 # space separated list of expected audiences, one should be present in the authorization authorization header
 # usually the value is the domain of the running application
 expected_audiences = https://localhost:6502
+
+[jwks]
+# comma separated field for singing certificates path
+signing_key_files = /secrets/signing_certificate_1.crt, /secrets/signing_certificate_2.crt
+#
+# comma separated field for active signing certificates
+ active_signing_key_files = /secrets/test_signing_certificate_1.crt
+#
+# comma separated fields for hsm labels
+hsm_key_labels =
+# comma separated fields for active hsm labels
+active_hsm_key_labels =
