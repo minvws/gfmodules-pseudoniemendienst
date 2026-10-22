@@ -10,7 +10,7 @@ from jwcrypto import jwk
 
 from app.enums.pseudonym_error_type import PseudonymErrorType
 from app.exceptions import PseudonymOperationError, RecipientNotFoundError
-from app.models.requests import BlindRequest
+from app.models.requests.oprf import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
 from app.services.jwe_token import Jwe
 from app.services.oprf.evaluators import OprfEvaluator

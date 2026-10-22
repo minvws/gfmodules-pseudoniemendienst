@@ -12,7 +12,7 @@ from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.db.session import DbSession
 from app.models.oin import Oin, RecipientOrganizationOin
-from app.models.requests import BlindRequest
+from app.models.requests.oprf import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.oprf.evaluators import (
@@ -277,7 +277,7 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     from jwcrypto import jwe as jwelib
     from jwcrypto import jwk
 
-    from app.models.requests import BlindRequest
+    from app.models.requests.oprf import BlindRequest
 
     now = datetime.now(timezone.utc)
     add_hsm_key_version(
@@ -354,7 +354,7 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     from jwcrypto import jwe as jwelib
     from jwcrypto import jwk
 
-    from app.models.requests import BlindRequest
+    from app.models.requests.oprf import BlindRequest
 
     now = datetime.now(timezone.utc)
     # expired: ended yesterday -> excluded

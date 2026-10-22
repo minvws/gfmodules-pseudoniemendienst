@@ -15,7 +15,7 @@ from app.logging.events import Log
 from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.requests import BlindRequest
+from app.models.requests.oprf import BlindRequest
 from app.routers.exchange.support import authorize_exchange
 from app.services.authorization_service import AuthorizationService
 from app.services.oprf.oprf_service import OprfService

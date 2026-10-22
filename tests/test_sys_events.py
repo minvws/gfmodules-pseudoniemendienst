@@ -20,7 +20,7 @@ from app.db.models import OrganizationEntity
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
 from app.models.oin import RecipientOrganizationOin
-from app.models.requests import BlindRequest
+from app.models.requests.oprf import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
