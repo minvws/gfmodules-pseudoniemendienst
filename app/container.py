@@ -137,5 +137,6 @@ def get_jwt_signing_service() -> JwtSigningService | None:
     return inject.instance(JwtSigningService)
 
 
-if not inject.is_configured():
-    inject.configure(container_config)
+def configure() -> None:
+    if not inject.is_configured():
+        inject.configure(container_config, once=True)

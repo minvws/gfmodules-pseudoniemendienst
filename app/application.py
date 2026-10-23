@@ -14,6 +14,7 @@ from gfmodules.logging.middleware import (
     restore_request_context,
 )
 
+from app import container
 from app.auth import get_auth_ctx, require_scopes
 from app.config import _ENVIRONMENT_CONFIG_PATH_NAME, _PATH, get_config
 from app.logging.events import Log
@@ -322,7 +323,6 @@ def setup_logging() -> None:
 
 
 def setup_fastapi() -> FastAPI:
-
     config = get_config()
 
     openapi_tags = list(TAGS_METADATA)
@@ -347,6 +347,8 @@ def setup_fastapi() -> FastAPI:
         lifespan=_lifespan,
         dependencies=gf_header_params(config.uvicorn.document_gf_headers),
     )
+
+    container.configure()
 
     fastapi.add_middleware(RequestContextMiddleware)
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)

@@ -144,9 +144,6 @@ jobs:
           sudo ldconfig
 
       - name: Run the tests
-        env:
-          FASTAPI_CONFIG_PATH: ./app.ci.conf
-
         run: |
           sudo bash -c 'echo "127.0.0.1 prs_db" >> /etc/hosts'
           DSN="postgresql://postgres:postgres@prs_db:5432/postgres" poetry run ./tools/migrate_db.sh
