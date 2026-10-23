@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.oin import RecipientOrganizationOin
 
 REVERSIBLE_PSEUDONYM_PREFIX = "pseudonym:reversible:"
+EXAMPLE_RECIPIENT_ORGANIZATION = "oin:00000099000000001000"
 
 
 class PseudonymExchangeRequest(BaseModel):
@@ -24,7 +25,7 @@ class ReversiblePseudonymInputRequest(PseudonymExchangeRequest):
             "examples": [
                 {
                     "reversiblePseudonym": "AQAB....",
-                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientOrganization": EXAMPLE_RECIPIENT_ORGANIZATION,
                     "recipientScope": "nvi",
                 },
             ]
@@ -52,7 +53,7 @@ class PersonalIdInputRequest(PseudonymExchangeRequest):
             "examples": [
                 {
                     "personalId": "NL:bsn:950000012",
-                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientOrganization": EXAMPLE_RECIPIENT_ORGANIZATION,
                     "recipientScope": "nvi",
                 },
                 {
@@ -61,7 +62,7 @@ class PersonalIdInputRequest(PseudonymExchangeRequest):
                         "type": "bsn",
                         "value": "950000012",
                     },
-                    "recipientOrganization": "oin:00000099000000001000",
+                    "recipientOrganization": EXAMPLE_RECIPIENT_ORGANIZATION,
                     "recipientScope": "nvi",
                 },
             ]
