@@ -12,7 +12,7 @@ from jwcrypto import jwk
 
 from app.logging.events import Log
 from app.models.oin import RecipientOrganizationOin
-from app.models.requests import BlindRequest
+from app.models.requests.oprf import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator, LocalOprfEvaluator
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 

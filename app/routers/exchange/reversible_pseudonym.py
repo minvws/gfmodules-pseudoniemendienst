@@ -14,9 +14,9 @@ from app.logging.events import Log
 from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.requests import (
+from app.models.requests.exchange import (
     REVERSIBLE_PSEUDONYM_PREFIX,
-    ReversiblePseudonymExchangeRequest,
+    PersonalIdInputRequest,
 )
 from app.routers.exchange.support import (
     authorize_exchange,
@@ -78,7 +78,7 @@ unauthorized caller cannot probe which recipient organizations exist.
 """,
 )
 def exchange_reversible_pseudonym(
-    req: ReversiblePseudonymExchangeRequest,
+    req: PersonalIdInputRequest,
     auth: Annotated[
         AuthContext,
         Security(

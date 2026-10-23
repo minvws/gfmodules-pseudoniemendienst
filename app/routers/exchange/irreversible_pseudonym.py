@@ -14,9 +14,9 @@ from app.logging.events import Log
 from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.requests import (
-    IrreversiblePseudonymExchangeRequest,
-    IrreversiblePseudonymFromReversiblePseudonymRequest,
+from app.models.requests.exchange import (
+    ExchangeInputRequest,
+    ReversiblePseudonymInputRequest,
 )
 from app.routers.exchange.support import (
     authorize_exchange,
@@ -101,7 +101,7 @@ an unauthorized caller cannot probe which recipient organizations exist.
 """,
 )
 def exchange_irreversible_pseudonym(
-    req: IrreversiblePseudonymExchangeRequest,
+    req: ExchangeInputRequest,
     auth: Annotated[
         AuthContext,
         Security(
@@ -135,7 +135,7 @@ def exchange_irreversible_pseudonym(
     )
     audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
-    if isinstance(req, IrreversiblePseudonymFromReversiblePseudonymRequest):
+    if isinstance(req, ReversiblePseudonymInputRequest):
         try:
             personal_id = reversible_service.reverse(
                 req.reversiblePseudonym, auth.claims.organization_id

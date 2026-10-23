@@ -6,15 +6,16 @@ from pydantic import TypeAdapter, ValidationError
 
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.organization_public_key import OrganizationPublicKeyRequest
-from app.models.requests import (
-    BlindRequest,
+from app.models.requests.exchange import (
+    ExchangeInputRequest,
+    PersonalIdInputRequest,
+    ReversiblePseudonymInputRequest,
+)
+from app.models.requests.hsm_key_version import (
     HsmKeyVersionRequest,
     HsmKeyVersionUpdateRequest,
-    IrreversiblePseudonymExchangeRequest,
-    IrreversiblePseudonymFromPersonalIdRequest,
-    IrreversiblePseudonymFromReversiblePseudonymRequest,
-    ReversiblePseudonymExchangeRequest,
 )
+from app.models.requests.oprf import BlindRequest
 
 
 def test_blind_request_encrypted_personal_id_is_normalized() -> None:
@@ -66,7 +67,7 @@ def test_blind_request_invalid_prefixed_recipient_organization_throws_oin_valida
 
 
 def test_reversible_pseudonym_request_recipient_organization_is_parsed_to_oin() -> None:
-    request = ReversiblePseudonymExchangeRequest(
+    request = PersonalIdInputRequest(
         personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
         recipientScope="scope",
@@ -78,12 +79,12 @@ def test_reversible_pseudonym_request_recipient_organization_is_parsed_to_oin() 
 def test_reversible_pseudonym_request_keeps_personal_id_unparsed() -> None:
     """Parsing happens in the endpoint, after authorization, so a malformed value
     is never echoed back in a validation error."""
-    as_str = ReversiblePseudonymExchangeRequest(
+    as_str = PersonalIdInputRequest(
         personalId="not a personal id",
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
         recipientScope="scope",
     )
-    as_dict = ReversiblePseudonymExchangeRequest(
+    as_dict = PersonalIdInputRequest(
         personalId={"foo": "bar"},
         recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
         recipientScope="scope",
@@ -97,7 +98,7 @@ def test_reversible_pseudonym_request_invalid_recipient_organization_throws_vali
     None
 ):
     with pytest.raises(ValidationError) as e:
-        ReversiblePseudonymExchangeRequest(
+        PersonalIdInputRequest(
             personalId={"landCode": "NL", "type": "bsn", "value": "950000012"},
             recipientOrganization="bad-oin",  # type: ignore[arg-type]
             recipientScope="scope",
@@ -108,7 +109,7 @@ def test_reversible_pseudonym_request_invalid_recipient_organization_throws_vali
 @pytest.mark.parametrize("scope", ["", "a|b", "x" * 101])
 def test_reversible_pseudonym_request_rejects_invalid_scope(scope: str) -> None:
     with pytest.raises(ValidationError):
-        ReversiblePseudonymExchangeRequest(
+        PersonalIdInputRequest(
             personalId="NL:bsn:950000012",
             recipientOrganization=RecipientOrganizationOin("oin:00000099000000003000"),
             recipientScope=scope,
@@ -120,8 +121,8 @@ RECIPIENT = RecipientOrganizationOin("oin:00000099000000003000")
 
 def _irreversible_request(
     fields: dict[str, str],
-) -> IrreversiblePseudonymExchangeRequest:
-    return TypeAdapter(IrreversiblePseudonymExchangeRequest).validate_python(
+) -> ExchangeInputRequest:
+    return TypeAdapter(ExchangeInputRequest).validate_python(
         {**fields, "recipientOrganization": RECIPIENT, "recipientScope": "scope"}
     )
 
@@ -132,14 +133,14 @@ def _irreversible_request(
 def test_irreversible_request_accepts_a_reversible_pseudonym(value: str) -> None:
     request = _irreversible_request({"reversiblePseudonym": value})
 
-    assert isinstance(request, IrreversiblePseudonymFromReversiblePseudonymRequest)
+    assert isinstance(request, ReversiblePseudonymInputRequest)
     assert request.reversiblePseudonym == "AQAB"
 
 
 def test_irreversible_request_accepts_a_personal_id() -> None:
     request = _irreversible_request({"personalId": "NL:bsn:950000012"})
 
-    assert isinstance(request, IrreversiblePseudonymFromPersonalIdRequest)
+    assert isinstance(request, PersonalIdInputRequest)
     assert request.personalId == "NL:bsn:950000012"
 
 
@@ -155,7 +156,7 @@ def test_irreversible_request_takes_exactly_one_input(fields: dict[str, str]) ->
 
 def test_reversible_request_requires_a_personal_id() -> None:
     with pytest.raises(ValidationError, match="personalId"):
-        ReversiblePseudonymExchangeRequest.model_validate(
+        PersonalIdInputRequest.model_validate(
             {
                 "reversiblePseudonym": "AQAB",
                 "recipientOrganization": RECIPIENT,

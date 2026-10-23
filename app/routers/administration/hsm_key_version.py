@@ -8,7 +8,10 @@ from starlette.responses import JSONResponse
 from app import container
 from app.auth import get_auth_ctx
 from app.models.auth.context import AuthContext
-from app.models.requests import HsmKeyVersionRequest, HsmKeyVersionUpdateRequest
+from app.models.requests.hsm_key_version import (
+    HsmKeyVersionRequest,
+    HsmKeyVersionUpdateRequest,
+)
 from app.services.hsm_key_version_service import HsmKeyVersionService
 
 router = APIRouter()

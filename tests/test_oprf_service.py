@@ -9,7 +9,7 @@ from conftest import blinded_input
 from jwcrypto.jwk import JWK
 
 from app.exceptions import RecipientNotFoundError
-from app.models.requests import BlindRequest
+from app.models.requests.oprf import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
 from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
 
