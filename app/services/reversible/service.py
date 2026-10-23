@@ -140,10 +140,10 @@ class ReversiblePseudonymService:
         return outer[:IV_LENGTH]
 
     def _version_available(self, recipient: Oin, version: int) -> bool:
-        return any(
-            v.version == version and v.removed_at is None
-            for v in self._key_versions.get_versions_by_organization_id(recipient)
+        active = self._key_versions.get_active_version_numbers_by_organization_oin(
+            recipient
         )
+        return version in active
 
     @staticmethod
     def _unpack(value: str) -> tuple[int, bytes, bytes]:

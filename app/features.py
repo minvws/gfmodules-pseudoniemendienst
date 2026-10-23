@@ -48,6 +48,14 @@ FEATURES: list[Feature] = [
     ),
     Feature(
         info=FeatureInfo(
+            id="personal_id",
+            title="Personal ID",
+            description="Exchange a caller-owned reversible pseudonym for a personal ID",
+        ),
+        enabled=lambda config: config.app.enable_exchange_services_routes,
+    ),
+    Feature(
+        info=FeatureInfo(
             id="saml_exchange",
             title="SAML exchange (mock)",
             description="Exchange a DigiD SAML response for a pseudonym",

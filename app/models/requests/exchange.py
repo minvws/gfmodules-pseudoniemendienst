@@ -15,7 +15,7 @@ class PseudonymExchangeRequest(BaseModel):
         min_length=1,
         max_length=100,
         pattern=r"^[^|]+$",
-        description="Scope of the recipient organization which the pseudonym is bound to.",
+        description="Scope of the recipient organization for the exchanged result.",
     )
 
 
@@ -45,6 +45,13 @@ class ReversiblePseudonymInputRequest(PseudonymExchangeRequest):
     @classmethod
     def strip_reversible_prefix(cls, value: str) -> str:
         return value.removeprefix(REVERSIBLE_PSEUDONYM_PREFIX)
+
+
+class PersonalIdFromReversiblePseudonymRequest(ReversiblePseudonymInputRequest):
+    recipientOrganization: RecipientOrganizationOin = Field(
+        ...,
+        description="Must match the verified calling organization.",
+    )
 
 
 class PersonalIdInputRequest(PseudonymExchangeRequest):

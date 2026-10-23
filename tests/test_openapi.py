@@ -1,5 +1,6 @@
 """Asserts the OpenAPI schema carries the extensions installed by the app."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -65,7 +66,7 @@ def test_bearer_security_scheme_when_gf_headers_not_documented(
 
     schemes = schema["components"]["securitySchemes"]
     assert schemes["BearerAuth"]["scheme"] == "bearer"
-    assert not any(s.get("name", "").startswith("x-gf-") for s in schemes.values())
+    assert "x-gf-" not in json.dumps(schema)
 
 
 def test_schema_is_built_once(

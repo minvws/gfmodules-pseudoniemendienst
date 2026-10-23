@@ -40,6 +40,7 @@ def test_all_features_enabled() -> None:
     [
         ("enable_exchange_services_routes", "reversible_pseudonym"),
         ("enable_exchange_services_routes", "irreversible_pseudonym"),
+        ("enable_exchange_services_routes", "personal_id"),
         ("enable_saml_exchange_routes", "saml_exchange"),
         ("enable_test_routes", "test_routes"),
     ],

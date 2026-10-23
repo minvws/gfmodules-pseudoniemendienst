@@ -373,22 +373,6 @@ To use this system:
    key version is active; during key rotation it holds the older versions as `{"<version>": "<base64 eval>"}`, so the receiver
    can also finalize against an older key version.
 
-## max-key-usage
-
-The max-key-usage is a property that defines what kind of pseudonyms an organization can create and reverse.
-
-There are 3 levels of max_key_usage:
-
-- BSN - can create reversible and irreversible pseudonyms, and can reverse reversible pseudonyms back to BSN
-- RP (Reversible Pseudonym) - can create reversible and irreversible pseudonyms, but cannot reverse any pseudonyms
-- IRP (Irreversible Pseudonym) - can only create irreversible pseudonyms, and cannot reverse any pseudonyms
-
-The "RP" level is mainly intended for organizations that need to create reversible pseudonyms for other organizations,
-but is not allowed to reverse them back to BSN itself.
-
-The "IRP" level is intended for organizations that only need to create irreversible pseudonyms, and do not have access to
-BSN information at all.
-
 ## Personal ID type authorizations
 
 An organization carries two administrator-managed lists of personal ID types (`oprf`, `reversible_pseudonym`,
@@ -399,6 +383,16 @@ technical design:
   `POST /exchange/reversible-pseudonym` requires `reversible_pseudonym` here.
 - the types it may *receive*: checked against the recipient organization of an exchange. Receiving a reversible
   pseudonym requires `reversible_pseudonym` here.
+
+`POST /exchange/personal-id` exchanges a reversible pseudonym issued to the verified caller for a personal ID,
+encrypted to that same caller's registered public key. The required `recipientOrganization` must match the verified
+`x-gf-sub`; a mismatch returns `403` with `Unauthorized request` before organization/key lookup or reversal. The
+caller must have both `reversible_pseudonym` request and receive grants, and the endpoint requires `prs:pseudonym`.
+There is no separate personal ID permission. `recipientScope` selects the caller's registered key (or `*`) and may
+differ from the source pseudonym's scope. The encryption target and token audience derive from `x-gf-sub`; the acting
+client in `x-gf-act-sub` does not select them. Other exchange routes still support delivery to another organization.
+See [the endpoint documentation](docs/endpoints.md#post-exchangepersonal-id) and
+[the test flow](docs/tests.md#steps-to-exchange-a-reversible-pseudonym-for-a-personal-id).
 
 ## Contribution
 

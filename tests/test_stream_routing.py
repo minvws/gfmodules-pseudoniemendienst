@@ -128,3 +128,43 @@ class TestOprfEvalOk:
             message = routed[stream][0]
             assert message["request_id"] == "req-1"
             assert message["correlation_id"] == "corr-1"
+
+
+@pytest.mark.parametrize(
+    ("event_name", "details"),
+    [
+        (
+            "PERSONAL_ID_EXCHANGED",
+            {"domein": "nvi", "sleutel_versie": 2, "ontvanger_pubkey_id": "key-1"},
+        ),
+        ("PERSONAL_ID_EXCHANGE_FAILED", {"error_type": "invalid_pseudonym"}),
+    ],
+)
+def test_personal_id_exchange_audit_streams(
+    route: Route, event_name: str, details: dict[str, Any]
+) -> None:
+    identities = {
+        "handelende_oin": _HANDELENDE_OIN,
+        "namens_oin": "00000099000000003000",
+        "doel_oin": _DOEL_OIN,
+    }
+    routed = route(
+        getattr(Log, event_name),
+        **identities,
+        **details,
+        personal_id="NL:bsn:950000012",
+        reversible_pseudonym="sensitive-pseudonym",
+    )
+
+    for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
+        assert len(routed[stream]) == 1
+        for name, value in identities.items():
+            assert routed[stream][0][name] == value
+        assert_fields_absent(routed[stream], "personal_id", "reversible_pseudonym")
+    for name, value in details.items():
+        assert routed[LoggingStreams.APP][0][name] == value
+    assert_fields_absent(
+        routed[LoggingStreams.SIEM], "domein", "sleutel_versie", "ontvanger_pubkey_id"
+    )
+    if "error_type" in details:
+        assert routed[LoggingStreams.SIEM][0]["error_type"] == details["error_type"]

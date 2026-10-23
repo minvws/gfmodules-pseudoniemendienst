@@ -63,7 +63,11 @@ are active during rotation) and is carried in the pseudonym so the PRS can selec
 
 Reversal decrypts the ciphertext with the (organization, version) AES key, recomputes the IV from the decrypted
 subject and compares it, in constant time, with the embedded IV. A mismatch, a subject naming another organization, or
-a version that has been destroyed is rejected. Reversal is only possible by the PRS itself.
+a source version that is unavailable, removed, not yet active, or expired is rejected. The source version must satisfy
+`from_dt <= now` and either no `until_dt` or `now < until_dt`; an older version is still accepted during this grace
+period when a newer version is current. At `until_dt`, reversal returns `410`
+(`Pseudonym key version no longer available`) independently of physical HSM cleanup. Reversal is only possible by the
+PRS itself.
 
 An RP is deterministic per (personal_id, organization, scope, version).
 
