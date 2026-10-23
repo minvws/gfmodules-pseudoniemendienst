@@ -1,11 +1,7 @@
-import base64
 from dataclasses import dataclass
 
-import pyoprf
 import pytest
-from conftest import setup_org_and_key
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from conftest import generate_rsa_keypair, setup_org_and_key
 from starlette.testclient import TestClient
 
 from app.db.models import OrganizationEntity
@@ -44,31 +40,39 @@ def oprf_test_router_context(
     )
 
 
+def _blind_and_evaluate(
+    client: TestClient,
+    context: OprfTestRouterContext,
+    headers: dict[str, str],
+) -> tuple[str, str]:
+    client_response = client.post(
+        "/test/oprf/client",
+        json={"personalId": context.oprf_input},
+        headers=headers,
+    )
+    assert client_response.status_code == 200
+
+    eval_response = client.post(
+        "/oprf/eval",
+        json={
+            "encryptedPersonalId": client_response.json()["blinded_input"],
+            "recipientOrganization": context.recipient_organization,
+            "recipientScope": context.recipient_scope,
+        },
+        headers=headers,
+    )
+    assert eval_response.status_code == 200
+    return client_response.json()["blind_factor"], eval_response.json()["jwe"]
+
+
 def test_test_oprf_client_and_receiver_roundtrip(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
     valid_headers: dict[str, str],
 ) -> None:
-    client_response = client.post(
-        "/test/oprf/client",
-        json={"personalId": oprf_test_router_context.oprf_input},
-        headers=valid_headers,
+    blind_factor, jwe_token = _blind_and_evaluate(
+        client, oprf_test_router_context, valid_headers
     )
-    assert client_response.status_code == 200
-
-    blinded_input = client_response.json()["blinded_input"]
-    blind_factor = client_response.json()["blind_factor"]
-    eval_response = client.post(
-        "/oprf/eval",
-        json={
-            "encryptedPersonalId": blinded_input,
-            "recipientOrganization": oprf_test_router_context.recipient_organization,
-            "recipientScope": oprf_test_router_context.recipient_scope,
-        },
-        headers=valid_headers,
-    )
-    assert eval_response.status_code == 200
-    jwe_token = eval_response.json()["jwe"]
 
     receiver_response = client.post(
         "/test/oprf/receiver",
@@ -91,43 +95,44 @@ def test_test_oprf_client_and_receiver_roundtrip(
     assert body["final_pseudonym"]
 
 
-def test_test_oprf_receiver_invalid_private_key(
+def test_test_oprf_receiver_incorrect_private_key(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
     valid_headers: dict[str, str],
 ) -> None:
-    info = (
-        f"{oprf_test_router_context.recipient_organization}|"
-        f"{oprf_test_router_context.recipient_scope}|v1"
-    ).encode()
-    hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info)
-    oprf_input = oprf_test_router_context.oprf_input
-    derived_personal_id = hkdf.derive(oprf_input.encode("utf-8"))
-
-    _, blinded_input_raw = pyoprf.blind(derived_personal_id)
-    blinded_input = base64.urlsafe_b64encode(blinded_input_raw).decode("ascii")
-
-    eval_response = client.post(
-        "/oprf/eval",
-        json={
-            "encryptedPersonalId": blinded_input,
-            "recipientOrganization": oprf_test_router_context.recipient_organization,
-            "recipientScope": oprf_test_router_context.recipient_scope,
-        },
-        headers=valid_headers,
+    blind_factor, jwe_token = _blind_and_evaluate(
+        client, oprf_test_router_context, valid_headers
     )
-    assert eval_response.status_code == 200
+    other_private_key_pem, _ = generate_rsa_keypair()
 
     receiver_response = client.post(
         "/test/oprf/receiver",
         json={
-            "blind_factor": "ZmFrZS1mYWN0b3I=",
-            "jwe": eval_response.json()["jwe"],
-            "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
+            "blind_factor": blind_factor,
+            "jwe": jwe_token,
+            "priv_key_pem": other_private_key_pem,
         },
         headers=valid_headers,
     )
     assert receiver_response.status_code == 200
-    assert receiver_response.json()["jwe"]["decrypted"].startswith(
-        "Could not decrypt JWE:"
+
+    body = receiver_response.json()
+    assert body["jwe"]["decrypted"].startswith("Could not decrypt JWE:")
+    assert body["eval_subject"] == "unknown"
+    assert body["final_pseudonym"] == "unknown"
+
+
+def test_test_oprf_receiver_invalid_private_key(
+    client: TestClient,
+    valid_headers: dict[str, str],
+) -> None:
+    receiver_response = client.post(
+        "/test/oprf/receiver",
+        json={
+            "blind_factor": "ZmFrZS1mYWN0b3I=",
+            "jwe": "a.b.c.d.e",
+            "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
+        },
+        headers=valid_headers,
     )
+    assert receiver_response.status_code == 422

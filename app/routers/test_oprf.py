@@ -1,43 +1,31 @@
 import json
-import logging
 from typing import Annotated, Any
 
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi import APIRouter, Depends
 from jwcrypto import jwe, jwk
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, field_validator
 from starlette.responses import JSONResponse
 
 from app import container
 from app.services.oprf.oprf_service import OprfService
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _private_key_from_pem(pem: str) -> jwk.JWK:
+    return jwk.JWK.from_pyca(load_pem_private_key(pem.encode(), password=None))
+
+
 class JweReceiverRequest(BaseModel):
-    jwe: str
+    jwe: str = Field(pattern=r"^[^.]*(\.[^.]*){4}$")
     priv_key_pem: str
 
-    @model_validator(mode="before")
+    @field_validator("priv_key_pem")
     @classmethod
-    def validate_jwe(cls, data: dict[str, Any]) -> dict[str, Any]:
-        # Check if JWE is actually a jwe token
-        jwe_token = data.get("jwe")
-        if not isinstance(jwe_token, str) or len(jwe_token.split(".")) != 5:
-            logger.warning("invalid JWE token format: %s", jwe_token)
-            raise ValueError("Invalid JWE token")
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_priv_key_pem(cls, data: dict[str, Any]) -> dict[str, Any]:
-        priv_key_pem = data.get("priv_key_pem")
-        if not isinstance(priv_key_pem, str) or not priv_key_pem.startswith(
-            "-----BEGIN PRIVATE KEY-----"
-        ):
-            logger.warning("invalid private key PEM format")
-            raise ValueError("Invalid private key PEM format")
-        return data
+    def validate_priv_key_pem(cls, pem: str) -> str:
+        _private_key_from_pem(pem)
+        return pem
 
 
 class ReceiverRequest(JweReceiverRequest):
@@ -48,23 +36,24 @@ class InputRequest(BaseModel):
     personalId: str
 
 
-def _decrypt_jwe(jwe_token: str, priv_key_pem: str) -> tuple[dict[str, Any], str, Any]:
-    token = jwe.JWE()
-    token.deserialize(jwe_token)
-    headers = token.jose_header
-
-    priv_key_kid = "unknown"
-    plain_data: Any = "unknown"
+def _jwe_report(req: JweReceiverRequest) -> dict[str, Any]:
+    priv_key = _private_key_from_pem(req.priv_key_pem)
+    token = jwe.JWE.from_jose_token(req.jwe)
     try:
-        priv_key = jwk.JWK.from_pem(priv_key_pem.encode("ascii"))
-        priv_key_kid = priv_key.thumbprint().rstrip("=")
         token.decrypt(priv_key)
-        plaintext = token.payload.decode("utf-8")
-        plain_data = json.loads(plaintext)
+        decrypted = json.loads(token.payload)
     except Exception as e:  # noqa: BLE001
-        plain_data = "Could not decrypt JWE: " + str(e)
+        decrypted = f"Could not decrypt JWE: {e}"
 
-    return headers, priv_key_kid, plain_data
+    return {
+        "jwe_data": req.jwe,
+        "priv_key_pem": req.priv_key_pem,
+        "priv_key_kid": priv_key.thumbprint(),
+        "jwe": {
+            "headers": token.jose_header,
+            "decrypted": decrypted,
+        },
+    }
 
 
 @router.post(
@@ -80,18 +69,11 @@ The personalId is not validated. Because the Pseudoniemendienst is not able to r
 the content of the blindedInput it does not validate the input.
 """,
 )
-def post_test_eval(
+def post_test_client(
     req: InputRequest,
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
-
-    res = oprf_service.blind_input(req.personalId)
-    return JSONResponse(
-        {
-            "blinded_input": res["blinded_input"],
-            "blind_factor": res["blind_factor"],
-        }
-    )
+    return JSONResponse(oprf_service.blind_input(req.personalId))
 
 
 @router.post(
@@ -111,31 +93,26 @@ def post_test_receiver(
     req: ReceiverRequest,
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
 ) -> JSONResponse:
-    headers, priv_key_kid, plain_data = _decrypt_jwe(req.jwe, req.priv_key_pem)
+    report = _jwe_report(req)
+    decrypted = report["jwe"]["decrypted"]
 
     subject = "unknown"
     pseudonym = "unknown"
-    if isinstance(plain_data, dict):
+    if isinstance(decrypted, dict):
+        subject = decrypted.get("subject", "").split(":")[-1]
         try:
-            subject = plain_data.get("subject", "").split(":")[-1]
             pseudonym = oprf_service.finalize(req.blind_factor, subject)
         except Exception as e:  # noqa: BLE001
-            plain_data = "Could not decrypt JWE: " + str(e)
+            pseudonym = f"Could not finalize pseudonym: {e}"
 
-    res = {
-        "jwe_data": req.jwe,
-        "priv_key_pem": req.priv_key_pem,
-        "priv_key_kid": priv_key_kid,
-        "blind_factor": req.blind_factor,
-        "jwe": {
-            "headers": headers,
-            "decrypted": plain_data,
-        },
-        "eval_subject": subject,
-        "final_pseudonym": pseudonym,
-    }
-
-    return JSONResponse(res)
+    return JSONResponse(
+        {
+            **report,
+            "blind_factor": req.blind_factor,
+            "eval_subject": subject,
+            "final_pseudonym": pseudonym,
+        }
+    )
 
 
 @router.post(
@@ -147,19 +124,5 @@ This endpoint is for testing purposes only. It decodes a given JWE using the pro
 check any mtls or organizational permissions.
 """,
 )
-def post_test_jwe_decode(
-    req: JweReceiverRequest,
-) -> JSONResponse:
-    headers, priv_key_kid, plain_data = _decrypt_jwe(req.jwe, req.priv_key_pem)
-
-    res = {
-        "jwe_data": req.jwe,
-        "priv_key_pem": req.priv_key_pem,
-        "priv_key_kid": priv_key_kid,
-        "jwe": {
-            "headers": headers,
-            "decrypted": plain_data,
-        },
-    }
-
-    return JSONResponse(res)
+def post_test_jwe_decode(req: JweReceiverRequest) -> JSONResponse:
+    return JSONResponse(_jwe_report(req))
