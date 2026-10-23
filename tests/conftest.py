@@ -1,50 +1,66 @@
+import base64
 import logging
 import os
-from typing import Any
-
-from cryptography.hazmat.primitives.asymmetric import rsa
-from sqlalchemy import select, text
-from sqlalchemy.orm import Session
-
-from app.db.models import HsmKeyVersionEntity, OrganizationEntity
-from app.db.models.base import Base
-from app.db.models.personal_id_type import PersonalIdTypeEntity
-from app.db.session import DbSession
-from app.enums.personal_id_type import PersonalIdType
-from app.models.oin import Oin
-from app.services.organization_public_key_service import OrganizationPublicKeyService
-
-os.environ.setdefault("FASTAPI_CONFIG_PATH", "./app.test.conf")
-
-import base64
 import secrets
 from collections.abc import Callable, Generator
 from datetime import datetime, timezone
+from typing import Any
 
 import gfmodules.logging as gflog
-import inject
 import pyoprf
 import pytest
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from gfmodules.logging import ConfigLogging
 from gfmodules.logging.testing import reset_for_tests
 from jwcrypto.jwk import JWK
 from jwcrypto.jwt import JWT
 from pydantic import SecretStr
+from sqlalchemy import select, text
 from starlette.testclient import TestClient
 
 from app.config import get_config, set_config
+from app.container import get_irreversible_pseudonym_service
 from app.db.db import Database
+from app.db.models import HsmKeyVersionEntity, OrganizationEntity
+from app.db.models.base import Base
+from app.db.models.personal_id_type import PersonalIdTypeEntity
+from app.db.session import DbSession
+from app.enums.personal_id_type import PersonalIdType
 from app.logging.events import Log
 from app.models.auth.data import AuthorizationScope
+from app.models.auth.headers import AuthHeaders
+from app.models.oin import Oin
+from app.routers.errors import (
+    install_domain_error_handler,
+    install_validation_error_handler,
+)
+from app.routers.exchange.router import router as exchange_router
+from app.routers.health import router as health_router
+from app.routers.oprf import router as oprf_router
+from app.routers.saml_exchange import router as saml_exchange_router
+from app.routers.test_oprf import router as test_oprf_router
+from app.services.auth.header import AuthHeaderService
+from app.services.authorization_service import AuthorizationService
 from app.services.hsm.client import HsmClient
 from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
-from app.services.irreversible.keys import HsmIrreversibleKeyOperations
+from app.services.irreversible.keys import (
+    HsmIrreversibleKeyOperations,
+    LocalIrreversibleKeyOperations,
+)
+from app.services.irreversible.service import IrreversiblePseudonymService
 from app.services.oprf.evaluators import HsmOprfEvaluator
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.keys import HsmReversibleKeyOperations
+from tests.test_config import get_test_config
+
+TEST_OIN = Oin("00000099000000001000")
+TEST_OIN_111 = Oin("00000099000000011000")
+
+os.environ.setdefault("FASTAPI_CONFIG_PATH", "./app.test.conf")
 
 
 def blinded_input() -> str:
@@ -55,12 +71,6 @@ def blinded_input() -> str:
 def genkey(len: int) -> str:
     key_bytes = secrets.token_bytes(len)
     return base64.urlsafe_b64encode(key_bytes).decode("ascii")
-
-
-def hsm_client() -> HsmClient:
-    return HsmClient(
-        HttpService(endpoint="https://hsm.local/hsm/softhsm/SoftHSMLabel", timeout=10)
-    )
 
 
 def hsm_key_cleanup_service(database: Database) -> HsmKeyCleanupService:
@@ -134,54 +144,145 @@ def record_logs() -> Generator[Callable[[str], list[logging.LogRecord]], None, N
             target.removeHandler(handler)
 
 
-@pytest.fixture
-def app(database: Database) -> Generator[FastAPI, None, None]:
-    from app.application import create_fastapi_app
-    from app.container import container_config
-
-    # Configure the injector for each test, clear if already configured
-    if inject.is_configured():
-        inject.configure(container_config, clear=True)
-    else:
-        inject.configure(container_config)
-    app = create_fastapi_app()
-    yield app
-    inject.clear()
-
-
 def _truncate_tables(db: Database) -> None:
-    metadata = Base.metadata
-    metadata.reflect(bind=db.engine)
-    with Session(db.engine) as session:
-        for table in reversed(metadata.sorted_tables):
-            session.execute(text(f"DELETE FROM {table.schema}.{table.name}"))
+    # metadata = Base.metadata
+    # metadata.reflect(bind=db.engine)
+    # with Session(db.engine) as session:
+    #     for table in reversed(metadata.sorted_tables):
+    #         session.execute(text(f"DELETE FROM {table.schema}.{table.name}"))
+    #     session.commit()
+    #
+    # metadata = MetaData()  # fresh, private
+    # metadata.reflect(bind=db.engine)  # only reads
+    # with Session(db.engine) as session:
+    #     for table in reversed(metadata.sorted_tables):
+    #         session.execute(table.delete())  # SQLAlchemy generates correct DML
+    #     session.commit()
+
+    with db.get_db_session() as session:
+        for table in reversed(Base.metadata.sorted_tables):
+            name = (
+                f'"{table.schema}"."{table.name}"'
+                if table.schema
+                else f'"{table.name}"'
+            )
+            session.execute(text(f"TRUNCATE {name} RESTART IDENTITY CASCADE"))
         session.commit()
 
 
 @pytest.fixture
-def database() -> Database:
-    try:
-        # first use the database from the injector
-        db = inject.instance(Database)
-    except inject.InjectorException:
-        db = Database(get_config().database)
+def database() -> Generator[Database, Any, Any]:
+    config = get_test_config()
+    db = Database(config_database=config.database)
     with db.get_db_session() as session:
         session.execute(
             text("CREATE SCHEMA IF NOT EXISTS admin; CREATE SCHEMA IF NOT EXISTS prs;")
         )
         session.commit()
+
     db.generate_tables()
     _truncate_tables(db)
     with db.get_db_session(commit=True) as session:
         for p in PersonalIdType:
             session.add(PersonalIdTypeEntity(name=p))
-    return db
+    yield db
+    db.engine.dispose()
 
 
 @pytest.fixture()
 def db_session(database: Database) -> Generator[DbSession, Any, None]:
     with database.get_db_session() as session:
         yield session
+
+
+@pytest.fixture()
+def hsm_key_version_service(database: Database) -> HsmKeyVersionService:
+    return HsmKeyVersionService(database)
+
+
+@pytest.fixture()
+def irreversible_pseudonym_service(
+    hsm_key_version_service: HsmKeyVersionService,
+) -> IrreversiblePseudonymService:
+    return IrreversiblePseudonymService(
+        keys=LocalIrreversibleKeyOperations(master_key=os.urandom(32)),
+        key_versions=hsm_key_version_service,
+    )
+
+
+@pytest.fixture()
+def auth_headers_service() -> AuthHeaderService:
+    config = get_test_config()
+    return AuthHeaderService(
+        expected_audiences=config.authorization_headers.expected_audiences
+    )
+
+
+@pytest.fixture()
+def http_service() -> HttpService:
+    config = get_test_config()
+    assert config.hsm.url is not None
+    return HttpService(endpoint=config.hsm.url, timeout=config.hsm.timeout)
+
+
+@pytest.fixture()
+def hsm_client(http_service: HttpService) -> HsmClient:
+    return HsmClient(http_service)
+
+
+@pytest.fixture()
+def authorization_service(database: Database) -> AuthorizationService:
+    return AuthorizationService(database)
+
+
+@pytest.fixture
+def auth_headers(
+    valid_organization_id: Oin,
+    valid_client_organization_id: Oin,
+    valid_client_common_name: str,
+) -> AuthHeaders:
+    return AuthHeaders(
+        organization_id=valid_client_organization_id,
+        client_organization_id=valid_organization_id,
+        client_organization_common_name=valid_client_common_name,
+        audience="prs.service",
+        scope=AuthorizationScope.OPRF_PSEUDONYM.value,  # type: ignore
+    )
+
+
+@pytest.fixture
+def app(
+    database: Database, irreversible_pseudonym_service: IrreversiblePseudonymService
+) -> Generator[FastAPI, None, None]:
+    app = FastAPI()
+    install_domain_error_handler(app)
+    install_validation_error_handler(app)
+    for router in [
+        exchange_router,
+        health_router,
+        oprf_router,
+        saml_exchange_router,
+        test_oprf_router,
+    ]:
+        app.include_router(router)
+
+    app.dependency_overrides[get_irreversible_pseudonym_service] = lambda: (
+        irreversible_pseudonym_service
+    )
+
+    yield app
+
+    # from app.application import create_fastapi_app
+    # from app.container import container_config
+    #
+    # # Configure the injector for each test, clear if already configured
+    # if inject.is_configured():
+    #     inject.configure(container_config, clear=True)
+    # else:
+    #     inject.configure(container_config)
+    # app = create_fastapi_app()
+    # yield app
+    # inject.clear()
 
 
 @pytest.fixture

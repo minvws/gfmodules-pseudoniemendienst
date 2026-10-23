@@ -5,13 +5,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from conftest import blinded_input, create_organization, hsm_client
 from jwcrypto import jwk
 
 from app.db.db import Database
-from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.db.session import DbSession
-from app.models.oin import Oin, RecipientOrganizationOin
+from app.models.oin import RecipientOrganizationOin
 from app.models.requests import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -21,150 +19,18 @@ from app.services.oprf.evaluators import (
     OprfHsmKeyLabel,
 )
 from app.services.oprf.oprf_service import OprfService
-
-TEST_OIN = Oin("00000099000000001000")
-TEST_OIN_WITH_PREFIX = f"oin:{TEST_OIN}"
-TEST_OIN_111 = Oin("00000099000000011000")
-TEST_OIN_222 = Oin("00000099000000022000")
-TEST_OIN_333 = Oin("00000099000000033000")
-TEST_OIN_444 = Oin("00000099000000044000")
-TEST_OIN_555 = Oin("00000099000000055000")
-TEST_OIN_78000 = Oin("00000000012345678000")
-TEST_OIN_79000 = Oin("00000000012345679000")
-
-
-def add_hsm_key_version(
-    db_session: DbSession,
-    external_id: Oin,
-    **kwargs: object,
-) -> OrganizationEntity:
-    org = create_organization(db_session, external_id)
-    org.hsm_key_versions.append(HsmKeyVersionEntity(**kwargs))
-    db_session.commit()
-    return org
-
-
-def test_get_active_versions_filters_by_date_and_removed(
-    database: Database,
-    db_session: DbSession,
-) -> None:
-    now = datetime.now(timezone.utc)
-    # active: started, no end date
-    add_hsm_key_version(
-        db_session,
-        external_id=TEST_OIN_111,
-        version=1,
-        from_dt=now - timedelta(days=1),
-        until_dt=None,
-    )
-    # active: within window
-    add_hsm_key_version(
-        db_session,
-        external_id=TEST_OIN_222,
-        version=2,
-        from_dt=now - timedelta(days=1),
-        until_dt=now + timedelta(days=1),
-    )
-    # inactive: not started yet
-    add_hsm_key_version(
-        db_session,
-        external_id=TEST_OIN_333,
-        version=3,
-        from_dt=now + timedelta(days=1),
-        until_dt=None,
-    )
-    # inactive: already ended
-    add_hsm_key_version(
-        db_session,
-        external_id=TEST_OIN_444,
-        version=4,
-        from_dt=now - timedelta(days=2),
-        until_dt=now - timedelta(days=1),
-    )
-    # inactive: removed
-    add_hsm_key_version(
-        db_session,
-        external_id=TEST_OIN_555,
-        version=5,
-        from_dt=now - timedelta(days=1),
-        until_dt=None,
-        removed_at=now,
-    )
-
-    service = HsmKeyVersionService(database)
-    test_oins = [TEST_OIN_111, TEST_OIN_222, TEST_OIN_333, TEST_OIN_444, TEST_OIN_555]
-
-    with database.get_db_session() as session:
-        org_ids = [
-            org.id
-            for org in session.query(OrganizationEntity)
-            .filter(
-                OrganizationEntity.external_id.in_([oin.value for oin in test_oins])
-            )
-            .all()
-        ]
-
-    active_versions = {
-        v.version
-        for org_id in org_ids
-        for v in service.get_active_versions_by_organization_id(org_id)
-    }
-
-    assert active_versions == {1, 2}
-
-
-def test_get_active_versions_excludes_version_ending_now(
-    database: Database,
-    db_session: DbSession,
-) -> None:
-    now = datetime.now(timezone.utc)
-    org = add_hsm_key_version(
-        db_session,
-        external_id=TEST_OIN_111,
-        version=1,
-        from_dt=now - timedelta(hours=1),
-        until_dt=now,
-    )
-
-    service = HsmKeyVersionService(database)
-    active = {
-        v.version
-        for v in service.get_active_versions_by_organization_id(org.id, at=now)
-    }
-
-    assert active == set()
-
-    # The same row is considered expired at this exact boundary.
-    expired = {v.version for v in service.get_expired_versions(at=now)}
-    assert expired == {1}
-
-
-def test_get_active_version_numbers(
-    database: Database,
-    db_session: DbSession,
-    persisted_organization: OrganizationEntity,
-) -> None:
-    now = datetime.now(timezone.utc)
-    initial_version = [
-        v for v in persisted_organization.hsm_key_versions if v.version == 1
-    ]
-    initial_version[0].until_dt = now - timedelta(days=1)
-    db_session.commit()
-
-    service = HsmKeyVersionService(database)
-    versions = service.get_active_version_numbers_by_organization_oin(
-        persisted_organization.external_id
-    )
-
-    assert versions == []
-
-    all_versions = service.get_versions_by_organization_id(
-        persisted_organization.external_id
-    )
-    assert [v.version for v in all_versions] == [1]
+from tests.conftest import blinded_input, hsm_client
+from tests.services.test_hsm_key_version_service import (
+    TEST_OIN,
+    TEST_OIN_78000,
+    TEST_OIN_79000,
+    TEST_OIN_WITH_PREFIX,
+    add_hsm_key_version,
+)
 
 
 def test_eval_via_hsm_returns_entry_per_active_version(
+    hsm_key_version_service: HsmKeyVersionService,
     database: Database,
     db_session: DbSession,
 ) -> None:
@@ -190,10 +56,7 @@ def test_eval_via_hsm_returns_entry_per_active_version(
         removed_at=now,
     )
 
-    evaluator = HsmOprfEvaluator(
-        hsm_client(),
-        HsmKeyVersionService(database),
-    )
+    evaluator = HsmOprfEvaluator(hsm_client(), hsm_key_version_service)
 
     with (
         patch.object(evaluator._client, "generate_oprf_key") as generate_key,
@@ -302,7 +165,8 @@ def test_eval_blind_subject_is_latest_with_extra_versions(
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
-    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+    # type: ignore[type-arg]
+    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:
         # Return slot info when asked
         if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
             resp = MagicMock()
@@ -399,7 +263,8 @@ def test_eval_blind_jwe_contains_only_versions_active_at_date(
     key = jwk.JWK.generate(kty="RSA", size=2048)
     pub = jwk.JWK.from_json(key.export_public())
 
-    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:  # type: ignore[type-arg]
+    # type: ignore[type-arg]
+    def fake_post(method: str, url: str, json: dict, **kwargs: object) -> MagicMock:
         # Return slot info when asked
         if url == "https://hsm.local/hsm/softhsm/SoftHSMLabel":
             resp = MagicMock()
