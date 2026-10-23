@@ -215,6 +215,39 @@ def test_reverse_with_destroyed_version_fails(
     assert e.value.error_type == "version_destroyed"
 
 
+@pytest.mark.parametrize(
+    ("active_versions", "known_versions"),
+    [
+        ([], [(1, False)]),
+        ([2], [(1, False), (2, False)]),
+        ([2], [(1, True), (2, False)]),
+        ([2], [(2, False)]),
+    ],
+    ids=["none-active", "retained-inactive", "removed", "unknown"],
+)
+def test_unavailable_source_version_is_rejected_before_crypto(
+    local_keys: LocalReversibleKeyOperations,
+    recipient: Oin,
+    active_versions: list[int],
+    known_versions: list[tuple[int, bool]],
+) -> None:
+    pseudonym = ReversiblePseudonymService(
+        local_keys, _key_versions({recipient: [1]})
+    ).generate(PID, recipient, SCOPE)
+    keys = MagicMock(wraps=local_keys)
+    later = ReversiblePseudonymService(
+        keys,
+        _key_versions({recipient: active_versions}, {recipient: known_versions}),
+    )
+
+    with pytest.raises(ReversiblePseudonymError) as error:
+        later.reverse(pseudonym.value, recipient)
+
+    assert error.value.error_type == "version_destroyed"
+    keys.decrypt.assert_not_called()
+    keys.hmac.assert_not_called()
+
+
 def _flip(value: str, index: int) -> str:
     blob = bytearray(base64.urlsafe_b64decode(value))
     blob[index] ^= 0x01

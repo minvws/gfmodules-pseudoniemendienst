@@ -2,8 +2,11 @@
 
 HSM key versions are stored in the `hsm_key_version` table with an optional
 `until_dt` (end date). When a version's `until_dt` is in the past (or exactly now) it is no longer
-used for [OPRF evaluation](./oprf-eval-flow.md), but the key still physically
-exists in the HSM. A standalone cleanup program removes those expired keys.
+used for [OPRF evaluation](./oprf-eval-flow.md) or reversible pseudonym reversal, but the key still physically
+exists in the HSM. Reversal returns `410` (`Pseudonym key version no longer available`) at `until_dt`, independently
+of cleanup. An older version can still reverse pseudonyms during its grace period while `from_dt <= now` and
+`now < until_dt` (or `until_dt` is unset), provided it has not been removed, even when a newer version is current.
+A standalone cleanup program removes those expired keys.
 
 ## What it does
 

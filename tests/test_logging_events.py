@@ -43,6 +43,8 @@ def test_emit_attaches_event_id_and_streams() -> None:
         (Log.PSEUDONYM_IRREVERSIBLE_DUAL_CREATED, "220402", logging.INFO),
         (Log.PSEUDONYM_CREATE_FAILED, "220403", logging.ERROR),
         (Log.PERSONAL_ID_VALIDATION_FAILED, "220404", logging.WARNING),
+        (Log.PERSONAL_ID_EXCHANGED, "220405", logging.INFO),
+        (Log.PERSONAL_ID_EXCHANGE_FAILED, "220406", logging.ERROR),
         (Log.OPRF_EVAL_OK, "210400", logging.INFO),
         (Log.OPRF_EVAL_FAILED, "210402", logging.ERROR),
         (Log.OPRF_REFUSED_NO_ACTIVE_PUBKEY, "210403", logging.WARNING),

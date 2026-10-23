@@ -161,7 +161,7 @@ class PseudonymExchangeRequest(BaseModel):
         min_length=1,
         max_length=100,
         pattern=r"^[^|]+$",
-        description="Scope of the recipient organization which the pseudonym is bound to.",
+        description="Scope of the recipient organization for the exchanged result.",
     )
 
 
@@ -204,7 +204,7 @@ class IrreversiblePseudonymFromPersonalIdRequest(PersonalIdExchangeRequest):
     model_config = ConfigDict(extra="forbid")
 
 
-class IrreversiblePseudonymFromReversiblePseudonymRequest(PseudonymExchangeRequest):
+class ReversiblePseudonymInputRequest(PseudonymExchangeRequest):
     model_config = ConfigDict(
         extra="forbid",
         json_schema_extra={
@@ -231,6 +231,19 @@ class IrreversiblePseudonymFromReversiblePseudonymRequest(PseudonymExchangeReque
     @classmethod
     def strip_reversible_prefix(cls, value: str) -> str:
         return value.removeprefix(REVERSIBLE_PSEUDONYM_PREFIX)
+
+
+class IrreversiblePseudonymFromReversiblePseudonymRequest(
+    ReversiblePseudonymInputRequest
+):
+    pass
+
+
+class PersonalIdFromReversiblePseudonymRequest(ReversiblePseudonymInputRequest):
+    recipientOrganization: RecipientOrganizationOin = Field(
+        ...,
+        description="Must match the verified calling organization (`x-gf-sub`).",
+    )
 
 
 IrreversiblePseudonymExchangeRequest = (

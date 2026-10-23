@@ -79,7 +79,7 @@ class InvalidAudienceError(DomainError):
 
 
 class UnauthorizedRequestError(DomainError):
-    """Malformed/missing proxy-verified headers, or a missing OAuth scope."""
+    """The request is not authorized by the proxy-verified caller context."""
 
     message = "Unauthorized request"
 

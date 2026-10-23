@@ -93,13 +93,45 @@ load the caller's organisation by `auth_ctx.claims.organization_id` and only
 operate on that organisation's own keys and key versions. A key or key version
 id that belongs to another organisation is simply not found.
 
-The one place where a request names another organisation is `/oprf/eval`, which
-carries the recipient in its body. That is an intended cross-organisation
-operation and is authorized separately: the caller must be allowed to *request*
-OPRF pseudonyms and the recipient must be allowed to *receive* them, both
-administrative flags on the organisation record. The caller is not the one who
-can decrypt the result; the response is encrypted to the recipient's registered
-key.
+`/oprf/eval`, `/exchange/reversible-pseudonym` and
+`/exchange/irreversible-pseudonym` support a different recipient organisation in
+the request body. These are intended cross-organisation operations, authorized
+separately: the verified caller must be allowed to *request* the required personal ID type and
+the recipient must be allowed to *receive* it, both administrative grants on the
+organisation record. Caller authorization is checked before recipient lookup.
+The response is encrypted to the recipient's registered key for the requested
+scope (or its wildcard key); the caller can decrypt it only if it also holds
+that recipient's private key.
+
+`/exchange/personal-id` returns the personal ID only to the verified caller.
+Its required `recipientOrganization` must match `x-gf-sub`; a mismatch returns
+`403` with `Unauthorized request` before organisation/key lookup or reversal.
+The caller must have both request and receive authorization for
+`reversible_pseudonym`. These existing grants also authorize the exchange to
+the personal ID; there is no separate personal ID grant. The caller's public
+key, encryption target, `aud` (`oin:<caller>`) and success audit `doel_oin` all
+derive from `x-gf-sub`, not the acting client in `x-gf-act-sub`.
+`recipientScope` selects the caller's registered delivery key (or its wildcard
+key) and may differ from the source scope. The returned JWE's `subject` is the
+canonical personal ID, such as `NL:bsn:950000012`. The endpoint requires
+`prs:pseudonym` and is mounted only when `enable_exchange_services_routes` is
+enabled.
+
+When an exchange accepts a reversible pseudonym, its source is always bound to
+the verified caller (`auth.claims.organization_id`, derived from `x-gf-sub`).
+The body cannot select whose pseudonym is reversed. The source scope is carried
+by the pseudonym and may differ from the destination scope. The source HSM key version must not be
+removed and must satisfy `from_dt <= now` and either no `until_dt` or
+`now < until_dt`. An older version remains usable during this grace period even
+when a newer version is current. At `until_dt`, reversal returns `410` even if
+physical HSM cleanup has not run. Personal ID delivery uses the caller's public
+encryption key without creating a new pseudonym or evaluating a destination
+HSM key version.
+
+The personal ID exchange's success APP audit event records the source HSM
+version as integer `sleutel_versie` and the caller JWK's `kid` as
+`ontvanger_pubkey_id`, matching the JWE protected header. The success SIEM event
+remains OIN-only.
 
 Any new endpoint that takes an OIN from the request body/path and acts on it
 **without** either comparing it to `x-gf-sub` or authorizing the
