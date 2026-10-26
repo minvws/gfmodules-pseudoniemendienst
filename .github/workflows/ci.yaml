@@ -150,6 +150,9 @@ jobs:
         run: |
           sudo bash -c 'echo "127.0.0.1 prs_db" >> /etc/hosts'
           DSN="postgresql://postgres:postgres@prs_db:5432/postgres" poetry run ./tools/migrate_db.sh
+          mkdir -p ./secrets
+          openssl req -new -x509 -newkey rsa:3072 -nodes -keyout /dev/null \
+          -days 365 -out secrets/test_cert.crt -subj "/CN=test-signing"
           poetry run pytest --cov --cov-report=term --cov-report=xml
 
       - name: Upload coverage report

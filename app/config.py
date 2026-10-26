@@ -112,6 +112,26 @@ class ConfigSamlService(BaseModel):
     ca_cert_file: str | None = Field(default=None)
 
 
+class ConfigJwks(BaseModel):
+    signing_key_files: list[str] = Field(default_factory=list)
+    active_signing_key_files: list[str] = Field(default_factory=list)
+    hsm_key_labels: list[str] = Field(default_factory=list)
+    active_hsm_key_labels: list[str] = Field(default_factory=list)
+
+    _split_signing_key_files = field_validator("signing_key_files", mode="before")(
+        split_comma_separated()
+    )
+    _split_active_signging_key_files = field_validator(
+        "active_signing_key_files", mode="before"
+    )(split_comma_separated())
+    _split_hsm_key_labels = field_validator("hsm_key_labels", mode="before")(
+        split_comma_separated()
+    )
+    _split_active_hsm_key_labels = field_validator(
+        "active_hsm_key_labels", mode="before"
+    )(split_comma_separated())
+
+
 class ConfigAuthorizationHeaders(BaseModel):
     expected_audiences: list[str]
 
@@ -144,6 +164,7 @@ class Config(BaseModel):
     local_keys: ConfigLocalKeys = Field(default_factory=ConfigLocalKeys)
     authorization_headers: ConfigAuthorizationHeaders
     saml_service: ConfigSamlService = Field(default_factory=ConfigSamlService)
+    jwks: ConfigJwks
 
 
 def read_ini_file(path: str) -> Any:

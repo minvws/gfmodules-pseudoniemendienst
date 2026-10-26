@@ -5,7 +5,7 @@ from fastapi import Depends, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 from starlette.requests import Request
 
-from app import container
+from app.container import get_auth_headers_service
 from app.exceptions import UnauthorizedRequestError
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.data import AuthorizationScope
@@ -26,7 +26,7 @@ bearer_auth = HTTPBearer(
 def get_auth_ctx(
     request: Request,
     auth_headers_service: Annotated[
-        AuthHeaderService, Depends(container.get_auth_headers_service)
+        AuthHeaderService, Depends(get_auth_headers_service)
     ],
 ) -> AuthContext:
     try:

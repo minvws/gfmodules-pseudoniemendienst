@@ -4,6 +4,8 @@ from typing import Any
 
 import gfmodules.logging as gflog
 import requests
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
 from app.logging.events import Log
 from app.services.http_service import HttpService
@@ -23,6 +25,10 @@ class HsmKeyNotFound(Exception):
 
 class HsmKeyExists(Exception):
     """A key with the requested label already exists in the HSM."""
+
+
+class HsmUnsupportedKeyType(TypeError):
+    """A key type retrieved by the HSM that is not supported by the application."""
 
 
 def _expected_error(response: requests.Response) -> Exception | None:
@@ -130,6 +136,20 @@ class HsmClient:
         self.destroy(label)
         logger.info("destroyed HSM key %r", label)
         return True
+
+    def get_public_key_pem(self, label: str) -> RSAPublicKey:
+        """The PEM public key of the key pair with this label."""
+        data = self.post("", {"label": label, "objtype": "PUBLIC_KEY"}, "lookup")
+        objects = data["objects"] or []
+        if not objects or "publickey" not in objects[0]:
+            raise HsmKeyNotFound(f"No public key with label {label!r}")
+
+        raw = objects[0]["publickey"]
+        pub_key = load_pem_public_key(raw.encode())
+        if not isinstance(pub_key, RSAPublicKey):
+            raise HsmUnsupportedKeyType()
+
+        return pub_key
 
     def oprf_evaluate(self, label: str, blinded: bytes) -> bytes:
         data = self.post(
