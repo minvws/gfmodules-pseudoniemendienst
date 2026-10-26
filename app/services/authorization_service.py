@@ -3,10 +3,7 @@ import logging
 from app.db.db import Database
 from app.db.repositories.organization_repository import OrganizationRepository
 from app.enums.personal_id_type import PersonalIdType
-from app.exceptions import (
-    NotAllowedToRequestError,
-    RecipientNotFoundError,
-)
+from app.exceptions.access import NotAllowedToRequestError, RecipientNotFoundError
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)

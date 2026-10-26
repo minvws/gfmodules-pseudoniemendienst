@@ -8,10 +8,11 @@ import requests
 from conftest import blinded_input
 from jwcrypto.jwk import JWK
 
-from app.exceptions import RecipientNotFoundError
+from app.exceptions.access import RecipientNotFoundError
+from app.exceptions.pseudonym import PseudonymOperationError
 from app.models.requests.oprf import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.oprf_service import OprfService
 
 REQUEST = BlindRequest.model_validate(
     {
@@ -20,6 +21,7 @@ REQUEST = BlindRequest.model_validate(
         "recipientScope": "nvi",
     }
 )
+KEY = JWK(generate="oct")
 
 
 def _service(evaluate_side_effect: Exception) -> OprfService:
@@ -37,20 +39,23 @@ def test_blind_that_is_not_a_ristretto255_element_is_rejected_before_evaluation(
     element: bytes,
 ) -> None:
     evaluator = MagicMock()
+    service = OprfService(evaluator)
     request = REQUEST.model_copy(
         update={"encryptedPersonalId": base64.urlsafe_b64encode(element).decode()}
     )
 
-    with pytest.raises(OprfEvaluationError) as e:
-        OprfService(evaluator).eval_blind(request, JWK(generate="oct"))
+    with pytest.raises(PseudonymOperationError) as e:
+        service.eval_blind(request, KEY)
 
     assert e.value.error_type == "invalid_blinded_input"
     evaluator.evaluate.assert_not_called()
 
 
-def test_domain_error_from_the_evaluator_passes_through_unwrapped() -> None:
+def test_app_error_from_the_evaluator_passes_through_unwrapped() -> None:
+    service = _service(RecipientNotFoundError())
+
     with pytest.raises(RecipientNotFoundError):
-        _service(RecipientNotFoundError()).eval_blind(REQUEST, JWK(generate="oct"))
+        service.eval_blind(REQUEST, KEY)
 
 
 @pytest.mark.parametrize(
@@ -67,8 +72,10 @@ def test_domain_error_from_the_evaluator_passes_through_unwrapped() -> None:
 def test_known_hsm_failure_becomes_an_evaluation_error(
     failure: Exception, error_type: str
 ) -> None:
-    with pytest.raises(OprfEvaluationError) as e:
-        _service(failure).eval_blind(REQUEST, JWK(generate="oct"))
+    service = _service(failure)
+
+    with pytest.raises(PseudonymOperationError) as e:
+        service.eval_blind(REQUEST, KEY)
 
     assert e.value.error_type == error_type
 
@@ -76,6 +83,7 @@ def test_known_hsm_failure_becomes_an_evaluation_error(
 def test_recipient_without_active_key_version_is_not_found() -> None:
     evaluator = MagicMock()
     evaluator.evaluate.return_value = {}
+    service = OprfService(evaluator)
 
     with pytest.raises(RecipientNotFoundError):
-        OprfService(evaluator).eval_blind(REQUEST, JWK(generate="oct"))
+        service.eval_blind(REQUEST, KEY)

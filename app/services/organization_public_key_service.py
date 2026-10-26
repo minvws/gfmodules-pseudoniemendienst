@@ -15,13 +15,12 @@ from app.db.repositories.organization_public_key_repository import (
     OrganizationPublicKeyRepository,
 )
 from app.db.repositories.organization_repository import OrganizationRepository
-from app.exceptions import (
+from app.exceptions.access import OrganizationNotRegisteredError, RecipientNotFoundError
+from app.exceptions.registration import (
     DomainAlreadyRegisteredError,
     DomainNotRegisteredError,
     InvalidJwsError,
-    OrganizationNotRegisteredError,
     PublicKeyNotFoundError,
-    RecipientNotFoundError,
 )
 from app.logging.events import Log
 from app.models.oin import Oin

@@ -10,11 +10,12 @@ from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 from gfmodules.logging.testing import assert_catalogue_complete, capture_records
 from jwcrypto import jwk
 
+from app.exceptions.pseudonym import PseudonymOperationError
 from app.logging.events import Log
 from app.models.oin import RecipientOrganizationOin
 from app.models.requests.oprf import BlindRequest
 from app.services.oprf.evaluators import HsmOprfEvaluator, LocalOprfEvaluator
-from app.services.oprf.oprf_service import OprfEvaluationError, OprfService
+from app.services.oprf.oprf_service import OprfService
 
 
 def test_catalogue_defines_every_required_event() -> None:
@@ -118,12 +119,10 @@ def test_eval_blind_invalid_input_raises_invalid_blinded_input(
             base64.urlsafe_b64decode(OprfService.generate_server_key())
         ),
     )
+    request = _blind_request(base64.urlsafe_b64encode(b"not-a-valid-point").decode())
 
-    with pytest.raises(OprfEvaluationError) as exc:
-        service.eval_blind(
-            _blind_request(base64.urlsafe_b64encode(b"not-a-valid-point").decode()),
-            pub_key,
-        )
+    with pytest.raises(PseudonymOperationError) as exc:
+        service.eval_blind(request, pub_key)
 
     assert exc.value.error_type == "invalid_blinded_input"
 
@@ -143,14 +142,15 @@ def test_eval_blind_hsm_refusal_raises_hsm_operation_failed(
             hsm_key_version_service=hsm_key_version_service,
         )
     )
+    request = _blind_request(blinded_input())
 
     with (
         patch(
             "requests.Session.request",
             return_value=refusal,
         ),
-        pytest.raises(OprfEvaluationError) as exc,
+        pytest.raises(PseudonymOperationError) as exc,
     ):
-        service.eval_blind(_blind_request(blinded_input()), pub_key)
+        service.eval_blind(request, pub_key)
 
     assert exc.value.error_type == "hsm_operation_failed"

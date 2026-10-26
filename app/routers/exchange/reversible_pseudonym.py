@@ -9,7 +9,7 @@ from starlette.responses import Response
 from app import container
 from app.auth import require_scopes
 from app.enums.personal_id_type import PersonalIdType
-from app.exceptions import PseudonymOperationError
+from app.exceptions.pseudonym import PseudonymOperationError
 from app.logging.events import Log
 from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
@@ -20,8 +20,8 @@ from app.models.requests.exchange import (
 )
 from app.routers.exchange.support import (
     authorize_exchange,
+    log_pseudonym_failure,
     parse_personal_id,
-    raise_pseudonym_error,
 )
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import Jwe
@@ -122,13 +122,14 @@ def exchange_reversible_pseudonym(
             recipient_scope=req.recipientScope,
         )
     except PseudonymOperationError as e:
-        raise_pseudonym_error(
+        log_pseudonym_failure(
             logger,
             audit,
             e,
             Log.PSEUDONYM_CREATE_FAILED,
             "Reversible pseudonym creation failed",
         )
+        raise
 
     jwe = Jwe.build(
         audience=str(req.recipientOrganization),

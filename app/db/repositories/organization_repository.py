@@ -2,7 +2,7 @@ from sqlalchemy import and_, select
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repositories.repository_base import RepositoryBase
-from app.exceptions import OrganizationNotRegisteredError
+from app.exceptions.access import OrganizationNotRegisteredError
 from app.models.oin import Oin
 
 
