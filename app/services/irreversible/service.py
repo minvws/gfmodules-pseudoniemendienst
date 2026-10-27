@@ -63,6 +63,9 @@ class IrreversiblePseudonymService:
             recipient
         )
         if not active:
+            logger.warning(
+                "organization '%s' has no active HSM key version", recipient.value
+            )
             raise NoActiveKeyVersionError()
 
         try:

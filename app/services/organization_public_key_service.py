@@ -247,6 +247,11 @@ class OrganizationPublicKeyService:
             if not public_key:
                 public_key = [pk for pk in org.public_keys if "*" in pk.domains]
             if not public_key:
+                logger.warning(
+                    "organization '%s' has no public key for scope '%s'",
+                    org_id.value,
+                    domain,
+                )
                 raise DomainNotRegisteredError()
             return public_key[0]
 

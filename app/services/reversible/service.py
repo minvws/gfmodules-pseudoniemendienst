@@ -76,6 +76,9 @@ class ReversiblePseudonymService:
             recipient
         )
         if not active:
+            logger.warning(
+                "organization '%s' has no active HSM key version", recipient.value
+            )
             raise NoActiveKeyVersionError()
         version = max(active)
 
@@ -100,6 +103,11 @@ class ReversiblePseudonymService:
             recipient
         )
         if version not in active:
+            logger.warning(
+                "key version %d is not available for organization '%s'",
+                version,
+                recipient.value,
+            )
             raise PseudonymVersionDestroyedError()
 
         try:
@@ -115,10 +123,15 @@ class ReversiblePseudonymService:
             raise InvalidPseudonymError() from e
 
         if not hmac.compare_digest(iv, expected_iv):
+            logger.warning("reversible pseudonym integrity check failed")
             raise InvalidPseudonymError()
 
         parts = subject.decode("utf-8").split(DELIMITER)
         if len(parts) != 3 or parts[1] != recipient_organization(recipient):
+            logger.warning(
+                "reversible pseudonym was not issued for organization '%s'",
+                recipient.value,
+            )
             raise InvalidPseudonymError()
 
         return ReversedPseudonym(
@@ -147,12 +160,15 @@ class ReversiblePseudonymService:
         try:
             blob = base64.urlsafe_b64decode(value)
         except Exception as e:
+            logger.warning("reversible pseudonym is not base64url")
             raise InvalidPseudonymError() from e
 
         if len(blob) < _MIN_LENGTH or blob[0] != FORMAT_VERSION:
+            logger.warning("reversible pseudonym has an unknown format")
             raise InvalidPseudonymError()
         body = blob[_HEADER_LENGTH:]
         if (len(body) - IV_LENGTH) % AES_BLOCK != 0:
+            logger.warning("reversible pseudonym has an invalid length")
             raise InvalidPseudonymError()
         version = int.from_bytes(blob[1:_HEADER_LENGTH], "big")
         return version, body[:-IV_LENGTH], body[-IV_LENGTH:]
