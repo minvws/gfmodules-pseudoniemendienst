@@ -18,7 +18,7 @@ updates:
       default-days: 5
     groups:
       actions: # action-bumps are one PR/week (low risk, large volume)
-        patterns: ["actions/*"]
+        patterns: ["*"]
 
   - package-ecosystem: pip
     directory: / # Scans pyproject.toml + poetry.lock
@@ -55,4 +55,21 @@ updates:
       default-days: 5
     groups:
       docker-patch-minor:
+        update-types: [patch, minor] # Major versions not grouped, one PR per breaking change
+
+  - package-ecosystem: docker-compose
+    directories: ["/"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:30"
+      timezone: Europe/Amsterdam
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: "deps(docker)"
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 5
+    groups:
+      compose-patch-minor:
         update-types: [patch, minor] # Major versions not grouped, one PR per breaking change
