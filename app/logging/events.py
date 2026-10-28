@@ -112,6 +112,37 @@ class Log(_Base):
         },
     )
 
+    PERSONAL_ID_EXCHANGED = LogEvent(
+        "220405",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "handelende_oin",
+                "namens_oin",
+                "doel_oin",
+                "domein",
+                "sleutel_versie",
+                "ontvanger_pubkey_id",
+            ),
+            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+        },
+    )
+    PERSONAL_ID_EXCHANGE_FAILED = LogEvent(
+        "220406",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "handelende_oin",
+                "namens_oin",
+                "doel_oin",
+                "error_type",
+            ),
+            _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+        },
+    )
+
     # OPRF exchange events (PRS-OPRF), see
     # https://github.com/minvws/gfmodules-coordination-private/issues/1035
     OPRF_EVAL_OK = LogEvent(  # PRS-OPRF-001

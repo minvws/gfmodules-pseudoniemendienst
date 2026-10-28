@@ -93,13 +93,15 @@ load the caller's organisation by `auth_ctx.claims.organization_id` and only
 operate on that organisation's own keys and key versions. A key or key version
 id that belongs to another organisation is simply not found.
 
-The one place where a request names another organisation is `/oprf/eval`, which
-carries the recipient in its body. That is an intended cross-organisation
-operation and is authorized separately: the caller must be allowed to *request*
-OPRF pseudonyms and the recipient must be allowed to *receive* them, both
-administrative flags on the organisation record. The caller is not the one who
-can decrypt the result; the response is encrypted to the recipient's registered
-key.
+The places where a request names another organisation are `/oprf/eval` and the
+`/exchange/*` endpoints, which carry the recipient in their body. Those are
+intended cross-organisation operations and are authorized separately: the
+caller must be allowed to *request* the personal ID type and the recipient must
+be allowed to *receive* it, both administrative flags on the organisation
+record. The caller is not the one who can decrypt the result; the response is
+encrypted to the recipient's registered key. A reversible pseudonym in the
+request is always reversed for the caller, so a caller can only hand in
+pseudonyms that were issued to itself.
 
 Any new endpoint that takes an OIN from the request body/path and acts on it
 **without** either comparing it to `x-gf-sub` or authorizing the

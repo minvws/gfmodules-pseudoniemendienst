@@ -164,6 +164,47 @@ def test_get_active_version_numbers(
     assert [v.version for v in all_versions] == [1]
 
 
+@pytest.mark.parametrize(
+    ("start_offset", "end_offset", "removed", "expected"),
+    [
+        (0, None, False, [1]),
+        (-10, 1, False, [1]),
+        (-10, 0, False, []),
+        (-10, -1, False, []),
+        (1, None, False, []),
+        (-10, None, True, []),
+    ],
+    ids=["starts-now", "within-grace", "ends-now", "expired", "future", "removed"],
+)
+def test_active_version_numbers_observe_validity_boundaries(
+    database: Database,
+    db_session: DbSession,
+    persisted_organization: OrganizationEntity,
+    monkeypatch: pytest.MonkeyPatch,
+    start_offset: int,
+    end_offset: int | None,
+    removed: bool,
+    expected: list[int],
+) -> None:
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    monkeypatch.setattr("app.services.hsm_key_version_service.now_utc", lambda: now)
+    version = persisted_organization.hsm_key_versions[0]
+    version.from_dt = now + timedelta(seconds=start_offset)
+    version.until_dt = (
+        None if end_offset is None else now + timedelta(seconds=end_offset)
+    )
+    version.removed_at = now if removed else None
+    db_session.commit()
+
+    service = HsmKeyVersionService(database)
+
+    active = service.get_active_version_numbers_by_organization_oin(
+        persisted_organization.external_id
+    )
+
+    assert active == expected
+
+
 def test_eval_via_hsm_returns_entry_per_active_version(
     database: Database,
     db_session: DbSession,

@@ -2,7 +2,7 @@
 
 HSM key versions are stored in the `hsm_key_version` table with an optional
 `until_dt` (end date). When a version's `until_dt` is in the past (or exactly now) it is no longer
-used for [OPRF evaluation](./oprf-eval-flow.md), but the key still physically
+used for [OPRF evaluation](./oprf-eval-flow.md) or for reversing reversible pseudonyms, but the key still physically
 exists in the HSM. A standalone cleanup program removes those expired keys.
 
 ## What it does

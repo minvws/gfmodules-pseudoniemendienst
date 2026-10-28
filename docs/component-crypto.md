@@ -63,7 +63,7 @@ are active during rotation) and is carried in the pseudonym so the PRS can selec
 
 Reversal decrypts the ciphertext with the (organization, version) AES key, recomputes the IV from the decrypted
 subject and compares it, in constant time, with the embedded IV. A mismatch, a subject naming another organization, or
-a version that has been destroyed is rejected. Reversal is only possible by the PRS itself.
+a version that is no longer active is rejected. Reversal is only possible by the PRS itself.
 
 An RP is deterministic per (personal_id, organization, scope, version).
 

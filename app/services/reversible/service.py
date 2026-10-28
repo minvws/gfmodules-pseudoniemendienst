@@ -96,7 +96,10 @@ class ReversiblePseudonymService:
     def reverse(self, value: str, recipient: Oin) -> ReversedPseudonym:
         version, ciphertext, iv = self._unpack(value)
 
-        if not self._version_available(recipient, version):
+        active = self._key_versions.get_active_version_numbers_by_organization_oin(
+            recipient
+        )
+        if version not in active:
             raise PseudonymVersionDestroyedError()
 
         try:
@@ -138,12 +141,6 @@ class ReversiblePseudonymService:
         inner = self._keys.hmac(recipient, version, subject)
         outer = self._keys.hmac(recipient, version, inner)
         return outer[:IV_LENGTH]
-
-    def _version_available(self, recipient: Oin, version: int) -> bool:
-        return any(
-            v.version == version and v.removed_at is None
-            for v in self._key_versions.get_versions_by_organization_id(recipient)
-        )
 
     @staticmethod
     def _unpack(value: str) -> tuple[int, bytes, bytes]:

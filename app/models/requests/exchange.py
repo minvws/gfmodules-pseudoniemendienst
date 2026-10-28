@@ -15,7 +15,7 @@ class PseudonymExchangeRequest(BaseModel):
         min_length=1,
         max_length=100,
         pattern=r"^[^|]+$",
-        description="Scope of the recipient organization which the pseudonym is bound to.",
+        description="Scope of the recipient organization for the exchanged result.",
     )
 
 

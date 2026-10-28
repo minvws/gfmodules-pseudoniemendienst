@@ -150,6 +150,34 @@ Response:
 
 
 
+# Steps to exchange a reversible pseudonym for a personal ID
+
+The calling organization hands in a reversible pseudonym that was issued to it, either as received in the JWE `subject` or as the bare value. It must be allowed to request the `personal_id` personal ID type, and the recipient organization must be allowed to receive it. The scenarios below grant `personal_id` to nobody, so add it to Org 2's request list and Org 3's receive list to send the personal ID behind a pseudonym of Org 2 to Org 3.
+
+Request, as Org 2:
+```
+POST /exchange/personal-id
+{
+  "reversiblePseudonym": "pseudonym:reversible:AQAB...",
+  "recipientOrganization": "oin:00000097000000001000",
+  "recipientScope": "bar"
+}
+```
+
+The response is a JWE for Org 3. Decoding it with `POST /test/jwe/decode` and Org 3's private key shows the personal ID in the `subject` claim:
+```
+"decrypted": {
+  "subject": "NL:bsn:950000012",
+  "aud": "oin:00000097000000001000",
+  "scope": "bar",
+  "version": "1.1",
+  "iat": 1762770476,
+  "exp": 1762770776
+}
+```
+
+
+
 # Scenarios:
 
  org   | oin                      | may request           | may receive
