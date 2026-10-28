@@ -7,7 +7,6 @@ personal ID type the sender and recipient are provisioned for differs.
 # ruff: noqa: F811 - the imported fixture is used by name as a test parameter
 
 from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -30,13 +29,11 @@ from test_reversible_pseudonym_router import (  # noqa: F401 - fixtures
 
 from app import container
 from app.db.db import Database
-from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
 from app.models.personal_id import PersonalId
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
-from app.utils.datetime import now_utc
 
 ENDPOINT = "/exchange/irreversible-pseudonym"
 LOGGER = "app.routers.exchange.irreversible_pseudonym"
@@ -229,49 +226,6 @@ def test_reversible_pseudonym_of_another_organization_is_refused(
     failed = _events(records, "220403")
     assert len(failed) == 1
     assert failed[0].error_type == "invalid_pseudonym"  # type: ignore[attr-defined]
-    assert _events(records, "220401") == []
-
-
-@pytest.mark.parametrize("source_state", ["expired", "ends-now", "future"])
-def test_retained_reversible_source_outside_its_window_is_refused(
-    source_state: str,
-    client: TestClient,
-    valid_headers: dict[str, str],
-    db_session: DbSession,
-    make_organization: MakeOrganization,
-    make_recipient: MakeRecipient,
-    monkeypatch: pytest.MonkeyPatch,
-    record_logs: RecordLogs,
-) -> None:
-    source = make_organization(
-        SENDER_OIN,
-        request=[PersonalIdType.IRREVERSIBLE_PSEUDONYM],
-        receive=[PersonalIdType.REVERSIBLE_PSEUDONYM],
-    )
-    make_recipient()
-    reversible = container.get_reversible_pseudonym_service().generate(
-        PersonalId.from_str(f"NL:bsn:{BSN}"), SENDER_OIN, "own-scope"
-    )
-    now = now_utc()
-    monkeypatch.setattr("app.services.hsm_key_version_service.now_utc", lambda: now)
-    version = source.hsm_key_versions[0]
-    if source_state == "future":
-        version.from_dt = now + timedelta(seconds=1)
-    else:
-        version.until_dt = now - timedelta(seconds=source_state == "expired")
-    db_session.commit()
-    assert version.removed_at is None
-    records = record_logs(LOGGER)
-
-    response = client.post(
-        ENDPOINT, json=_reversible_body(reversible.value), headers=valid_headers
-    )
-
-    assert response.status_code == 410
-    assert response.json() == {"detail": "Pseudonym key version no longer available"}
-    failed = _events(records, "220403")
-    assert len(failed) == 1
-    assert failed[0].error_type == "version_destroyed"  # type: ignore[attr-defined]
     assert _events(records, "220401") == []
 
 

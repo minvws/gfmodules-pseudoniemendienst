@@ -191,11 +191,10 @@ EXCHANGE_TAGS_METADATA = [
             "targeted at a recipient organization/scope. Instead of a personal "
             "ID, the irreversible exchange also takes a previously issued "
             "reversible pseudonym, which is reversed first. The personal ID "
-            "exchange reverses a caller-owned pseudonym and encrypts the ID to "
-            "that same caller, which must hold both reversible-pseudonym request "
-            "and receive grants. Its recipientOrganization must match the caller. "
+            "exchange turns a reversible pseudonym back into its personal ID. "
             "Every exchange requires both the calling and the recipient "
-            "organization to hold the required administrator-managed grants."
+            "organization to be authorized for that personal ID type by a PRS "
+            "administrator."
         ),
     },
 ]

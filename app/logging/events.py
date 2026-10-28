@@ -112,8 +112,6 @@ class Log(_Base):
         },
     )
 
-    # Personal ID exchanges are distinct from pseudonym creation. As above,
-    # neither the recovered personal ID nor the source pseudonym is logged.
     PERSONAL_ID_EXCHANGED = LogEvent(
         "220405",
         logging.INFO,

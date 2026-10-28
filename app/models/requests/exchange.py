@@ -47,13 +47,6 @@ class ReversiblePseudonymInputRequest(PseudonymExchangeRequest):
         return value.removeprefix(REVERSIBLE_PSEUDONYM_PREFIX)
 
 
-class PersonalIdFromReversiblePseudonymRequest(ReversiblePseudonymInputRequest):
-    recipientOrganization: RecipientOrganizationOin = Field(
-        ...,
-        description="Must match the verified calling organization.",
-    )
-
-
 class PersonalIdInputRequest(PseudonymExchangeRequest):
     model_config = ConfigDict(
         json_schema_extra={

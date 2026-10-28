@@ -96,7 +96,7 @@ Request:
 POST /exchange/reversible-pseudonym
 {
   "personalId": "NL:bsn:950000012",
-  "recipientOrganization": "oin:00000098000000001000",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar"
 }
 ```
@@ -106,7 +106,7 @@ Response:
 eyJraWQiOiAiYXBjc3o....
 ```
 
-The response has status `201` and content type `application/jwe`.
+Note: this is not an `application/json` content type, but an `Multipart/Encrypted`.
 
 Basically, this is all you need. You can send this JWE to the receiver, who can decrypt it using their private key to obtain the pseudonym.
 
@@ -136,7 +136,7 @@ Response:
     },
     "decrypted": {
       "subject": "pseudonym:reversible:gOm6ILU3e0jjB9TJIUUHo0O0CCCgbhmpDmnvauyGP2w=",
-      "aud": "oin:00000098000000001000",
+      "aud": "90000036",
       "scope": "bar",
       "version": "1.1",
       "iat": 1762770476,
@@ -152,37 +152,23 @@ Response:
 
 # Steps to exchange a reversible pseudonym for a personal ID
 
-Use the reversible pseudonym obtained above by Org 2 (`00000098000000001000`). Send the trusted development headers
-with Org 2 as `x-gf-sub` and `prs:pseudonym` in `x-gf-scope`. Org 2 must have both `reversible_pseudonym` request and
-receive grants. Use its public key already registered for `bar` (or `*`). The required `recipientOrganization` must
-also identify Org 2. Enable `enable_exchange_services_routes` to mount the endpoint.
+The calling organization hands in a reversible pseudonym that was issued to it, either as received in the JWE `subject` or as the bare value. The same authorizations as for creating reversible pseudonyms apply, so in the scenarios below Org 2 can send the personal ID behind its pseudonym to Org 3.
 
-Request:
-
-```text
+Request, as Org 2:
+```
 POST /exchange/personal-id
 {
-  "reversiblePseudonym": "pseudonym:reversible:gOm6ILU3e0jjB9TJIUUHo0O0CCCgbhmpDmnvauyGP2w=",
-  "recipientOrganization": "oin:00000098000000001000",
+  "reversiblePseudonym": "pseudonym:reversible:AQAB...",
+  "recipientOrganization": "oin:00000097000000001000",
   "recipientScope": "bar"
 }
 ```
 
-The bare pseudonym value is also accepted. This example uses `bar` for both the source and destination scope.
-Another destination scope is allowed when Org 2 has a public key registered for it or a wildcard key.
-The response has status `201`, content type `application/jwe`, and a compact JWE body:
-
-```text
-eyJraWQiOiAi...rest of JWE...
+The response is a JWE for Org 3. Decoding it with `POST /test/jwe/decode` and Org 3's private key shows the personal ID in the `subject` claim:
 ```
-
-For a local test, call `POST /test/jwe/decode` as above, using Org 2's private key.
-The decrypted payload is:
-
-```json
-{
+"decrypted": {
   "subject": "NL:bsn:950000012",
-  "aud": "oin:00000098000000001000",
+  "aud": "oin:00000097000000001000",
   "scope": "bar",
   "version": "1.1",
   "iat": 1762770476,
@@ -190,18 +176,7 @@ The decrypted payload is:
 }
 ```
 
-The canonical personal ID is in `subject`, and the token expires after 300 seconds. Neither `keyVersion` nor
-`extraVersions` is included. Changing `recipientOrganization` to Org 3 returns `403` with `Unauthorized request`
-before organisation/key lookup or reversal. With Org 3 as the verified caller, a pseudonym issued to Org 2 cannot be
-reversed. The encryption key, `aud` and success audit `doel_oin` derive from `x-gf-sub`; an acting client named in
-`x-gf-act-sub` does not change the recipient. The source HSM key version must not be removed and
-must satisfy `from_dt <= now` and either no `until_dt` or `now < until_dt`. An older version still reverses the
-pseudonym during this grace period when a newer version is current. At `until_dt`, reversal returns `410`
-(`Pseudonym key version no longer available`), even before physical HSM cleanup. Missing, not yet active, and
-removed source versions return the same `410`.
 
-The success APP audit event retains the source HSM version as integer `sleutel_versie` and records the caller
-JWK's `kid` as `ontvanger_pubkey_id`, matching the JWE protected header. The success SIEM event remains OIN-only.
 
 # Scenarios:
 
@@ -215,4 +190,4 @@ JWK's `kid` as `ontvanger_pubkey_id`, matching the JWE protected header. The suc
 * Org 2 can hand a personal ID to the PRS and receive reversible pseudonyms.
 * Org 3 can hand a personal ID to the PRS and receive both OPRF evaluations and reversible pseudonyms.
 
-An exchange of a personal ID for a reversible pseudonym therefore succeeds from Org 2 or Org 3 towards Org 2 or Org 3, and is refused when Org 1 is the sender (403) or the recipient (404). The same request and receive grants govern `/exchange/personal-id`, but both must belong to the verified caller: Org 2 can exchange its own reversible pseudonym for a personal ID encrypted to Org 2, and Org 3 can do the same for itself. A different `recipientOrganization` returns `403`.
+An exchange of a personal ID for a reversible pseudonym therefore succeeds from Org 2 or Org 3 towards Org 2 or Org 3, and is refused when Org 1 is the sender (401) or the recipient (404).

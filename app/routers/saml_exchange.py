@@ -28,7 +28,9 @@ FAIL_TEXT = "SAML exchange failed"
 service (the SAML-ontvanger), which currently echoes it back unchanged; no SAML
 decryption or validation is performed, and no pseudonym is derived.
 
-Requires the `prs:saml-pseudonym` OAuth scope.
+Requires the `prs:saml-pseudonym` OAuth scope; the token itself is
+validated upstream by the OIN-verifier proxy, which forwards its scopes in the
+`x-gf-scope` header.
 """,
     responses={502: {"description": FAIL_TEXT}},
 )

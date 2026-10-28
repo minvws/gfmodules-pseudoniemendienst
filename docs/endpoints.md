@@ -16,13 +16,13 @@ The `x-gf-scope` header carries the OAuth scopes of the caller's token. Each gro
 |--------------------|-----------------------|
 | `/administration/*` | `prs:administration`  |
 | `/oprf/eval`       | `prs:oprf-pseudonym`  |
-| `/exchange/*`     | `prs:pseudonym` |
+| `/exchange/*`      | `prs:pseudonym`       |
 | `/saml-exchange/*` | `prs:saml-pseudonym`  |
 | `/test/*`          | none (headers still required) |
 
 A request whose token lacks the required scope is rejected with `403`.
 
-The calling organization (`x-gf-sub`) must also be registered in the PRS database. When it is not, the endpoint answers `403` with `Organization does not exist`. A registered organization that lacks the endpoint's required personal ID type request authorization is refused with `403` as well, with `Not allowed to request personal_id_type: <type>`. The PRS never answers `401`: the OIN-verifier already authenticated the caller, so every refusal is an authorization decision.
+The calling organization (`x-gf-sub`) must also be registered in the PRS database. When it is not, the endpoint answers `403` with `Organization does not exist`. A registered organization that is not allowed to request the personal ID type an endpoint produces is refused with `403` as well, with `Not allowed to request personal_id_type: <type>`. The PRS never answers `401`: the OIN-verifier already authenticated the caller, so every refusal is an authorization decision.
 
 ## Service Information
 
@@ -40,8 +40,7 @@ The contents of `version.json`, or `404` when the file is absent. A `features` l
   "git_ref": "0fe1369...",
   "features": [
     {"id": "oprf", "title": "OPRF", "description": "Pseudonyms via a blinded OPRF evaluation"},
-    {"id": "reversible_pseudonym", "title": "Reversible pseudonym", "description": "..."},
-    {"id": "personal_id", "title": "Personal ID", "description": "..."}
+    {"id": "reversible_pseudonym", "title": "Reversible pseudonym", "description": "..."}
   ]
 }
 ```
@@ -61,7 +60,7 @@ Health of the service and its components. Returns `200` when everything is healt
 These endpoints are under `/administration` and require the `prs:administration` scope. They act on the calling organization only; the organization is taken from the verified headers, not from the request.
 
 #### `POST /administration/keys`
-Register a public key for one or more scopes (`domains`) of the calling organization. The PRS encrypts its OPRF and exchange responses for this organization to this key.
+Register a public key for one or more scopes (`domains`) of the calling organization. The PRS encrypts its OPRF responses for this organization to this key.
 
 The key is supplied as a self-signed JWS in compact serialization. Its protected header carries the public key as a `jwk` with a `kid`; this must be an RSA key of at least 3072 bits, because tokens for the organization are encrypted with `RSA-OAEP`, and its payload carries the calling organization's `oin` and an `iat`. The JWS must verify with the key in its own header, which proves possession of the private key.
 
@@ -133,7 +132,7 @@ Returns `201`, or `409` when the organization has no key version yet to rotate f
 List all HSM key versions of the calling organization, including expired and removed ones, in the same shape as above.
 
 #### `PUT /administration/key-versions/{id}`
-Set or clear the end date of one key version. At `until_dt`, the version is treated as destroyed for evaluation and reversible pseudonym reversal.
+Set or clear the end date of one key version. Once `until_dt` has passed, the version is no longer used for evaluation or reversal, and the periodic cleanup (`python -m app.cleanup`) destroys its secret in the HSM and sets `removed_at`.
 
 ```json
 {
@@ -173,8 +172,6 @@ The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key register
 Errors: `403` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, has no key registered for the scope, or has no active HSM key version, `400` when the blinded input is invalid, `502` when the HSM refuses the evaluation, `503` when the HSM cannot be reached, `504` when the HSM does not answer in time.
 
 ## Exchange Services
-
-These routes are only mounted when `enable_exchange_services_routes` is enabled. The service information feature list includes `personal_id` when the personal ID exchange is enabled.
 
 #### `POST /exchange/reversible-pseudonym`
 Exchange a personal ID for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>` and its `keyVersion` claim the recipient's HSM key version the pseudonym was made with. The pseudonym is deterministic for the same personal ID, organization, scope and key version, is computed with keys held in the HSM (see [component-crypto.md](component-crypto.md)), and can only be reversed to the personal ID by the PRS. When the HSM cannot be reached the endpoint returns `503`.
@@ -217,45 +214,24 @@ Exchange a personal ID, or a reversible pseudonym issued to the calling organiza
 
 `personalId` is a personal ID as for the reversible exchange. Instead of `personalId`, `reversiblePseudonym` may hold a reversible pseudonym that was issued to the calling organization, either as the bare value or exactly as received in the JWE `subject` (`pseudonym:reversible:<...>`); the PRS reverses it for the caller first and never returns the personal ID.
 
-The same two administrator-managed authorizations apply, for the `irreversible_pseudonym` personal ID type: the calling organization must be allowed to *request* it and the recipient must be allowed to *receive* it. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request irreversible pseudonyms, `404` when the recipient organization is unknown, not allowed to receive irreversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed or `reversiblePseudonym` cannot be reversed for the caller, `410` when the source key version has since been destroyed.
+The same two administrator-managed authorizations apply, for the `irreversible_pseudonym` personal ID type: the calling organization must be allowed to *request* it and the recipient must be allowed to *receive* it. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request irreversible pseudonyms, `404` when the recipient organization is unknown, not allowed to receive irreversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed or `reversiblePseudonym` cannot be reversed for the caller, `410` when `reversiblePseudonym` was issued under a key version of the caller that is no longer active.
 
 `POST /oprf/eval` also returns a pseudonym without the PRS seeing the personal ID. It uses a different key, so its pseudonyms do not match the ones from this endpoint.
 
 #### `POST /exchange/personal-id`
-Exchange a reversible pseudonym issued to the calling organization for the canonical personal ID, encrypted to that same organization's public key. Requires the `prs:pseudonym` OAuth scope and reuses the existing `reversible_pseudonym` authorizations: the verified caller must be allowed to both *request* and *receive* that type. These grants therefore also authorize receiving the personal ID through this endpoint.
-
-`recipientOrganization` is required and must match the verified caller in `x-gf-sub`. A mismatch returns `403` with `Unauthorized request` before organization/key lookup or pseudonym reversal. In this example, `x-gf-sub` is `00000098000000001000`:
+Exchange a reversible pseudonym issued to the calling organization for the personal ID it was made from. Requires the `prs:pseudonym` OAuth scope. The PRS reverses the pseudonym for the caller and returns a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is the personal ID (`<landCode>:<type>:<value>`). When the HSM cannot be reached the endpoint returns `503`.
 
 ```json
 {
   "reversiblePseudonym": "pseudonym:reversible:AQAB...",
-  "recipientOrganization": "oin:00000098000000001000",
+  "recipientOrganization": "oin:00000099000000001000",
   "recipientScope": "bar"
 }
 ```
 
-`reversiblePseudonym` accepts the bare value or the JWE `subject` with its `pseudonym:reversible:` prefix. The PRS reverses it using the organization from the verified `x-gf-sub` (`auth.claims.organization_id`). A pseudonym issued to another organization cannot be reversed by changing `recipientOrganization`.
+`reversiblePseudonym` is the bare value or exactly as received in the JWE `subject` (`pseudonym:reversible:<...>`). The `recipientScope` only selects the recipient's public key and may differ from the scope the pseudonym was issued for.
 
-`recipientScope` selects the caller's public encryption key registered for that scope or `*`. It may differ from the source pseudonym's scope when a suitable delivery key is registered. No new HSM key version is needed for delivery.
-
-The response is a compact JWE (status `201`, content type `application/jwe`), encrypted with `RSA-OAEP` and `A256GCM` to the caller's key. The encryption target, public key and `aud` derive from `x-gf-sub`, not the acting client in `x-gf-act-sub`. The holder of the caller's corresponding private key can decrypt the following payload:
-
-```json
-{
-  "subject": "NL:bsn:950000012",
-  "aud": "oin:00000098000000001000",
-  "scope": "bar",
-  "version": "1.1",
-  "iat": 1762770476,
-  "exp": 1762770776
-}
-```
-
-The token expires five minutes after issuance. It contains no `keyVersion` or `extraVersions` claims.
-
-The successful exchange's audit target `doel_oin` is the verified caller from `x-gf-sub`. Its APP audit event records the source HSM version as integer `sleutel_versie` and the caller JWK's `kid` as `ontvanger_pubkey_id`, matching the JWE protected header's `kid`. The success SIEM event remains OIN-only.
-
-Errors: `403` for a recipient/caller mismatch (`Unauthorized request`), missing scope, an unknown caller, or a missing caller request grant; `404` for a missing caller receive grant or no caller public key for the recipient scope; `400` for a malformed pseudonym or one that cannot be reversed for the caller; `410` (`Pseudonym key version no longer available`) when the source key version has since been destroyed; `422` for request validation errors; `500` for an internal cryptographic failure; `503` when the HSM cannot be reached.
+The `reversible_pseudonym` authorizations apply: the calling organization must be allowed to *request* it and the recipient must be allowed to *receive* it. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request reversible pseudonyms, `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, or has no public key for the scope, `400` when `reversiblePseudonym` cannot be reversed for the caller, `410` when it was issued under a key version of the caller that is no longer active.
 
 ## SAML Exchange Services
 

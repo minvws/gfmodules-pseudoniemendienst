@@ -50,7 +50,10 @@ FEATURES: list[Feature] = [
         info=FeatureInfo(
             id="personal_id",
             title="Personal ID",
-            description="Exchange a caller-owned reversible pseudonym for a personal ID",
+            description=(
+                "Exchange a reversible pseudonym issued to the caller for its "
+                "personal ID"
+            ),
         ),
         enabled=lambda config: config.app.enable_exchange_services_routes,
     ),

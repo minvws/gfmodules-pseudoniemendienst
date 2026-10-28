@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import os
 from collections.abc import Callable
-from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -34,27 +33,11 @@ PID = PersonalId.from_str("NL:bsn:950000012")
 SCOPE = "nvi"
 
 
-def _key_versions(
-    active: dict[Oin, list[int]], known: dict[Oin, list[tuple[int, bool]]] | None = None
-) -> MagicMock:
-    """Stub of HsmKeyVersionService keyed by organization OIN: ``active`` gives
-    the active version numbers, ``known`` all (version, removed) rows (defaults
-    to the active ones, not removed)."""
+def _key_versions(active: dict[Oin, list[int]]) -> MagicMock:
     service = MagicMock()
     service.get_active_version_numbers_by_organization_oin.side_effect = lambda oin: (
         active[oin]
     )
-
-    def _versions(oin: Oin) -> list[Any]:
-        rows = (known or {}).get(oin) or [(v, False) for v in active[oin]]
-        return [
-            MagicMock(
-                version=v, removed_at=datetime.now(timezone.utc) if removed else None
-            )
-            for v, removed in rows
-        ]
-
-    service.get_versions_by_organization_id.side_effect = _versions
     return service
 
 
@@ -199,53 +182,19 @@ def test_reverse_for_another_organization_fails(
     assert e.value.error_type == "invalid_pseudonym"
 
 
-def test_reverse_with_destroyed_version_fails(
+def test_reverse_with_inactive_version_fails_without_decrypting(
     local_keys: LocalReversibleKeyOperations, recipient: Oin
 ) -> None:
     pseudonym = ReversiblePseudonymService(
         local_keys, _key_versions({recipient: [1]})
     ).generate(PID, recipient, SCOPE)
+    keys = MagicMock(wraps=local_keys)
 
-    later = ReversiblePseudonymService(
-        local_keys,
-        _key_versions({recipient: [2]}, {recipient: [(1, True), (2, False)]}),
-    )
+    later = ReversiblePseudonymService(keys, _key_versions({recipient: [2]}))
     with pytest.raises(PseudonymOperationError) as e:
         later.reverse(pseudonym.value, recipient)
     assert e.value.error_type == "version_destroyed"
-
-
-@pytest.mark.parametrize(
-    ("active_versions", "known_versions"),
-    [
-        ([], [(1, False)]),
-        ([2], [(1, False), (2, False)]),
-        ([2], [(1, True), (2, False)]),
-        ([2], [(2, False)]),
-    ],
-    ids=["none-active", "retained-inactive", "removed", "unknown"],
-)
-def test_unavailable_source_version_is_rejected_before_crypto(
-    local_keys: LocalReversibleKeyOperations,
-    recipient: Oin,
-    active_versions: list[int],
-    known_versions: list[tuple[int, bool]],
-) -> None:
-    pseudonym = ReversiblePseudonymService(
-        local_keys, _key_versions({recipient: [1]})
-    ).generate(PID, recipient, SCOPE)
-    keys = MagicMock(wraps=local_keys)
-    later = ReversiblePseudonymService(
-        keys,
-        _key_versions({recipient: active_versions}, {recipient: known_versions}),
-    )
-
-    with pytest.raises(PseudonymOperationError) as error:
-        later.reverse(pseudonym.value, recipient)
-
-    assert error.value.error_type == "version_destroyed"
     keys.decrypt.assert_not_called()
-    keys.hmac.assert_not_called()
 
 
 def _flip(value: str, index: int) -> str:

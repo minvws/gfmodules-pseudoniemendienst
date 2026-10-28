@@ -196,12 +196,13 @@ def test_active_version_numbers_observe_validity_boundaries(
     version.removed_at = now if removed else None
     db_session.commit()
 
-    assert (
-        HsmKeyVersionService(database).get_active_version_numbers_by_organization_oin(
-            persisted_organization.external_id
-        )
-        == expected
+    service = HsmKeyVersionService(database)
+
+    active = service.get_active_version_numbers_by_organization_oin(
+        persisted_organization.external_id
     )
+
+    assert active == expected
 
 
 def test_eval_via_hsm_returns_entry_per_active_version(
