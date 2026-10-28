@@ -290,13 +290,17 @@ def test_recipient_without_public_key_for_scope_is_not_found(
     valid_headers: dict[str, str],
     sender: None,
     make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
 ) -> None:
     make_recipient(with_key=False)
+    records = record_logs(LOGGER)
 
     response = client.post(ENDPOINT, json=BODY, headers=valid_headers)
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Organization domain is not registered"}
+    assert len(_events(records, "220407")) == 1
+    assert _events(records, "220400") == []
 
 
 def test_recipient_without_active_key_version_is_not_found(
