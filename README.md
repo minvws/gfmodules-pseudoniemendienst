@@ -395,8 +395,8 @@ An organization carries two administrator-managed lists of personal ID types (`o
 `irreversible_pseudonym`, `personal_id`; there is no self-service for them), following the "dubbele
 bevoegdheidscontrole" of the technical design:
 
-- the types it may *request*: checked against the verified caller (`x-gf-sub`). Handing a personal ID to the PRS on
-  `POST /exchange/reversible-pseudonym` requires `reversible_pseudonym` here.
+- the types it may *request*: checked against the verified caller (`x-gf-sub`). Handing a personal ID or a reversible
+  pseudonym to the PRS on `POST /exchange/reversible-pseudonym` requires `reversible_pseudonym` here.
 - the types it may *receive*: checked against the recipient organization of an exchange. Receiving a reversible
   pseudonym requires `reversible_pseudonym` here.
 

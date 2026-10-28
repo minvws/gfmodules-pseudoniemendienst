@@ -24,6 +24,7 @@ from test_reversible_pseudonym_router import (  # noqa: F401 - fixtures
     _decrypt,
     _dump,
     _events,
+    _reversible_body,
     make_organization,
 )
 
@@ -43,14 +44,6 @@ BODY = {
     "recipientScope": SCOPE,
 }
 MakeRecipient = Callable[..., str]
-
-
-def _reversible_body(value: str) -> dict[str, str]:
-    return {
-        "reversiblePseudonym": value,
-        "recipientOrganization": RECIPIENT,
-        "recipientScope": SCOPE,
-    }
 
 
 @pytest.fixture
