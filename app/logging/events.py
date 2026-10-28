@@ -142,6 +142,15 @@ class Log(_Base):
             _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
         },
     )
+    EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY = LogEvent(
+        "220407",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: ("handelende_oin", "namens_oin", "doel_oin"),
+            _SIEM: ("handelende_oin", "doel_oin"),
+        },
+    )
 
     # OPRF exchange events (PRS-OPRF), see
     # https://github.com/minvws/gfmodules-coordination-private/issues/1035

@@ -20,6 +20,7 @@ from app.models.requests.exchange import (
 )
 from app.routers.exchange.support import (
     authorize_exchange,
+    get_recipient_public_key,
     log_pseudonym_failure,
     parse_personal_id,
 )
@@ -148,9 +149,12 @@ def exchange_irreversible_pseudonym(
     else:
         personal_id = parse_personal_id(logger, req.personalId, audit)
 
-    # Raises 404 when the recipient has no public key for the scope.
-    public_key = organization_public_key_service.get_by_org_and_domain(
-        req.recipientOrganization, req.recipientScope
+    public_key = get_recipient_public_key(
+        logger,
+        organization_public_key_service,
+        audit,
+        req.recipientOrganization,
+        req.recipientScope,
     )
 
     try:

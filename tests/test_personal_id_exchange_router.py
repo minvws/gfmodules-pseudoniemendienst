@@ -168,23 +168,32 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
 
 
 @pytest.mark.parametrize(
-    "recipient",
-    [None, {"receive": [PersonalIdType.REVERSIBLE_PSEUDONYM]}, {"with_key": False}],
+    ("recipient", "event"),
+    [
+        (None, "200402"),
+        ({"receive": [PersonalIdType.REVERSIBLE_PSEUDONYM]}, "200402"),
+        ({"with_key": False}, "220407"),
+    ],
     ids=["unknown", "not-allowed-to-receive", "without-public-key"],
 )
 def test_unavailable_recipient_is_not_found(
     recipient: dict[str, Any] | None,
+    event: str,
     client: TestClient,
     valid_headers: dict[str, str],
     pseudonym: str,
     make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
 ) -> None:
     if recipient is not None:
         make_recipient(**recipient)
+    records = record_logs(LOGGER)
 
     response = client.post(ENDPOINT, json=_body(pseudonym), headers=valid_headers)
 
     assert response.status_code == 404
+    assert len(_events(records, event)) == 1
+    assert _events(records, "220405") == []
 
 
 def test_reversible_pseudonym_of_another_organization_is_refused(

@@ -15,7 +15,11 @@ from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests.exchange import ReversiblePseudonymInputRequest
-from app.routers.exchange.support import authorize_exchange, log_pseudonym_failure
+from app.routers.exchange.support import (
+    authorize_exchange,
+    get_recipient_public_key,
+    log_pseudonym_failure,
+)
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import Jwe
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -112,8 +116,12 @@ def exchange_personal_id(
     )
     audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
-    public_key = organization_public_key_service.get_by_org_and_domain(
-        req.recipientOrganization, req.recipientScope
+    public_key = get_recipient_public_key(
+        logger,
+        organization_public_key_service,
+        audit,
+        req.recipientOrganization,
+        req.recipientScope,
     )
 
     try:

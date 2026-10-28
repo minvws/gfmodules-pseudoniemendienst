@@ -3,8 +3,10 @@ import logging
 import gfmodules.logging as gflog
 from gfmodules.logging import LogEvent
 
+from app.db.models.organization_public_key import OrganizationPublicKeyEntity
 from app.enums.personal_id_type import PersonalIdType
 from app.exceptions.access import AccessError
+from app.exceptions.base import AppError
 from app.exceptions.pseudonym import InvalidPersonalIdError, PseudonymOperationError
 from app.logging.events import Log
 from app.logging.exchange_audit import ExchangeAudit
@@ -12,6 +14,7 @@ from app.models.auth.context import AuthContext
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId, PersonalIdValidationError
 from app.services.authorization_service import AuthorizationService
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 
 def authorize_exchange(
@@ -45,6 +48,25 @@ def authorize_exchange(
         authorization_service.validate_allowed_to_receive(recipient, personal_id_type)
     except AccessError as e:
         deny(f"recipient_may_not_receive_{personal_id_type}", e)
+        raise
+
+
+def get_recipient_public_key(
+    logger: logging.Logger,
+    organization_public_key_service: OrganizationPublicKeyService,
+    audit: ExchangeAudit,
+    recipient: Oin,
+    scope: str,
+) -> OrganizationPublicKeyEntity:
+    try:
+        return organization_public_key_service.get_by_org_and_domain(recipient, scope)
+    except AppError as e:
+        gflog.emit(
+            logger,
+            Log.EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY,
+            f"Exchange refused: {e.message}",
+            fields=audit.fields(),
+        )
         raise
 
 
