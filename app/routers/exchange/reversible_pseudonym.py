@@ -16,13 +16,13 @@ from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests.exchange import (
     REVERSIBLE_PSEUDONYM_PREFIX,
-    PersonalIdInputRequest,
+    ExchangeInputRequest,
 )
 from app.routers.exchange.support import (
     authorize_exchange,
     get_recipient_public_key,
     log_pseudonym_failure,
-    parse_personal_id,
+    resolve_personal_id,
 )
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import Jwe
@@ -33,11 +33,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _OPERATION = "exchange:reversible-pseudonym"
+_FAILED = "Reversible pseudonym creation failed"
 
 
 @router.post(
     "/reversible-pseudonym",
-    summary="Exchange a personal ID for a reversible pseudonym",
+    summary="Exchange a personal ID or reversible pseudonym for a reversible pseudonym",
     status_code=201,
     response_class=Response,
     responses={
@@ -48,7 +49,12 @@ _OPERATION = "exchange:reversible-pseudonym"
             ),
             "content": {"application/jwe": {}},
         },
-        400: {"description": "The personal ID is malformed."},
+        400: {
+            "description": (
+                "The personal ID is malformed, or the reversible pseudonym cannot "
+                "be reversed for the calling organization."
+            )
+        },
         403: {
             "description": (
                 "Insufficient scope (the token requires `prs:pseudonym`), the "
@@ -63,6 +69,13 @@ _OPERATION = "exchange:reversible-pseudonym"
                 "scope, or has no active HSM key version."
             )
         },
+        410: {
+            "description": (
+                "The reversible pseudonym was issued under a key version of the "
+                "calling organization that has since been destroyed, so it can "
+                "no longer be reversed."
+            )
+        },
         500: {"description": "The pseudonym could not be produced."},
         503: {"description": "The HSM could not be reached; retry later."},
     },
@@ -71,15 +84,20 @@ Exchange a personal ID for a reversible pseudonym bound to the recipient
 organization and scope. The pseudonym is deterministic for the same input and
 can only be reversed to the personal ID by the PRS itself.
 
-Requires the `prs:pseudonym` OAuth scope. Before the personal ID is
-processed, two administrator-managed authorizations are checked: the calling
-organization must be allowed to request reversible pseudonyms, and the recipient
-organization must be allowed to receive them. The sender is checked first, so an
-unauthorized caller cannot probe which recipient organizations exist.
+Instead of `personalId`, `reversiblePseudonym` may hold a reversible pseudonym
+that was issued to the calling organization, as the bare value or as received
+(`pseudonym:reversible:<...>`); the PRS reverses it first and never returns the
+personal ID.
+
+Requires the `prs:pseudonym` OAuth scope. Before the input is processed, two
+administrator-managed authorizations are checked: the calling organization
+must be allowed to request reversible pseudonyms, and the recipient
+organization must be allowed to receive them. The sender is checked first, so
+an unauthorized caller cannot probe which recipient organizations exist.
 """,
 )
 def exchange_reversible_pseudonym(
-    req: PersonalIdInputRequest,
+    req: ExchangeInputRequest,
     auth: Annotated[
         AuthContext,
         Security(
@@ -109,7 +127,14 @@ def exchange_reversible_pseudonym(
     )
     audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
-    personal_id = parse_personal_id(logger, req.personalId, audit)
+    personal_id = resolve_personal_id(
+        logger,
+        pseudonym_service,
+        audit,
+        req,
+        auth.claims.organization_id,
+        _FAILED,
+    )
 
     public_key = get_recipient_public_key(
         logger,
@@ -126,13 +151,7 @@ def exchange_reversible_pseudonym(
             recipient_scope=req.recipientScope,
         )
     except PseudonymOperationError as e:
-        log_pseudonym_failure(
-            logger,
-            audit,
-            e,
-            Log.PSEUDONYM_CREATE_FAILED,
-            "Reversible pseudonym creation failed",
-        )
+        log_pseudonym_failure(logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED)
         raise
 
     jwe = Jwe.build(

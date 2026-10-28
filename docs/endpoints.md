@@ -174,7 +174,7 @@ Errors: `403` when the calling organization may not request OPRF pseudonyms, `40
 ## Exchange Services
 
 #### `POST /exchange/reversible-pseudonym`
-Exchange a personal ID for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>` and its `keyVersion` claim the recipient's HSM key version the pseudonym was made with. The pseudonym is deterministic for the same personal ID, organization, scope and key version, is computed with keys held in the HSM (see [component-crypto.md](component-crypto.md)), and can only be reversed to the personal ID by the PRS. When the HSM cannot be reached the endpoint returns `503`.
+Exchange a personal ID, or a reversible pseudonym issued to the calling organization, for a reversible pseudonym bound to a recipient organization/scope. Requires the `prs:pseudonym` OAuth scope. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:reversible:<...>` and its `keyVersion` claim the recipient's HSM key version the pseudonym was made with. The pseudonym is deterministic for the same personal ID, organization, scope and key version, is computed with keys held in the HSM (see [component-crypto.md](component-crypto.md)), and can only be reversed to the personal ID by the PRS. When the HSM cannot be reached the endpoint returns `503`.
 
 ```json
 {
@@ -184,14 +184,22 @@ Exchange a personal ID for a reversible pseudonym bound to a recipient organizat
 }
 ```
 
-`personalId` is either `"<landCode>:<type>:<value>"` or an object `{"landCode": "NL", "type": "bsn", "value": "950000012"}`.
+```json
+{
+  "reversiblePseudonym": "AQAB...",
+  "recipientOrganization": "oin:00000099000000001000",
+  "recipientScope": "bar"
+}
+```
 
-Before the personal ID is processed, two administrator-managed authorizations are checked (the "dubbele bevoegdheidscontrole" from the technical design, PRS-AK-DBAC):
+`personalId` is either `"<landCode>:<type>:<value>"` or an object `{"landCode": "NL", "type": "bsn", "value": "950000012"}`. Instead of `personalId`, `reversiblePseudonym` may hold a reversible pseudonym that was issued to the calling organization, either as the bare value or exactly as received in the JWE `subject` (`pseudonym:reversible:<...>`); the PRS reverses it for the caller first and never returns the personal ID. Exactly one of the two must be given.
+
+Before the input is processed, two administrator-managed authorizations are checked (the "dubbele bevoegdheidscontrole" from the technical design, PRS-AK-DBAC):
 
 - the calling organization (the verified `x-gf-sub` identity) must be allowed to *request* the `reversible_pseudonym` personal ID type;
 - the recipient organization must be allowed to *receive* the `reversible_pseudonym` personal ID type, since the pseudonym can be reversed to the personal ID by the PRS.
 
-Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed, has the wrong length, or fails the elfproef (the audit event records which, never the value).
+Neither authorization can be set by the organizations themselves. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request reversible pseudonyms (the sender is checked first, so an unauthorized caller cannot probe which organizations exist), `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, has no public key for the scope, or has no active HSM key version, `400` when `personalId` is malformed, has the wrong length, or fails the elfproef (the audit event records which, never the value), or when `reversiblePseudonym` cannot be reversed for the caller, `410` when `reversiblePseudonym` was issued under a key version of the caller that is no longer active.
 
 #### `POST /exchange/irreversible-pseudonym`
 Exchange a personal ID, or a reversible pseudonym issued to the calling organization, for an irreversible pseudonym bound to a recipient organization/scope. Requires the `prs:pseudonym` OAuth scope. The pseudonym is a keyed one-way function (HMAC-SHA256 under the recipient's HSM key version, its own key hierarchy separate from the reversible keys) of the personal ID: deterministic for the same personal ID, organization, scope and key version, and reversible by nobody, the PRS included. The response is a JWE encrypted to the recipient's registered public key for that scope (content type `application/jwe`, status `201`); its decrypted `subject` claim is `pseudonym:irreversible:<...>` for the recipient's latest key version and `keyVersion` names that version. During a key rotation, while an older version is still active, the `extraVersions` claim holds the pseudonym per older version (`{"<version>": "<pseudonym>"}`) so a receiver can migrate its records. When the HSM cannot be reached the endpoint returns `503`.

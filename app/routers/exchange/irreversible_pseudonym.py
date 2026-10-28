@@ -14,15 +14,12 @@ from app.logging.events import Log
 from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
-from app.models.requests.exchange import (
-    ExchangeInputRequest,
-    ReversiblePseudonymInputRequest,
-)
+from app.models.requests.exchange import ExchangeInputRequest
 from app.routers.exchange.support import (
     authorize_exchange,
     get_recipient_public_key,
     log_pseudonym_failure,
-    parse_personal_id,
+    resolve_personal_id,
 )
 from app.services.authorization_service import AuthorizationService
 from app.services.irreversible.service import IrreversiblePseudonymService
@@ -136,18 +133,14 @@ def exchange_irreversible_pseudonym(
     )
     audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)
 
-    if isinstance(req, ReversiblePseudonymInputRequest):
-        try:
-            personal_id = reversible_service.reverse(
-                req.reversiblePseudonym, auth.claims.organization_id
-            ).personal_id
-        except PseudonymOperationError as e:
-            log_pseudonym_failure(
-                logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED
-            )
-            raise
-    else:
-        personal_id = parse_personal_id(logger, req.personalId, audit)
+    personal_id = resolve_personal_id(
+        logger,
+        reversible_service,
+        audit,
+        req,
+        auth.claims.organization_id,
+        _FAILED,
+    )
 
     public_key = get_recipient_public_key(
         logger,

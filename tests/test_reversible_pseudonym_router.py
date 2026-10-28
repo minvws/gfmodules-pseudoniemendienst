@@ -9,11 +9,15 @@ from conftest import personal_id_types, setup_org_and_key
 from fastapi.testclient import TestClient
 from jwcrypto import jwe, jwk
 
+from app import container
+from app.db.db import Database
 from app.db.models import HsmKeyVersionEntity, OrganizationEntity
 from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
 from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
+from app.models.personal_id import PersonalId
+from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 ENDPOINT = "/exchange/reversible-pseudonym"
@@ -52,6 +56,14 @@ def _dump(record: logging.LogRecord) -> str:
 
 def _events(records: list[logging.LogRecord], event_id: str) -> list[logging.LogRecord]:
     return [r for r in records if getattr(r, "event_id", None) == event_id]
+
+
+def _reversible_body(value: str) -> dict[str, str]:
+    return {
+        "reversiblePseudonym": value,
+        "recipientOrganization": RECIPIENT,
+        "recipientScope": SCOPE,
+    }
 
 
 @pytest.fixture
@@ -185,6 +197,152 @@ def test_scope_changes_the_pseudonym(
     _, claims_one = _decrypt(one.text, priv_key)
     _, claims_other = _decrypt(other.text, priv_key)
     assert claims_one["subject"] != claims_other["subject"]
+
+
+@pytest.mark.parametrize(
+    "as_input",
+    [
+        _reversible_body,
+        lambda value: _reversible_body(f"pseudonym:reversible:{value}"),
+    ],
+    ids=["bare", "as-received"],
+)
+def test_reversible_pseudonym_of_the_caller_is_accepted_as_input(
+    as_input: Callable[[str], dict[str, str]],
+    client: TestClient,
+    valid_headers: dict[str, str],
+    make_organization: MakeOrganization,
+    make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
+) -> None:
+    """A sender that holds a reversible pseudonym for its own organization gets
+    the same reversible pseudonym for the recipient as it would for the
+    personal ID."""
+    make_organization(
+        SENDER_OIN,
+        request=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+        receive=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+    )
+    priv_key = make_recipient()
+    reversible = container.get_reversible_pseudonym_service().generate(
+        PersonalId.from_str(f"NL:bsn:{BSN}"), SENDER_OIN, "own-scope"
+    )
+    records = record_logs(LOGGER)
+
+    from_personal_id = client.post(ENDPOINT, json=BODY, headers=valid_headers)
+    from_pseudonym = client.post(
+        ENDPOINT, json=as_input(reversible.value), headers=valid_headers
+    )
+
+    assert from_pseudonym.status_code == 201
+    _, claims_personal_id = _decrypt(from_personal_id.text, priv_key)
+    _, claims_pseudonym = _decrypt(from_pseudonym.text, priv_key)
+    assert claims_pseudonym["subject"] == claims_personal_id["subject"]
+    assert len(_events(records, "220400")) == 2
+    for record in records:
+        assert BSN not in _dump(record)
+
+
+def test_reversible_pseudonym_of_another_organization_is_refused(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    sender: None,
+    make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
+) -> None:
+    """The reversible pseudonym was issued to the recipient, not to the caller,
+    so the caller cannot have it reversed."""
+    make_recipient()
+    reversible = container.get_reversible_pseudonym_service().generate(
+        PersonalId.from_str(f"NL:bsn:{BSN}"), RECIPIENT_OIN, SCOPE
+    )
+    records = record_logs(LOGGER)
+
+    response = client.post(
+        ENDPOINT, json=_reversible_body(reversible.value), headers=valid_headers
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid pseudonym"}
+    failed = _events(records, "220403")
+    assert len(failed) == 1
+    assert failed[0].error_type == "invalid_pseudonym"  # type: ignore[attr-defined]
+    assert _events(records, "220400") == []
+
+
+def test_reversible_pseudonym_with_destroyed_key_version_is_gone(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    database: Database,
+    sender: None,
+    make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
+) -> None:
+    """The caller's own pseudonym was valid, but the key version it was issued
+    under has since been destroyed by the HSM key cleanup."""
+    make_recipient()
+    reversible = container.get_reversible_pseudonym_service().generate(
+        PersonalId.from_str(f"NL:bsn:{BSN}"), SENDER_OIN, "own-scope"
+    )
+    versions = HsmKeyVersionService(database)
+    for version in versions.get_versions_by_organization_id(SENDER_OIN):
+        versions.mark_removed(version.id)
+    records = record_logs(LOGGER)
+
+    response = client.post(
+        ENDPOINT, json=_reversible_body(reversible.value), headers=valid_headers
+    )
+
+    assert response.status_code == 410
+    assert response.json() == {"detail": "Pseudonym key version no longer available"}
+    failed = _events(records, "220403")
+    assert len(failed) == 1
+    assert failed[0].error_type == "version_destroyed"  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["not-a-pseudonym", "pseudonym:irreversible:AQAB"],
+    ids=["garbage", "irreversible-subject"],
+)
+def test_garbage_reversible_pseudonym_is_refused(
+    value: str,
+    client: TestClient,
+    valid_headers: dict[str, str],
+    sender: None,
+    make_recipient: MakeRecipient,
+    record_logs: RecordLogs,
+) -> None:
+    make_recipient()
+    records = record_logs(LOGGER)
+
+    response = client.post(
+        ENDPOINT, json=_reversible_body(value), headers=valid_headers
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid pseudonym"}
+    assert len(_events(records, "220403")) == 1
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{}, {"personalId": f"NL:bsn:{BSN}", "reversiblePseudonym": "AQAB"}],
+    ids=["neither", "both"],
+)
+def test_not_exactly_one_input_is_rejected_without_echoing_it(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    fields: dict[str, str],
+) -> None:
+    response = client.post(
+        ENDPOINT,
+        json={**fields, "recipientOrganization": RECIPIENT, "recipientScope": SCOPE},
+        headers=valid_headers,
+    )
+
+    assert response.status_code == 422
+    assert BSN not in response.text
 
 
 def test_requires_the_pseudonym_scope(
@@ -338,6 +496,7 @@ def test_recipient_without_active_key_version_is_not_found(
         ("NL:bsn:95000001", "lengte"),
         ("NL:bsn:950000013", "elfproef"),
         ({"landCode": "NL", "type": "bsn", "value": "123456789"}, "elfproef"),
+        ("pseudonym:reversible:AQAB", "formaat"),
     ],
 )
 def test_malformed_personal_id_is_rejected_and_audited_without_the_value(

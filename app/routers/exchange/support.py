@@ -13,8 +13,13 @@ from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId, PersonalIdValidationError
+from app.models.requests.exchange import (
+    ExchangeInputRequest,
+    ReversiblePseudonymInputRequest,
+)
 from app.services.authorization_service import AuthorizationService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
+from app.services.reversible.service import ReversiblePseudonymService
 
 
 def authorize_exchange(
@@ -103,3 +108,22 @@ def log_pseudonym_failure(
         exc_info=error,
         fields={**audit.fields(), "error_type": error.error_type},
     )
+
+
+def resolve_personal_id(
+    logger: logging.Logger,
+    reversible_service: ReversiblePseudonymService,
+    audit: ExchangeAudit,
+    req: ExchangeInputRequest,
+    caller: Oin,
+    failure_message: str,
+) -> PersonalId:
+    if not isinstance(req, ReversiblePseudonymInputRequest):
+        return parse_personal_id(logger, req.personalId, audit)
+    try:
+        return reversible_service.reverse(req.reversiblePseudonym, caller).personal_id
+    except PseudonymOperationError as e:
+        log_pseudonym_failure(
+            logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, failure_message
+        )
+        raise
