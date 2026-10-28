@@ -50,14 +50,13 @@ _OPERATION = "exchange:personal-id"
             "description": (
                 "Insufficient scope (the token requires `prs:pseudonym`), the "
                 "calling organization is not registered, or it is not allowed to "
-                "request reversible pseudonyms."
+                "request personal IDs."
             )
         },
         404: {
             "description": (
                 "The recipient organization is unknown, is not allowed to receive "
-                "reversible pseudonyms, or has no public key registered for the "
-                "scope."
+                "personal IDs, or has no public key registered for the scope."
             )
         },
         410: {
@@ -75,11 +74,11 @@ the personal ID it was made from, encrypted to the recipient organization's
 public key for the scope. The pseudonym is accepted as the bare value or as
 received (`pseudonym:reversible:<...>`).
 
-Requires the `prs:pseudonym` OAuth scope. The same administrator-managed
-authorizations as for reversible pseudonyms apply: the calling organization
-must be allowed to request them, and the recipient organization must be allowed
-to receive them. The sender is checked first, so an unauthorized caller cannot
-probe which recipient organizations exist.
+Requires the `prs:pseudonym` OAuth scope. Before the pseudonym is reversed, two
+administrator-managed authorizations are checked: the calling organization must
+be allowed to request personal IDs, and the recipient organization must be
+allowed to receive them. The sender is checked first, so an unauthorized caller
+cannot probe which recipient organizations exist.
 """,
 )
 def exchange_personal_id(
@@ -108,7 +107,7 @@ def exchange_personal_id(
         authorization_service,
         auth,
         req.recipientOrganization,
-        PersonalIdType.REVERSIBLE_PSEUDONYM,
+        PersonalIdType.PERSONAL_ID,
         _OPERATION,
     )
     audit = ExchangeAudit.from_auth(auth, req.recipientOrganization)

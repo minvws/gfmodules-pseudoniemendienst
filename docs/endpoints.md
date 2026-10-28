@@ -231,7 +231,7 @@ Exchange a reversible pseudonym issued to the calling organization for the perso
 
 `reversiblePseudonym` is the bare value or exactly as received in the JWE `subject` (`pseudonym:reversible:<...>`). The `recipientScope` only selects the recipient's public key and may differ from the scope the pseudonym was issued for.
 
-The `reversible_pseudonym` authorizations apply: the calling organization must be allowed to *request* it and the recipient must be allowed to *receive* it. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request reversible pseudonyms, `404` when the recipient organization is unknown, not allowed to receive reversible pseudonyms, or has no public key for the scope, `400` when `reversiblePseudonym` cannot be reversed for the caller, `410` when it was issued under a key version of the caller that is no longer active.
+Two administrator-managed authorizations apply, for the `personal_id` personal ID type: the calling organization must be allowed to *request* it and the recipient must be allowed to *receive* it. Responses: `403` when the scope is missing, the calling organization is not registered, or it is not allowed to request personal IDs, `404` when the recipient organization is unknown, not allowed to receive personal IDs, or has no public key for the scope, `400` when `reversiblePseudonym` cannot be reversed for the caller, `410` when it was issued under a key version of the caller that is no longer active.
 
 ## SAML Exchange Services
 

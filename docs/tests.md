@@ -152,7 +152,7 @@ Response:
 
 # Steps to exchange a reversible pseudonym for a personal ID
 
-The calling organization hands in a reversible pseudonym that was issued to it, either as received in the JWE `subject` or as the bare value. The same authorizations as for creating reversible pseudonyms apply, so in the scenarios below Org 2 can send the personal ID behind its pseudonym to Org 3.
+The calling organization hands in a reversible pseudonym that was issued to it, either as received in the JWE `subject` or as the bare value. It must be allowed to request the `personal_id` personal ID type, and the recipient organization must be allowed to receive it. The scenarios below grant `personal_id` to nobody, so add it to Org 2's request list and Org 3's receive list to send the personal ID behind a pseudonym of Org 2 to Org 3.
 
 Request, as Org 2:
 ```

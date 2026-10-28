@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
+from conftest import setup_org_and_key
 from fastapi.testclient import TestClient
 from test_reversible_pseudonym_router import (  # noqa: F401 - fixtures
     ACTOR_OIN,
@@ -19,7 +20,6 @@ from test_reversible_pseudonym_router import (  # noqa: F401 - fixtures
     _dump,
     _events,
     make_organization,
-    make_recipient,
 )
 
 from app import container
@@ -29,6 +29,7 @@ from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.utils.datetime import now_utc
 
 ENDPOINT = "/exchange/personal-id"
@@ -54,7 +55,25 @@ def _issue(oin: Oin) -> str:
 
 @pytest.fixture
 def sender(make_organization: MakeOrganization) -> None:
-    make_organization(SENDER_OIN, request=[PersonalIdType.REVERSIBLE_PSEUDONYM])
+    make_organization(SENDER_OIN, request=[PersonalIdType.PERSONAL_ID])
+
+
+@pytest.fixture
+def make_recipient(
+    make_organization: MakeOrganization,
+    organization_public_key_service: OrganizationPublicKeyService,
+) -> MakeRecipient:
+    def _make(
+        receive: list[PersonalIdType] | None = None, with_key: bool = True
+    ) -> str:
+        if receive is None:
+            receive = [PersonalIdType.PERSONAL_ID]
+        org = make_organization(RECIPIENT_OIN, receive=receive)
+        if not with_key:
+            return ""
+        return setup_org_and_key(organization_public_key_service, org, [SCOPE])
+
+    return _make
 
 
 @pytest.fixture
@@ -137,7 +156,7 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
     make_organization: MakeOrganization,
     record_logs: RecordLogs,
 ) -> None:
-    make_organization(SENDER_OIN, request=[PersonalIdType.IRREVERSIBLE_PSEUDONYM])
+    make_organization(SENDER_OIN, request=[PersonalIdType.REVERSIBLE_PSEUDONYM])
     records = record_logs(LOGGER)
 
     response = client.post(ENDPOINT, json=_body("AQAB"), headers=valid_headers)
@@ -150,7 +169,7 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
 
 @pytest.mark.parametrize(
     "recipient",
-    [None, {"receive": [PersonalIdType.IRREVERSIBLE_PSEUDONYM]}, {"with_key": False}],
+    [None, {"receive": [PersonalIdType.REVERSIBLE_PSEUDONYM]}, {"with_key": False}],
     ids=["unknown", "not-allowed-to-receive", "without-public-key"],
 )
 def test_unavailable_recipient_is_not_found(

@@ -392,16 +392,16 @@ BSN information at all.
 ## Personal ID type authorizations
 
 An organization carries two administrator-managed lists of personal ID types (`oprf`, `reversible_pseudonym`,
-`irreversible_pseudonym`; there is no self-service for them), following the "dubbele bevoegdheidscontrole" of the
-technical design:
+`irreversible_pseudonym`, `personal_id`; there is no self-service for them), following the "dubbele
+bevoegdheidscontrole" of the technical design:
 
 - the types it may *request*: checked against the verified caller (`x-gf-sub`). Handing a personal ID to the PRS on
   `POST /exchange/reversible-pseudonym` requires `reversible_pseudonym` here.
 - the types it may *receive*: checked against the recipient organization of an exchange. Receiving a reversible
   pseudonym requires `reversible_pseudonym` here.
 
-`POST /exchange/personal-id` uses the same `reversible_pseudonym` authorizations to turn a reversible pseudonym back
-into its personal ID.
+Turning a reversible pseudonym back into its personal ID on `POST /exchange/personal-id` requires `personal_id` in
+both lists: the caller must be allowed to request it and the recipient must be allowed to receive it.
 
 ## Contribution
 
