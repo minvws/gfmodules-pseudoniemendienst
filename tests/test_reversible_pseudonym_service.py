@@ -12,7 +12,10 @@ from conftest import hsm_client
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from app.exceptions.pseudonym import PseudonymOperationError
+from app.exceptions.pseudonym import (
+    PseudonymOperationError,
+    PseudonymVersionDestroyedError,
+)
 from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.personal_id import PersonalId
 from app.services.reversible.keys import (
@@ -191,9 +194,8 @@ def test_reverse_with_inactive_version_fails_without_decrypting(
     keys = MagicMock(wraps=local_keys)
 
     later = ReversiblePseudonymService(keys, _key_versions({recipient: [2]}))
-    with pytest.raises(PseudonymOperationError) as e:
+    with pytest.raises(PseudonymVersionDestroyedError):
         later.reverse(pseudonym.value, recipient)
-    assert e.value.error_type == "version_destroyed"
     keys.decrypt.assert_not_called()
 
 
