@@ -19,7 +19,7 @@ JWKS_MAX_AGE_SECONDS = 15 * 60
         "signs pseudonym JWTs with. Every configured signing key is listed, "
         "including keys no longer active, so tokens signed before a rotation "
         "stay verifiable. Receivers select the key by the `kid` in the JWT "
-        "header. Only mounted when `enable_jwt_signing` is set."
+        "header."
     ),
     tags=["Service Information"],
     responses={
