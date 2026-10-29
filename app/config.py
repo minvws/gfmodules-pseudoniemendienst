@@ -26,7 +26,6 @@ class ConfigApp(BaseModel):
     enable_test_routes: bool = Field(default=False)
     enable_exchange_services_routes: bool = Field(default=True)
     enable_saml_exchange_routes: bool = Field(default=False)
-    enable_jwt_signing: bool = Field(default=False)
 
 
 def _int_or_default(default: int) -> Callable[[Any, Any], int]:
@@ -114,14 +113,16 @@ class ConfigSamlService(BaseModel):
 
 
 class ConfigJwtSigning(BaseModel):
+    # Sign the pseudonym inside the JWE (nested JWT, PS256)
+    enabled: bool = Field(default=False)
     # The `iss` claim in signed pseudonym JWTs. Receivers map it to the PRS
-    # JWKS URL in their own configuration. Required when enable_jwt_signing is set.
+    # JWKS URL in their own configuration. Required when enabled.
     issuer: str = Field(default="")
     # Signing keys: PEM files with RSA private keys and/or labels of RSA key
     # pairs in the HSM. key_files and hsm_key_labels are comma separated lists
     # in the conf file. All keys are published for verification; only the one
     # named by active_key_file or active_key_label (a single entry from its
-    # list) signs. At least one key is required when enable_jwt_signing is set.
+    # list) signs. At least one key is required when enabled.
     key_files: list[str] = Field(default=[])
     active_key_file: str = Field(default="")
     hsm_key_labels: list[str] = Field(default=[])

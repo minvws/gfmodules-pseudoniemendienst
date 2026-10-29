@@ -4,10 +4,12 @@ from app.config import Config, get_config
 from app.features import FEATURES, enabled_features
 
 
-def _config(**app_flags: bool) -> Config:
+def _config(**flags: bool) -> Config:
+    """Flags are named ``<section>__<field>``, e.g. ``app__enable_test_routes``."""
     config = get_config().model_copy(deep=True)
-    for name, value in app_flags.items():
-        setattr(config.app, name, value)
+    for name, value in flags.items():
+        section, field = name.split("__")
+        setattr(getattr(config, section), field, value)
     return config
 
 
@@ -17,10 +19,10 @@ def _ids(config: Config) -> list[str]:
 
 def test_oprf_is_always_enabled() -> None:
     config = _config(
-        enable_exchange_services_routes=False,
-        enable_saml_exchange_routes=False,
-        enable_jwt_signing=False,
-        enable_test_routes=False,
+        app__enable_exchange_services_routes=False,
+        app__enable_saml_exchange_routes=False,
+        jwt_signing__enabled=False,
+        app__enable_test_routes=False,
     )
 
     assert _ids(config) == ["oprf"]
@@ -28,10 +30,10 @@ def test_oprf_is_always_enabled() -> None:
 
 def test_all_features_enabled() -> None:
     config = _config(
-        enable_exchange_services_routes=True,
-        enable_saml_exchange_routes=True,
-        enable_jwt_signing=True,
-        enable_test_routes=True,
+        app__enable_exchange_services_routes=True,
+        app__enable_saml_exchange_routes=True,
+        jwt_signing__enabled=True,
+        app__enable_test_routes=True,
     )
 
     assert _ids(config) == [feature.info.id for feature in FEATURES]
@@ -40,12 +42,12 @@ def test_all_features_enabled() -> None:
 @pytest.mark.parametrize(
     ("flag", "feature_id"),
     [
-        ("enable_exchange_services_routes", "reversible_pseudonym"),
-        ("enable_exchange_services_routes", "irreversible_pseudonym"),
-        ("enable_exchange_services_routes", "personal_id"),
-        ("enable_saml_exchange_routes", "saml_exchange"),
-        ("enable_jwt_signing", "jwt_signing"),
-        ("enable_test_routes", "test_routes"),
+        ("app__enable_exchange_services_routes", "reversible_pseudonym"),
+        ("app__enable_exchange_services_routes", "irreversible_pseudonym"),
+        ("app__enable_exchange_services_routes", "personal_id"),
+        ("app__enable_saml_exchange_routes", "saml_exchange"),
+        ("jwt_signing__enabled", "jwt_signing"),
+        ("app__enable_test_routes", "test_routes"),
     ],
 )
 def test_feature_follows_config_flag(flag: str, feature_id: str) -> None:

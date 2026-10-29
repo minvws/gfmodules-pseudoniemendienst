@@ -160,12 +160,12 @@ def _check_config(config: ConfigJwtSigning) -> None:
     if not config.issuer:
         raise ValueError(
             "jwt_signing.issuer is not configured. It is required when "
-            "enable_jwt_signing is set."
+            "jwt_signing.enabled is set."
         )
     if not config.key_files and not config.hsm_key_labels:
         raise ValueError(
             "jwt_signing.key_files or jwt_signing.hsm_key_labels is not "
-            "configured. It is required when enable_jwt_signing is set."
+            "configured. It is required when jwt_signing.enabled is set."
         )
     if bool(config.active_key_file) == bool(config.active_key_label):
         raise ValueError(

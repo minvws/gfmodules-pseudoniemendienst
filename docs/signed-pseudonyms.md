@@ -5,7 +5,7 @@ Every pseudonym the PRS hands out travels in a JWE that is encrypted to the reci
 the recipient can read the pseudonym. It does not prove that the PRS made it: anyone who knows the recipient's public
 key can build a JWE for it.
 
-With `enable_jwt_signing` set, the PRS therefore signs the claims first and encrypts the signed JWT: a nested JWT
+With `jwt_signing.enabled` set, the PRS therefore signs the claims first and encrypts the signed JWT: a nested JWT
 (RFC 7519 §5.2), signed with PS256. The public keys are published at `GET /.well-known/jwks`, so a recipient can check
 that a pseudonym was issued by the PRS and was not altered on the way.
 
@@ -161,13 +161,11 @@ JWS header and whether the signature verifies (see [tests.md](tests.md)).
 
 ## Configuration
 
-Signing is enabled with `enable_jwt_signing=True` in `[app]` and configured in `[jwt_signing]`:
+Signing is enabled and configured in `[jwt_signing]`:
 
 ```ini
-[app]
-enable_jwt_signing=True
-
 [jwt_signing]
+enabled=True
 issuer=https://pseudoniemendienst.example.nl
 
 # Keys in the HSM (production)

@@ -58,11 +58,11 @@ Health of the service and its components. Returns `200` when everything is healt
 #### `GET /.well-known/jwks`
 The JSON Web Key Set with the public keys the PRS signs pseudonym JWTs with, including keys that no longer sign but may
 have signed a token that is still valid. Sent with `Cache-Control: public, max-age=900`. Only available when
-`enable_jwt_signing` is set; `404` otherwise. See [signed-pseudonyms.md](signed-pseudonyms.md).
+`jwt_signing.enabled` is set; `404` otherwise. See [signed-pseudonyms.md](signed-pseudonyms.md).
 
 ## Signed pseudonyms
 
-The pseudonym endpoints below answer with a JWE encrypted to the recipient. When `enable_jwt_signing` is set, the JWE
+The pseudonym endpoints below answer with a JWE encrypted to the recipient. When `jwt_signing.enabled` is set, the JWE
 does not contain the claims as JSON (`cty: application/json`) but a JWT with those claims plus `iss`, signed by the
 PRS with PS256 (`cty: JWT`). See [signed-pseudonyms.md](signed-pseudonyms.md) for the structure and how recipients
 verify it.

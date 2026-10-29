@@ -370,7 +370,7 @@ def jwt_signing_key_pem() -> str:
 def jwt_signing(
     app: FastAPI, tmp_path: Any, jwt_signing_key_pem: str
 ) -> Generator[JwtSigningKeys, None, None]:
-    """Turns on enable_jwt_signing and rebuilds the container, so requests
+    """Turns on jwt_signing.enabled and rebuilds the container, so requests
     through `client` get signed pseudonyms from the real wiring."""
     from app.container import container_config
 
@@ -378,8 +378,8 @@ def jwt_signing(
     key_file.write_text(jwt_signing_key_pem)
     original = get_config()
     config = original.model_copy(deep=True)
-    config.app.enable_jwt_signing = True
     config.jwt_signing = ConfigJwtSigning(
+        enabled=True,
         issuer=JWT_ISSUER,
         key_files=[str(key_file)],
         active_key_file=str(key_file),

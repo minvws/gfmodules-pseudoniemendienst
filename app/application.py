@@ -362,7 +362,7 @@ def setup_fastapi() -> FastAPI:
         default_router,
         health_router,
     ]
-    if config.app.enable_jwt_signing:
+    if config.jwt_signing.enabled:
         public_routers.append(jwks_router)
     for router in public_routers:
         fastapi.include_router(router)

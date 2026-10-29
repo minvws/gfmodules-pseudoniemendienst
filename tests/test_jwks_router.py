@@ -54,8 +54,8 @@ def rotated_signing(
 
     original = get_config()
     config = original.model_copy(deep=True)
-    config.app.enable_jwt_signing = True
     config.jwt_signing = ConfigJwtSigning(
+        enabled=True,
         issuer=JWT_ISSUER,
         key_files=[str(old), str(new)],
         active_key_file=str(new),

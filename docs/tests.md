@@ -148,7 +148,7 @@ Response:
 
 ```
 
-With `enable_jwt_signing` the JWE header `cty` is `JWT`, `decrypted` holds the claims of the signed JWT inside, and
+With `jwt_signing.enabled` the JWE header `cty` is `JWT`, `decrypted` holds the claims of the signed JWT inside, and
 `jws` shows its header and whether the signature verifies against this PRS's signing keys (`valid`, `invalid` or
 `unknown kid`):
 

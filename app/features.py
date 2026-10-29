@@ -71,7 +71,7 @@ FEATURES: list[Feature] = [
             title="Signed pseudonyms",
             description="Pseudonyms in the JWE are signed by the PRS (nested JWT, PS256)",
         ),
-        enabled=lambda config: config.app.enable_jwt_signing,
+        enabled=lambda config: config.jwt_signing.enabled,
     ),
     Feature(
         info=FeatureInfo(

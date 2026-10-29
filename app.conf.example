@@ -6,8 +6,6 @@ enable_test_routes=True
 enable_exchange_services_routes=True
 # Enable the mock SAML exchange routes (/saml-exchange/*); test environments only
 enable_saml_exchange_routes=False
-# Sign the pseudonym inside the JWE (nested JWT, PS256); needs [jwt_signing]
-enable_jwt_signing=False
 
 [logging]
 # Single syslog channel (host:port, UDP); leave empty to log to stdout only.
@@ -71,6 +69,8 @@ master_key=
 oprf_server_key_file=secrets/oprf-server.key
 
 [jwt_signing]
+# Sign the pseudonym inside the JWE (nested JWT, PS256)
+enabled=False
 # The `iss` claim in signed pseudonym JWTs; receivers map it to the PRS JWKS URL
 # issuer=https://pseudoniemendienst.example.nl
 # Signing keys, RSA of at least 3072 bits. Every key in key_files and
