@@ -4,7 +4,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwcrypto import jwe, jwk, jws
 
-from app.services.jwe_token import Jwe
+from app.services.jwe_token import JweTokenService
 from app.services.jwt_signer import JwtSigningService, LocalJwtSigner
 
 ISSUER = "https://prs.test"
@@ -23,7 +23,7 @@ def signing() -> JwtSigningService:
     return JwtSigningService(issuer=ISSUER, active=signer, signers=(signer,))
 
 
-def _build(builder: Jwe, recipient_key: jwk.JWK) -> str:
+def _build(builder: JweTokenService, recipient_key: jwk.JWK) -> str:
     return builder.build(
         audience="oin:00000099000000003000",
         scope="nvi",
@@ -41,7 +41,7 @@ def _decrypt(token: str, recipient_key: jwk.JWK) -> jwe.JWE:
 
 
 def test_without_signing_the_content_is_plain_json(recipient_key: jwk.JWK) -> None:
-    outer = _decrypt(_build(Jwe(), recipient_key), recipient_key)
+    outer = _decrypt(_build(JweTokenService(), recipient_key), recipient_key)
 
     assert outer.jose_header["cty"] == "application/json"
     claims = json.loads(outer.payload)
@@ -52,7 +52,7 @@ def test_without_signing_the_content_is_plain_json(recipient_key: jwk.JWK) -> No
 def test_with_signing_the_content_is_a_signed_jwt(
     recipient_key: jwk.JWK, signing: JwtSigningService
 ) -> None:
-    outer = _decrypt(_build(Jwe(signing), recipient_key), recipient_key)
+    outer = _decrypt(_build(JweTokenService(signing), recipient_key), recipient_key)
 
     assert outer.jose_header["cty"] == "JWT"
     assert outer.jose_header["kid"] == "recipient"
@@ -78,7 +78,7 @@ def test_with_signing_the_content_is_a_signed_jwt(
 def test_signature_does_not_verify_with_another_key(
     recipient_key: jwk.JWK, signing: JwtSigningService
 ) -> None:
-    outer = _decrypt(_build(Jwe(signing), recipient_key), recipient_key)
+    outer = _decrypt(_build(JweTokenService(signing), recipient_key), recipient_key)
     other = jwk.JWK.generate(kty="RSA", size=3072)
 
     inner = jws.JWS()
@@ -91,7 +91,7 @@ def test_signature_does_not_verify_with_another_key(
 def test_extra_claims_cannot_override_the_issuer(
     recipient_key: jwk.JWK, signing: JwtSigningService
 ) -> None:
-    token = Jwe(signing).build(
+    token = JweTokenService(signing).build(
         audience="oin:00000099000000003000",
         scope="nvi",
         subject="pseudonym:reversible:abc",

@@ -8,7 +8,7 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
 from app.services.irreversible.service import IrreversiblePseudonymService
-from app.services.jwe_token import Jwe
+from app.services.jwe_token import JweTokenService
 from app.services.jwt_signer import JwtSigningService
 from app.services.key_operations import KeyOperations
 from app.services.oprf.oprf_service import OprfService
@@ -47,10 +47,10 @@ def container_config(binder: inject.Binder) -> None:
     )
     binder.bind(JwtSigningService, jwt_signing_service)
 
-    jwe = Jwe(jwt_signing_service)
-    binder.bind(Jwe, jwe)
+    jwe_token_service = JweTokenService(jwt_signing_service)
+    binder.bind(JweTokenService, jwe_token_service)
 
-    oprf_service = OprfService(key_operations.oprf_evaluator, jwe)
+    oprf_service = OprfService(key_operations.oprf_evaluator, jwe_token_service)
     binder.bind(OprfService, oprf_service)
 
     reversible_pseudonym_service = ReversiblePseudonymService(
@@ -129,8 +129,8 @@ def get_saml_service_client() -> SamlServiceClient:
     return inject.instance(SamlServiceClient)
 
 
-def get_jwe() -> Jwe:
-    return inject.instance(Jwe)
+def get_jwe_token_service() -> JweTokenService:
+    return inject.instance(JweTokenService)
 
 
 def get_jwt_signing_service() -> JwtSigningService | None:

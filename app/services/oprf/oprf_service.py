@@ -17,7 +17,7 @@ from app.exceptions.pseudonym import (
 )
 from app.models.requests.oprf import BlindRequest
 from app.services.hsm.client import HsmKeyNotFound
-from app.services.jwe_token import Jwe
+from app.services.jwe_token import JweTokenService
 from app.services.oprf.evaluators import OprfEvaluator
 
 logger = logging.getLogger(__name__)
@@ -43,9 +43,11 @@ class OprfEvalResult:
 
 
 class OprfService:
-    def __init__(self, evaluator: OprfEvaluator, jwe: Jwe | None = None):
+    def __init__(
+        self, evaluator: OprfEvaluator, jwe_token_service: JweTokenService | None = None
+    ):
         self.__evaluator = evaluator
-        self.__jwe = jwe or Jwe()
+        self.__jwe_token_service = jwe_token_service or JweTokenService()
 
     @staticmethod
     def generate_server_key() -> str:
@@ -107,7 +109,7 @@ class OprfService:
             if version != latest
         }
 
-        jwe = self.__jwe.build(
+        jwe = self.__jwe_token_service.build(
             audience=str(req.recipientOrganization),
             scope=req.recipientScope,
             subject=subject,

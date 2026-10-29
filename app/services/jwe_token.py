@@ -7,7 +7,7 @@ from jwcrypto import jwe, jwk
 from app.services.jwt_signer import JwtSigningService
 
 
-class Jwe:
+class JweTokenService:
     """
     Builds the JWE that carries a pseudonym to its recipient. With signing
     keys the content is a JWT signed by the PRS (a nested JWT, RFC 7519
