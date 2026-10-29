@@ -15,7 +15,7 @@ class Jwe:
     """
 
     def __init__(self, signing: JwtSigningService | None = None) -> None:
-        self.signing = signing
+        self._signing = signing
 
     def build(
         self,
@@ -38,11 +38,11 @@ class Jwe:
             **extra_claims,
         }
 
-        if self.signing is None:
+        if self._signing is None:
             plaintext = json.dumps(claims).encode("utf-8")
             content_type = "application/json"
         else:
-            plaintext = self.signing.sign(claims).encode("ascii")
+            plaintext = self._signing.sign(claims).encode("ascii")
             content_type = "JWT"
 
         protected_headers = {
