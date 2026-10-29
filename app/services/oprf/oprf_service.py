@@ -68,6 +68,7 @@ class OprfService:
             logger.exception("unable to decode blinded input")
             raise InvalidBlindedInputError() from e
         if not _is_ristretto255_element(bi):
+            logger.warning("blinded input is not a ristretto255 element")
             raise InvalidBlindedInputError()
 
         try:
@@ -84,6 +85,10 @@ class OprfService:
             # The recipient has no active HSM key version. Reported like an
             # unknown recipient, as the reversible exchange does, so a caller
             # cannot tell the two apart.
+            logger.warning(
+                "organization '%s' has no active HSM key version",
+                req.recipientOrganization.value,
+            )
             raise RecipientNotFoundError()
 
         # The subject always carries the latest key version in the original,
