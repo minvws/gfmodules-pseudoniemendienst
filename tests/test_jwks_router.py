@@ -9,7 +9,7 @@ from starlette.testclient import TestClient
 
 from app.application import create_fastapi_app
 from app.config import ConfigJwtSigning, get_config, set_config
-from app.services.jwt_signer import JwtSigningKeys
+from app.services.jwt_signer import JwtSigningService
 
 ENDPOINT = "/.well-known/jwks"
 PRIVATE_MEMBERS = {"d", "p", "q", "dp", "dq", "qi"}
@@ -20,7 +20,7 @@ def test_not_mounted_when_jwt_signing_is_disabled(client: TestClient) -> None:
 
 
 def test_returns_the_signing_key_without_authentication(
-    jwt_signing: JwtSigningKeys,
+    jwt_signing: JwtSigningService,
 ) -> None:
     client = TestClient(create_fastapi_app())
 
@@ -42,10 +42,9 @@ def test_returns_the_signing_key_without_authentication(
 @pytest.fixture
 def rotated_signing(
     app: FastAPI, tmp_path: Path, jwt_signing_key_pem: str
-) -> Generator[tuple[JwtSigningKeys, TestClient], None, None]:
+) -> Generator[tuple[JwtSigningService, TestClient], None, None]:
     """Two signing keys configured, the newer one active."""
     from app.container import container_config
-    from app.services.jwe_token import Jwe
 
     old = tmp_path / "old.pem"
     old.write_text(jwt_signing_key_pem)
@@ -63,7 +62,7 @@ def rotated_signing(
     set_config(config)
     try:
         inject.configure(container_config, clear=True)
-        signing = inject.instance(Jwe).signing
+        signing = inject.instance(JwtSigningService)
         assert signing is not None
         yield signing, TestClient(create_fastapi_app())
     finally:
@@ -71,7 +70,7 @@ def rotated_signing(
 
 
 def test_lists_inactive_keys_next_to_the_active_one(
-    rotated_signing: tuple[JwtSigningKeys, TestClient],
+    rotated_signing: tuple[JwtSigningService, TestClient],
 ) -> None:
     signing, client = rotated_signing
 

@@ -5,7 +5,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from jwcrypto import jwe, jwk, jws
 
 from app.services.jwe_token import Jwe
-from app.services.jwt_signer import JwtSigningKeys, LocalJwtSigner
+from app.services.jwt_signer import JwtSigningService, LocalJwtSigner
 
 ISSUER = "https://prs.test"
 
@@ -16,11 +16,11 @@ def recipient_key() -> jwk.JWK:
 
 
 @pytest.fixture(scope="module")
-def signing() -> JwtSigningKeys:
+def signing() -> JwtSigningService:
     signer = LocalJwtSigner(
         rsa.generate_private_key(public_exponent=65537, key_size=3072)
     )
-    return JwtSigningKeys(issuer=ISSUER, active=signer, signers=(signer,))
+    return JwtSigningService(issuer=ISSUER, active=signer, signers=(signer,))
 
 
 def _build(builder: Jwe, recipient_key: jwk.JWK) -> str:
@@ -50,7 +50,7 @@ def test_without_signing_the_content_is_plain_json(recipient_key: jwk.JWK) -> No
 
 
 def test_with_signing_the_content_is_a_signed_jwt(
-    recipient_key: jwk.JWK, signing: JwtSigningKeys
+    recipient_key: jwk.JWK, signing: JwtSigningService
 ) -> None:
     outer = _decrypt(_build(Jwe(signing), recipient_key), recipient_key)
 
@@ -76,7 +76,7 @@ def test_with_signing_the_content_is_a_signed_jwt(
 
 
 def test_signature_does_not_verify_with_another_key(
-    recipient_key: jwk.JWK, signing: JwtSigningKeys
+    recipient_key: jwk.JWK, signing: JwtSigningService
 ) -> None:
     outer = _decrypt(_build(Jwe(signing), recipient_key), recipient_key)
     other = jwk.JWK.generate(kty="RSA", size=3072)
@@ -89,7 +89,7 @@ def test_signature_does_not_verify_with_another_key(
 
 
 def test_extra_claims_cannot_override_the_issuer(
-    recipient_key: jwk.JWK, signing: JwtSigningKeys
+    recipient_key: jwk.JWK, signing: JwtSigningService
 ) -> None:
     token = Jwe(signing).build(
         audience="oin:00000099000000003000",

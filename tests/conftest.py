@@ -45,8 +45,7 @@ from app.services.hsm_key_cleanup_service import HsmKeyCleanupService
 from app.services.hsm_key_version_service import HsmKeyVersionService
 from app.services.http_service import HttpService
 from app.services.irreversible.keys import HsmIrreversibleKeyOperations
-from app.services.jwe_token import Jwe
-from app.services.jwt_signer import JwtSigningKeys
+from app.services.jwt_signer import JwtSigningService
 from app.services.oprf.evaluators import HsmOprfEvaluator
 from app.services.reversible.keys import HsmReversibleKeyOperations
 
@@ -369,7 +368,7 @@ def jwt_signing_key_pem() -> str:
 @pytest.fixture
 def jwt_signing(
     app: FastAPI, tmp_path: Any, jwt_signing_key_pem: str
-) -> Generator[JwtSigningKeys, None, None]:
+) -> Generator[JwtSigningService, None, None]:
     """Turns on jwt_signing.enabled and rebuilds the container, so requests
     through `client` get signed pseudonyms from the real wiring."""
     from app.container import container_config
@@ -387,7 +386,7 @@ def jwt_signing(
     set_config(config)
     try:
         inject.configure(container_config, clear=True)
-        signing = inject.instance(Jwe).signing
+        signing = inject.instance(JwtSigningService)
         assert signing is not None
         yield signing
     finally:
@@ -395,7 +394,7 @@ def jwt_signing(
 
 
 def decrypt_signed(
-    token: str, priv_key_pem: str, signing: JwtSigningKeys
+    token: str, priv_key_pem: str, signing: JwtSigningService
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Decrypts a nested JWT and verifies the inner signature as a receiver
     would. Returns the JWE header, the JWS header and the claims."""

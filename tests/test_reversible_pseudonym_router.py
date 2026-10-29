@@ -18,7 +18,7 @@ from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
 from app.services.hsm_key_version_service import HsmKeyVersionService
-from app.services.jwt_signer import JwtSigningKeys
+from app.services.jwt_signer import JwtSigningService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 ENDPOINT = "/exchange/reversible-pseudonym"
@@ -168,7 +168,7 @@ def test_with_jwt_signing_returns_signed_reversible_pseudonym(
     valid_headers: dict[str, str],
     sender: None,
     make_recipient: MakeRecipient,
-    jwt_signing: JwtSigningKeys,
+    jwt_signing: JwtSigningService,
 ) -> None:
     priv_key = make_recipient()
 

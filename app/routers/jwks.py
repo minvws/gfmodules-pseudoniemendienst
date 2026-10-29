@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from app import container
-from app.services.jwe_token import Jwe
+from app.services.jwt_signer import JwtSigningService
 
 router = APIRouter()
 
@@ -46,11 +46,13 @@ JWKS_MAX_AGE_SECONDS = 15 * 60
     },
 )
 def get_jwks(
-    jwe: Annotated[Jwe, Depends(container.get_jwe)],
+    signing: Annotated[
+        JwtSigningService | None, Depends(container.get_jwt_signing_service)
+    ],
 ) -> JSONResponse:
-    if jwe.signing is None:
+    if signing is None:
         raise HTTPException(status_code=404)
     return JSONResponse(
-        {"keys": jwe.signing.public_jwks()},
+        {"keys": signing.public_jwks()},
         headers={"Cache-Control": f"public, max-age={JWKS_MAX_AGE_SECONDS}"},
     )

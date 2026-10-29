@@ -15,7 +15,7 @@ from jwcrypto import jwk, jws
 
 from app.config import ConfigJwtSigning
 from app.services.hsm.client import HsmClient, HsmKeyNotFound
-from app.services.jwt_signer import HsmJwtSigner, JwtSigningKeys, LocalJwtSigner
+from app.services.jwt_signer import HsmJwtSigner, JwtSigningService, LocalJwtSigner
 
 
 def _b64url(data: bytes) -> str:
@@ -102,7 +102,7 @@ def test_from_config_uses_active_key_and_publishes_all(
     old = _write_pem(tmp_path / "old.pem", rsa_key)
     new = _write_pem(tmp_path / "new.pem", other_rsa_key)
 
-    keys = JwtSigningKeys.from_config(
+    keys = JwtSigningService.from_config(
         ConfigJwtSigning.model_validate(
             {"issuer": ISSUER, "key_files": f"{old}, {new}", "active_key_file": new}
         ),
@@ -117,16 +117,31 @@ def test_from_config_uses_active_key_and_publishes_all(
     ]
 
 
+def test_sign_uses_active_key_and_sets_issuer_last(
+    rsa_key: rsa.RSAPrivateKey,
+) -> None:
+    signer = LocalJwtSigner(rsa_key)
+    service = JwtSigningService(issuer=ISSUER, active=signer, signers=(signer,))
+
+    token = service.sign({"sub": "x", "iss": "https://attacker.test"})
+
+    parsed = jws.JWS()
+    parsed.deserialize(token)
+    parsed.verify(jwk.JWK(**signer.public_jwk()), alg="PS256")
+    assert parsed.jose_header == {"alg": "PS256", "kid": signer.kid, "typ": "JWT"}
+    assert json.loads(parsed.payload) == {"sub": "x", "iss": ISSUER}
+
+
 def test_from_config_requires_issuer() -> None:
     config = ConfigJwtSigning()
     with pytest.raises(ValueError, match="issuer is not configured"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 def test_from_config_requires_a_key() -> None:
     config = _config()
     with pytest.raises(ValueError, match="key_files or jwt_signing.hsm_key_labels"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 @pytest.mark.parametrize(
@@ -135,7 +150,7 @@ def test_from_config_requires_a_key() -> None:
 def test_from_config_requires_exactly_one_active_key(active: dict[str, str]) -> None:
     config = _config(key_files=["a"], hsm_key_labels=["b"], **active)
     with pytest.raises(ValueError, match="exactly one of"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 def test_from_config_requires_active_key_in_key_files(
@@ -144,19 +159,19 @@ def test_from_config_requires_active_key_in_key_files(
     path = _write_pem(tmp_path / "key.pem", rsa_key)
     config = _config(key_files=[path], active_key_file="other.pem")
     with pytest.raises(ValueError, match="active_key_file must be one of"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 def test_from_config_requires_active_label_in_hsm_key_labels() -> None:
     config = _config(hsm_key_labels=["a"], active_key_label="b")
     with pytest.raises(ValueError, match="active_key_label must be one of"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 def test_from_config_hsm_labels_need_the_hsm() -> None:
     config = _config(hsm_key_labels=["a"], active_key_label="a")
     with pytest.raises(ValueError, match="needs the HSM"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 def test_from_config_rejects_same_key_twice(
@@ -166,7 +181,7 @@ def test_from_config_rejects_same_key_twice(
     second = _write_pem(tmp_path / "b.pem", rsa_key)
     config = _config(key_files=[first, second], active_key_file=first)
     with pytest.raises(ValueError, match="configured more than once"):
-        JwtSigningKeys.from_config(config, None)
+        JwtSigningService.from_config(config, None)
 
 
 # --- HSM-backed signing, against a fake HSM API
@@ -281,7 +296,7 @@ def test_from_config_publishes_file_and_hsm_keys_with_hsm_active(
 ) -> None:
     old = _write_pem(tmp_path / "old.pem", other_rsa_key)
 
-    keys = JwtSigningKeys.from_config(
+    keys = JwtSigningService.from_config(
         _config(
             key_files=[old],
             hsm_key_labels=["prs-jwt-1"],

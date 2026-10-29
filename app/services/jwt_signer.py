@@ -1,4 +1,6 @@
+import base64
 import hashlib
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any, Protocol, Self
@@ -15,6 +17,14 @@ logger = logging.getLogger(__name__)
 ALG_PS256 = "PS256"
 MIN_RSA_KEY_BITS = 3072
 PSS_SALT_BYTES = 32
+
+
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _json(data: dict[str, Any]) -> bytes:
+    return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
 
 class JwtSigner(Protocol):
@@ -111,10 +121,11 @@ class HsmJwtSigner(_Ps256Signer):
 
 
 @dataclass(frozen=True)
-class JwtSigningKeys:
+class JwtSigningService:
     """
-    All configured signing keys. Only ``active`` signs; the others stay
-    published so tokens they signed can still be verified during rotation.
+    Signs pseudonym JWTs with the configured keys. Only ``active`` signs; the
+    others stay published so tokens they signed can still be verified during
+    rotation.
     """
 
     issuer: str
@@ -151,6 +162,19 @@ class JwtSigningKeys:
             active.kid,
         )
         return cls(issuer=config.issuer, active=active, signers=tuple(signers.values()))
+
+    def sign(self, claims: dict[str, Any]) -> str:
+        """
+        Compact JWS with the active key and ``iss`` set to the issuer, after
+        the other claims so none of them can override it. Built by hand so the
+        key itself can stay in an HSM.
+        """
+        signer = self.active
+        header = {"alg": signer.alg, "kid": signer.kid, "typ": "JWT"}
+        payload = {**claims, "iss": self.issuer}
+        signing_input = _b64url(_json(header)) + "." + _b64url(_json(payload))
+        signature = signer.sign(signing_input.encode("ascii"))
+        return signing_input + "." + _b64url(signature)
 
     def public_jwks(self) -> list[dict[str, Any]]:
         return [signer.public_jwk() for signer in self.signers]

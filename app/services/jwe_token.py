@@ -1,19 +1,10 @@
-import base64
 import json
 import time
 from typing import Any
 
 from jwcrypto import jwe, jwk
 
-from app.services.jwt_signer import JwtSigner, JwtSigningKeys
-
-
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _json(data: dict[str, Any]) -> bytes:
-    return json.dumps(data, separators=(",", ":")).encode("utf-8")
+from app.services.jwt_signer import JwtSigningService
 
 
 class Jwe:
@@ -23,7 +14,7 @@ class Jwe:
     §5.2), otherwise the plain JSON claims.
     """
 
-    def __init__(self, signing: JwtSigningKeys | None = None) -> None:
+    def __init__(self, signing: JwtSigningService | None = None) -> None:
         self.signing = signing
 
     def build(
@@ -51,8 +42,7 @@ class Jwe:
             plaintext = json.dumps(claims).encode("utf-8")
             content_type = "application/json"
         else:
-            claims["iss"] = self.signing.issuer
-            plaintext = _sign(self.signing.active, claims).encode("ascii")
+            plaintext = self.signing.sign(claims).encode("ascii")
             content_type = "JWT"
 
         protected_headers = {
@@ -68,11 +58,3 @@ class Jwe:
         )
         jwe_token.add_recipient(pub_key)
         return str(jwe_token.serialize(compact=True))
-
-
-def _sign(signer: JwtSigner, claims: dict[str, Any]) -> str:
-    """Compact JWS. Built by hand so the key itself can stay in an HSM."""
-    header = {"alg": signer.alg, "kid": signer.kid, "typ": "JWT"}
-    signing_input = _b64url(_json(header)) + "." + _b64url(_json(claims))
-    signature = signer.sign(signing_input.encode("ascii"))
-    return signing_input + "." + _b64url(signature)

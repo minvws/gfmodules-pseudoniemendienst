@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.responses import JSONResponse
 
 from app import container
-from app.services.jwe_token import Jwe
+from app.services.jwt_signer import JwtSigningService
 from app.services.oprf.oprf_service import OprfService
 
 router = APIRouter()
@@ -42,11 +42,11 @@ def _b64url_json(part: str) -> Any:
     return json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
 
 
-def _verify_signature(token: str, kid: str, jwe_builder: Jwe) -> str:
+def _verify_signature(token: str, kid: str, signing: JwtSigningService | None) -> str:
     """Checks the inner JWS against this PRS's own signing keys."""
-    if jwe_builder.signing is None:
+    if signing is None:
         return "not checked: JWT signing is disabled"
-    for public in jwe_builder.signing.public_jwks():
+    for public in signing.public_jwks():
         if public["kid"] == kid:
             parsed = jws.JWS()
             parsed.deserialize(token)
@@ -58,7 +58,9 @@ def _verify_signature(token: str, kid: str, jwe_builder: Jwe) -> str:
     return "unknown kid"
 
 
-def _jwe_report(req: JweReceiverRequest, jwe_builder: Jwe) -> dict[str, Any]:
+def _jwe_report(
+    req: JweReceiverRequest, signing: JwtSigningService | None
+) -> dict[str, Any]:
     """
     The JWE headers and claims, and for a nested JWT the inner JWS header and
     signature check.
@@ -76,7 +78,7 @@ def _jwe_report(req: JweReceiverRequest, jwe_builder: Jwe) -> dict[str, Any]:
             inner = {
                 "headers": inner_headers,
                 "signature": _verify_signature(
-                    plaintext, inner_headers.get("kid", ""), jwe_builder
+                    plaintext, inner_headers.get("kid", ""), signing
                 ),
             }
         else:
@@ -132,9 +134,11 @@ and should be all on a single line.
 def post_test_receiver(
     req: ReceiverRequest,
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
-    jwe_builder: Annotated[Jwe, Depends(container.get_jwe)],
+    signing: Annotated[
+        JwtSigningService | None, Depends(container.get_jwt_signing_service)
+    ],
 ) -> JSONResponse:
-    report = _jwe_report(req, jwe_builder)
+    report = _jwe_report(req, signing)
     decrypted = report["jwe"]["decrypted"]
 
     subject = "unknown"
@@ -167,6 +171,8 @@ check any mtls or organizational permissions.
 )
 def post_test_jwe_decode(
     req: JweReceiverRequest,
-    jwe_builder: Annotated[Jwe, Depends(container.get_jwe)],
+    signing: Annotated[
+        JwtSigningService | None, Depends(container.get_jwt_signing_service)
+    ],
 ) -> JSONResponse:
-    return JSONResponse(_jwe_report(req, jwe_builder))
+    return JSONResponse(_jwe_report(req, signing))
