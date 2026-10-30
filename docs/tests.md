@@ -142,10 +142,24 @@ Response:
       "iat": 1762770476,
       "exp": 1762770776
     }
-  }
+  },
+  "jws": null
 }
 
 ```
+
+With `jwt_signing.enabled` the JWE header `cty` is `JWT`, `decrypted` holds the claims of the signed JWT inside, and
+`jws` shows its header and whether the signature verifies against this PRS's signing keys (`valid`, `invalid` or
+`unknown kid`):
+
+```
+  "jws": {
+    "headers": {"alg": "PS256", "kid": "8XnMgBBynigdp-ThfbpM_hIyitWL61KhaiZD_W5ib5w", "typ": "JWT"},
+    "signature": "valid"
+  }
+```
+
+`POST /test/oprf/receiver` returns the same `jws` block. See [signed-pseudonyms.md](signed-pseudonyms.md).
 
 
 

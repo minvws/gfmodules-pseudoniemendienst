@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from conftest import personal_id_types, setup_org_and_key
+from conftest import JWT_ISSUER, decrypt_signed, personal_id_types, setup_org_and_key
 from fastapi.testclient import TestClient
 from jwcrypto import jwe, jwk
 
@@ -18,6 +18,7 @@ from app.models.auth.data import AuthorizationScope
 from app.models.oin import Oin
 from app.models.personal_id import PersonalId
 from app.services.hsm_key_version_service import HsmKeyVersionService
+from app.services.jwt_signer import JwtSigningService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
 ENDPOINT = "/exchange/reversible-pseudonym"
@@ -160,6 +161,29 @@ def test_happy_path_returns_jwe_with_reversible_pseudonym(
     assert event.doel_oin == RECIPIENT  # type: ignore[attr-defined]
     assert event.domein == SCOPE  # type: ignore[attr-defined]
     assert event.sleutel_versie == 1  # type: ignore[attr-defined]
+
+
+def test_with_jwt_signing_returns_signed_reversible_pseudonym(
+    client: TestClient,
+    valid_headers: dict[str, str],
+    sender: None,
+    make_recipient: MakeRecipient,
+    jwt_signing: JwtSigningService,
+) -> None:
+    priv_key = make_recipient()
+
+    response = client.post(ENDPOINT, json=BODY, headers=valid_headers)
+
+    assert response.status_code == 201
+    jwe_headers, jws_headers, claims = decrypt_signed(
+        response.text, priv_key, jwt_signing
+    )
+    assert jwe_headers["cty"] == "JWT"
+    assert jws_headers == {"alg": "PS256", "kid": jwt_signing.active.kid, "typ": "JWT"}
+    assert claims["iss"] == JWT_ISSUER
+    assert claims["subject"].startswith("pseudonym:reversible:")
+    assert claims["aud"] == RECIPIENT
+    assert claims["keyVersion"] == 1
 
 
 def test_pseudonym_is_deterministic_and_accepts_both_personal_id_forms(

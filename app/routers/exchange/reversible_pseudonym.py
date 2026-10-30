@@ -25,7 +25,7 @@ from app.routers.exchange.support import (
     resolve_personal_id,
 )
 from app.services.authorization_service import AuthorizationService
-from app.services.jwe_token import Jwe
+from app.services.jwe_token import JweTokenService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from app.services.reversible.service import ReversiblePseudonymService
 
@@ -116,6 +116,9 @@ def exchange_reversible_pseudonym(
         ReversiblePseudonymService,
         Depends(container.get_reversible_pseudonym_service),
     ],
+    jwe_token_service: Annotated[
+        JweTokenService, Depends(container.get_jwe_token_service)
+    ],
 ) -> Response:
     authorize_exchange(
         logger,
@@ -154,7 +157,7 @@ def exchange_reversible_pseudonym(
         log_pseudonym_failure(logger, audit, e, Log.PSEUDONYM_CREATE_FAILED, _FAILED)
         raise
 
-    jwe = Jwe.build(
+    token = jwe_token_service.build(
         audience=str(req.recipientOrganization),
         scope=req.recipientScope,
         subject=REVERSIBLE_PSEUDONYM_PREFIX + pseudonym.value,
@@ -172,4 +175,4 @@ def exchange_reversible_pseudonym(
             "sleutel_versie": pseudonym.version,
         },
     )
-    return Response(status_code=201, content=jwe, media_type="application/jwe")
+    return Response(status_code=201, content=token, media_type="application/jwe")

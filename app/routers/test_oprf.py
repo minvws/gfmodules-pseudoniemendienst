@@ -1,13 +1,15 @@
+import base64
 import json
 from typing import Annotated, Any
 
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi import APIRouter, Depends
-from jwcrypto import jwe, jwk
+from jwcrypto import jwe, jwk, jws
 from pydantic import BaseModel, Field, field_validator
 from starlette.responses import JSONResponse
 
 from app import container
+from app.services.jwt_signer import JwtSigningService
 from app.services.oprf.oprf_service import OprfService
 
 router = APIRouter()
@@ -36,12 +38,51 @@ class InputRequest(BaseModel):
     personalId: str
 
 
-def _jwe_report(req: JweReceiverRequest) -> dict[str, Any]:
+def _b64url_json(part: str) -> Any:
+    return json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
+
+
+def _verify_signature(token: str, kid: str, signing: JwtSigningService | None) -> str:
+    """Checks the inner JWS against this PRS's own signing keys."""
+    if signing is None:
+        return "not checked: JWT signing is disabled"
+    for public in signing.public_jwks():
+        if public["kid"] == kid:
+            parsed = jws.JWS()
+            parsed.deserialize(token)
+            try:
+                parsed.verify(jwk.JWK(**public), alg=public["alg"])
+            except jws.InvalidJWSSignature:
+                return "invalid"
+            return "valid"
+    return "unknown kid"
+
+
+def _jwe_report(
+    req: JweReceiverRequest, signing: JwtSigningService | None
+) -> dict[str, Any]:
+    """
+    The JWE headers and claims, and for a nested JWT the inner JWS header and
+    signature check.
+    """
     priv_key = _private_key_from_pem(req.priv_key_pem)
     token = jwe.JWE.from_jose_token(req.jwe)
+    inner: dict[str, Any] | None = None
     try:
         token.decrypt(priv_key)
-        decrypted = json.loads(token.payload)
+        plaintext = token.payload.decode("utf-8")
+        if token.jose_header.get("cty") == "JWT":
+            header_part, payload_part, _ = plaintext.split(".")
+            inner_headers = _b64url_json(header_part)
+            decrypted = _b64url_json(payload_part)
+            inner = {
+                "headers": inner_headers,
+                "signature": _verify_signature(
+                    plaintext, inner_headers.get("kid", ""), signing
+                ),
+            }
+        else:
+            decrypted = json.loads(plaintext)
     except Exception as e:  # noqa: BLE001
         decrypted = f"Could not decrypt JWE: {e}"
 
@@ -53,6 +94,7 @@ def _jwe_report(req: JweReceiverRequest) -> dict[str, Any]:
             "headers": token.jose_header,
             "decrypted": decrypted,
         },
+        "jws": inner,
     }
 
 
@@ -92,8 +134,11 @@ and should be all on a single line.
 def post_test_receiver(
     req: ReceiverRequest,
     oprf_service: Annotated[OprfService, Depends(container.get_oprf_service)],
+    signing: Annotated[
+        JwtSigningService | None, Depends(container.get_jwt_signing_service)
+    ],
 ) -> JSONResponse:
-    report = _jwe_report(req)
+    report = _jwe_report(req, signing)
     decrypted = report["jwe"]["decrypted"]
 
     subject = "unknown"
@@ -124,5 +169,10 @@ This endpoint is for testing purposes only. It decodes a given JWE using the pro
 check any mtls or organizational permissions.
 """,
 )
-def post_test_jwe_decode(req: JweReceiverRequest) -> JSONResponse:
-    return JSONResponse(_jwe_report(req))
+def post_test_jwe_decode(
+    req: JweReceiverRequest,
+    signing: Annotated[
+        JwtSigningService | None, Depends(container.get_jwt_signing_service)
+    ],
+) -> JSONResponse:
+    return JSONResponse(_jwe_report(req, signing))
