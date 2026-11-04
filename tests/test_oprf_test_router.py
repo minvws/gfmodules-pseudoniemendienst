@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 import pytest
@@ -7,10 +8,13 @@ from conftest import (
     generate_rsa_keypair,
     setup_org_and_key,
 )
+from jwcrypto import jwk
+from pytest_mock import MockerFixture
 from starlette.testclient import TestClient
 
 from app.db.models import OrganizationEntity
 from app.models.oin import Oin
+from app.routers import test_oprf
 from app.services.jwt_signer import JwtSigningService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 
@@ -103,6 +107,86 @@ def test_test_oprf_client_and_receiver_roundtrip(
     assert body["jws"] is None
 
 
+@pytest.mark.parametrize("path", ["/test/oprf/receiver", "/test/jwe/decode"])
+def test_test_endpoints_parse_private_key_once(
+    path: str,
+    client: TestClient,
+    oprf_test_router_context: OprfTestRouterContext,
+    valid_headers: dict[str, str],
+    mocker: MockerFixture,
+) -> None:
+    ctx = oprf_test_router_context
+    blind_factor, jwe_token = _blind_and_evaluate(client, ctx, valid_headers)
+    load_key = mocker.spy(test_oprf, "load_pem_private_key")
+    payload = {"jwe": jwe_token, "priv_key_pem": ctx.private_key_pem}
+    if path == "/test/oprf/receiver":
+        payload["blind_factor"] = blind_factor
+
+    response = client.post(path, json=payload, headers=valid_headers)
+
+    assert response.status_code == 200
+    assert response.json()["priv_key_pem"] == ctx.private_key_pem
+    assert response.json()["jwe"]["decrypted"]["aud"] == ctx.recipient_organization
+    assert load_key.call_count == 1
+
+
+@pytest.mark.parametrize("path", ["/test/oprf/receiver", "/test/jwe/decode"])
+def test_test_endpoints_reject_unexpected_fields(
+    path: str,
+    client: TestClient,
+    oprf_test_router_context: OprfTestRouterContext,
+    valid_headers: dict[str, str],
+) -> None:
+    ctx = oprf_test_router_context
+    blind_factor, jwe_token = _blind_and_evaluate(client, ctx, valid_headers)
+    payload = {
+        "jwe": jwe_token,
+        "priv_key_pem": ctx.private_key_pem,
+        "unexpected": "value",
+    }
+    if path == "/test/oprf/receiver":
+        payload["blind_factor"] = blind_factor
+
+    response = client.post(path, json=payload, headers=valid_headers)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == [
+        {
+            "type": "extra_forbidden",
+            "loc": ["body", "unexpected"],
+            "msg": "Extra inputs are not permitted",
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "request_type", [test_oprf.JweReceiverRequest, test_oprf.ReceiverRequest]
+)
+def test_jwe_request_schema_forbids_extra_fields(
+    request_type: type[test_oprf.JweReceiverRequest],
+) -> None:
+    assert request_type.model_json_schema().get("additionalProperties") is False
+
+
+def test_jwe_receiver_request_retains_and_serializes_private_key() -> None:
+    pem, _ = generate_rsa_keypair()
+    request = test_oprf.JweReceiverRequest.model_validate(
+        {"jwe": "a.b.c.d.e", "priv_key_pem": pem}
+    )
+
+    assert request.private_key.pem == pem
+    assert isinstance(request.private_key.key, jwk.JWK)
+    assert pem not in repr(request.private_key)
+    assert request.model_dump()["priv_key_pem"] == pem
+    assert request.model_dump(by_alias=False)["private_key"] == pem
+    assert request.model_dump(by_alias=True)["priv_key_pem"] == pem
+    assert json.loads(request.model_dump_json())["priv_key_pem"] == pem
+    schema = request.model_json_schema(mode="validation")
+    assert schema["properties"]["priv_key_pem"]["type"] == "string"
+    schema = request.model_json_schema(mode="serialization")
+    assert schema["properties"]["priv_key_pem"]["type"] == "string"
+
+
 def test_with_jwt_signing_oprf_eval_is_signed_and_test_routes_verify_it(
     client: TestClient,
     oprf_test_router_context: OprfTestRouterContext,
@@ -184,13 +268,33 @@ def test_test_oprf_receiver_invalid_private_key(
     client: TestClient,
     valid_headers: dict[str, str],
 ) -> None:
+    invalid_pem = "-----BEGIN PRIVATE KEY-----invalid"
     receiver_response = client.post(
         "/test/oprf/receiver",
         json={
             "blind_factor": "ZmFrZS1mYWN0b3I=",
             "jwe": "a.b.c.d.e",
-            "priv_key_pem": "-----BEGIN PRIVATE KEY-----invalid",
+            "priv_key_pem": invalid_pem,
         },
         headers=valid_headers,
     )
     assert receiver_response.status_code == 422
+    assert invalid_pem not in receiver_response.text
+
+
+def test_test_oprf_receiver_rejects_public_key(
+    client: TestClient, valid_headers: dict[str, str]
+) -> None:
+    _, public_pem = generate_rsa_keypair()
+    response = client.post(
+        "/test/oprf/receiver",
+        json={
+            "jwe": "a.b.c.d.e",
+            "blind_factor": "ZmFrZS1mYWN0b3I=",
+            "priv_key_pem": public_pem,
+        },
+        headers=valid_headers,
+    )
+
+    assert response.status_code == 422
+    assert public_pem not in response.text

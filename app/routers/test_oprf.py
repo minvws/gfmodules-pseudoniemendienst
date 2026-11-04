@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from fastapi import APIRouter, Depends
 from jwcrypto import jwe, jwk, jws
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, ValidateAs
 from starlette.responses import JSONResponse
 
 from app import container
@@ -15,19 +15,22 @@ from app.services.oprf.oprf_service import OprfService
 router = APIRouter()
 
 
-def _private_key_from_pem(pem: str) -> jwk.JWK:
-    return jwk.JWK.from_pyca(load_pem_private_key(pem.encode(), password=None))
+class ParsedPrivateKey:
+    def __init__(self, pem: str) -> None:
+        self.pem = pem
+        self.key = jwk.JWK.from_pyca(load_pem_private_key(pem.encode(), password=None))
 
 
 class JweReceiverRequest(BaseModel):
-    jwe: str = Field(pattern=r"^[^.]*(\.[^.]*){4}$")
-    priv_key_pem: str
+    model_config = ConfigDict(serialize_by_alias=True, extra="forbid")
 
-    @field_validator("priv_key_pem")
-    @classmethod
-    def validate_priv_key_pem(cls, pem: str) -> str:
-        _private_key_from_pem(pem)
-        return pem
+    jwe: str = Field(pattern=r"^[^.]*(\.[^.]*){4}$")
+    private_key: Annotated[
+        ParsedPrivateKey,
+        ValidateAs(str, ParsedPrivateKey),
+        PlainSerializer(lambda value: value.pem, return_type=str),
+        Field(alias="priv_key_pem"),
+    ]
 
 
 class ReceiverRequest(JweReceiverRequest):
@@ -65,7 +68,7 @@ def _jwe_report(
     The JWE headers and claims, and for a nested JWT the inner JWS header and
     signature check.
     """
-    priv_key = _private_key_from_pem(req.priv_key_pem)
+    priv_key = req.private_key.key
     token = jwe.JWE.from_jose_token(req.jwe)
     inner: dict[str, Any] | None = None
     try:
@@ -88,7 +91,7 @@ def _jwe_report(
 
     return {
         "jwe_data": req.jwe,
-        "priv_key_pem": req.priv_key_pem,
+        "priv_key_pem": req.private_key.pem,
         "priv_key_kid": priv_key.thumbprint(),
         "jwe": {
             "headers": token.jose_header,
