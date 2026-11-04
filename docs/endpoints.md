@@ -55,9 +55,11 @@ Health of the service and its components. Returns `200` when everything is healt
 }
 ```
 
-#### `GET /.well-known/jwks`
+#### `GET /.well-known/jwks.json`
 The JSON Web Key Set with the public keys the PRS signs pseudonym JWTs with, including keys that no longer sign but may
-have signed a token that is still valid. Sent with `Cache-Control: public, max-age=900`. Only available when
+have signed a token that is still valid. Sent with `Cache-Control: public, max-age=3600`. Also served without mTLS on the well-known domain (e.g.
+`https://well-known.pseudoniemendienst.test.gf.irealisatie.nl/.well-known/jwks.json`); the old path `/.well-known/jwks`
+still works. Only available when
 `jwt_signing.enabled` is set; `404` otherwise. See [signed-pseudonyms.md](signed-pseudonyms.md).
 
 ## Signed pseudonyms

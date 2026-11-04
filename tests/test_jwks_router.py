@@ -11,12 +11,16 @@ from app.application import create_fastapi_app
 from app.config import ConfigJwtSigning, get_config, set_config
 from app.services.jwt_signer import JwtSigningService
 
-ENDPOINT = "/.well-known/jwks"
+ENDPOINT = "/.well-known/jwks.json"
+LEGACY_ENDPOINT = "/.well-known/jwks"
 PRIVATE_MEMBERS = {"d", "p", "q", "dp", "dq", "qi"}
 
 
-def test_not_mounted_when_jwt_signing_is_disabled(client: TestClient) -> None:
-    assert client.get(ENDPOINT).status_code == 404
+@pytest.mark.parametrize("endpoint", [ENDPOINT, LEGACY_ENDPOINT])
+def test_not_mounted_when_jwt_signing_is_disabled(
+    client: TestClient, endpoint: str
+) -> None:
+    assert client.get(endpoint).status_code == 404
 
 
 def test_returns_the_signing_key_without_authentication(
@@ -28,7 +32,7 @@ def test_returns_the_signing_key_without_authentication(
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
-    assert response.headers["cache-control"] == "public, max-age=900"
+    assert response.headers["cache-control"] == "public, max-age=3600"
     keys = response.json()["keys"]
     assert len(keys) == 1
     key = keys[0]
@@ -37,6 +41,39 @@ def test_returns_the_signing_key_without_authentication(
     assert key["alg"] == "PS256"
     assert key["use"] == "sig"
     assert not PRIVATE_MEMBERS & key.keys()
+
+
+def test_legacy_path_serves_the_same_keys(jwt_signing: JwtSigningService) -> None:
+    client = TestClient(create_fastapi_app())
+
+    legacy = client.get(LEGACY_ENDPOINT)
+
+    assert legacy.status_code == 200
+    assert legacy.json() == client.get(ENDPOINT).json()
+    assert legacy.headers["cache-control"] == "public, max-age=3600"
+
+
+def test_only_the_json_path_is_documented(jwt_signing: JwtSigningService) -> None:
+    paths = TestClient(create_fastapi_app()).get("/openapi.json").json()["paths"]
+
+    assert ENDPOINT in paths
+    assert LEGACY_ENDPOINT not in paths
+
+
+@pytest.mark.parametrize("path", [ENDPOINT, f"/v1/api{ENDPOINT}"])
+def test_served_with_and_without_the_root_path_prefix(
+    jwt_signing: JwtSigningService, path: str
+) -> None:
+    # The public well-known host forwards /.well-known/jwks.json without the
+    # /v1/api prefix that the mTLS host uses.
+    config = get_config()
+    original_root_path = config.uvicorn.root_path
+    config.uvicorn.root_path = "/v1/api"
+    try:
+        client = TestClient(create_fastapi_app())
+        assert client.get(path).status_code == 200
+    finally:
+        config.uvicorn.root_path = original_root_path
 
 
 @pytest.fixture
