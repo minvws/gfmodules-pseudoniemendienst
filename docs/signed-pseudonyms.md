@@ -6,7 +6,7 @@ the recipient can read the pseudonym. It does not prove that the PRS made it: an
 key can build a JWE for it.
 
 With `jwt_signing.enabled` set, the PRS therefore signs the claims first and encrypts the signed JWT: a nested JWT
-(RFC 7519 §5.2), signed with PS256. The public keys are published at `GET /.well-known/jwks`, so a recipient can check
+(RFC 7519 §5.2), signed with PS256. The public keys are published at `GET /.well-known/jwks.json`, so a recipient can check
 that a pseudonym was issued by the PRS and was not altered on the way.
 
 ## Token structure
@@ -70,7 +70,9 @@ The claims are the same as in an unsigned token, plus `iss`:
 A recipient configures two values once, out of band:
 
 - the PRS issuer, e.g. `https://pseudoniemendienst.example.nl`, and
-- the PRS JWKS URL, `<PRS base URL>/.well-known/jwks`.
+- the PRS JWKS URL. The PRS domain requires a client certificate, so the JWKS is also published on a separate
+  domain without mTLS, e.g. `https://well-known.pseudoniemendienst.example.nl/.well-known/jwks.json` on
+  the test environment.
 
 Do not take the JWKS URL from the token; the `iss` claim is only compared with the configured issuer.
 
@@ -89,7 +91,8 @@ To accept a pseudonym:
 
 ### The JWKS
 
-`GET /.well-known/jwks` is public and needs no authentication. It returns a JSON Web Key Set (RFC 7517) with every key
+`GET /.well-known/jwks.json` is public and needs no authentication or client certificate on the well-known domain.
+It returns a JSON Web Key Set (RFC 7517) with every key
 the PRS may have signed a still valid token with:
 
 ```json
@@ -107,7 +110,7 @@ the PRS may have signed a still valid token with:
 }
 ```
 
-The response carries `Cache-Control: public, max-age=900`. Cache it for up to 15 minutes; the rotation procedure below
+The response carries `Cache-Control: public, max-age=3600`. Cache it for up to one hour; the rotation procedure below
 counts on recipients picking up a new key within that time. The endpoint answers `404` when signing is disabled.
 
 ### Example
@@ -122,7 +125,7 @@ import requests
 from jwcrypto import jwe, jwk, jws
 
 PRS_ISSUER = "https://pseudoniemendienst.example.nl"
-PRS_JWKS_URL = "https://pseudoniemendienst.example.nl/.well-known/jwks"
+PRS_JWKS_URL = "https://well-known.pseudoniemendienst.example.nl/.well-known/jwks.json"
 OWN_OIN = "oin:00000003123456790000"
 CLOCK_SKEW = 60
 
@@ -208,18 +211,18 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out secrets/jwt-si
 
 ## Key rotation
 
-Recipients cache the JWKS for up to 15 minutes and tokens live for five minutes. A new key must therefore be published
+Recipients cache the JWKS for up to one hour and tokens live for five minutes. A new key must therefore be published
 before it signs, and an old key must stay published until the last token it signed has expired. All PRS instances
 must run with the same configuration at every step.
 
 1. **Create** the new key (see above).
 2. **Publish.** Add it to `hsm_key_labels` (or `key_files`) and leave the active key as it is. Deploy. The JWKS now
    lists both keys; the old one still signs.
-3. **Wait at least 15 minutes** after the last instance has been deployed, so every recipient's cached JWKS holds the
+3. **Wait at least one hour** after the last instance has been deployed, so every recipient's cached JWKS holds the
    new key.
 4. **Activate.** Set `active_key_label` (or `active_key_file`) to the new key. Deploy.
-5. **Wait at least 20 minutes** after the last instance has been deployed: the five minute token lifetime plus the
-   15 minute cache window, as a margin for recipients that verify a token some time after receiving it.
+5. **Wait at least 65 minutes** after the last instance has been deployed: the five minute token lifetime plus the
+   one hour cache window, as a margin for recipients that verify a token some time after receiving it.
 6. **Retire.** Remove the old key from the list. Deploy. Then destroy the old key in the HSM, or delete the file.
 
 A recipient that follows step 4 of [verifying a pseudonym](#verifying-a-pseudonym-for-recipients) also copes with a
@@ -229,5 +232,5 @@ new key it has not seen yet, but the procedure does not depend on that.
 
 Skip the waiting: create a new key, make it the only key in the configuration, activate it, and deploy. Recipients
 reject tokens signed with the new key until they refresh their JWKS, which they do on the unknown `kid`. Recipients
-that cached the JWKS keep accepting the compromised key until their cache expires, at most 15 minutes. Inform the
+that cached the JWKS keep accepting the compromised key until their cache expires, at most one hour. Inform the
 recipients so they can flush their cache sooner.
