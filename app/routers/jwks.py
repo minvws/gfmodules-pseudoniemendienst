@@ -11,8 +11,6 @@ router = APIRouter()
 JWKS_MAX_AGE_SECONDS = 60 * 60
 
 
-# The old path stays for receivers that already use it on the mTLS domain
-@router.get("/.well-known/jwks", include_in_schema=False)
 @router.get(
     "/.well-known/jwks.json",
     summary="Public keys for verifying signed pseudonyms",

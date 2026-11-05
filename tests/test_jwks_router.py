@@ -12,15 +12,11 @@ from app.config import ConfigJwtSigning, get_config, set_config
 from app.services.jwt_signer import JwtSigningService
 
 ENDPOINT = "/.well-known/jwks.json"
-LEGACY_ENDPOINT = "/.well-known/jwks"
 PRIVATE_MEMBERS = {"d", "p", "q", "dp", "dq", "qi"}
 
 
-@pytest.mark.parametrize("endpoint", [ENDPOINT, LEGACY_ENDPOINT])
-def test_not_mounted_when_jwt_signing_is_disabled(
-    client: TestClient, endpoint: str
-) -> None:
-    assert client.get(endpoint).status_code == 404
+def test_not_mounted_when_jwt_signing_is_disabled(client: TestClient) -> None:
+    assert client.get(ENDPOINT).status_code == 404
 
 
 def test_returns_the_signing_key_without_authentication(
@@ -41,23 +37,6 @@ def test_returns_the_signing_key_without_authentication(
     assert key["alg"] == "PS256"
     assert key["use"] == "sig"
     assert not PRIVATE_MEMBERS & key.keys()
-
-
-def test_legacy_path_serves_the_same_keys(jwt_signing: JwtSigningService) -> None:
-    client = TestClient(create_fastapi_app())
-
-    legacy = client.get(LEGACY_ENDPOINT)
-
-    assert legacy.status_code == 200
-    assert legacy.json() == client.get(ENDPOINT).json()
-    assert legacy.headers["cache-control"] == "public, max-age=3600"
-
-
-def test_only_the_json_path_is_documented(jwt_signing: JwtSigningService) -> None:
-    paths = TestClient(create_fastapi_app()).get("/openapi.json").json()["paths"]
-
-    assert ENDPOINT in paths
-    assert LEGACY_ENDPOINT not in paths
 
 
 @pytest.mark.parametrize("path", [ENDPOINT, f"/v1/api{ENDPOINT}"])

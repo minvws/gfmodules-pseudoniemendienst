@@ -71,7 +71,7 @@ A recipient configures two values once, out of band:
 
 - the PRS issuer, e.g. `https://pseudoniemendienst.example.nl`, and
 - the PRS JWKS URL. The PRS domain requires a client certificate, so the JWKS is also published on a separate
-  domain without mTLS, e.g. `https://well-known.pseudoniemendienst.test.gf.irealisatie.nl/.well-known/jwks.json` on
+  domain without mTLS, e.g. `https://well-known.pseudoniemendienst.example.nl/.well-known/jwks.json` on
   the test environment.
 
 Do not take the JWKS URL from the token; the `iss` claim is only compared with the configured issuer.
@@ -92,7 +92,7 @@ To accept a pseudonym:
 ### The JWKS
 
 `GET /.well-known/jwks.json` is public and needs no authentication or client certificate on the well-known domain.
-The old path `/.well-known/jwks` still works on the PRS domain. It returns a JSON Web Key Set (RFC 7517) with every key
+It returns a JSON Web Key Set (RFC 7517) with every key
 the PRS may have signed a still valid token with:
 
 ```json
