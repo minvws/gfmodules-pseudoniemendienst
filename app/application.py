@@ -15,7 +15,7 @@ from gfmodules.logging.middleware import (
 )
 
 from app.auth import get_auth_ctx, require_scopes
-from app.config import _ENVIRONMENT_CONFIG_PATH_NAME, _PATH, get_config
+from app.config import _ENVIRONMENT_CONFIG_PATH_NAME, _PATH, Config, get_config
 from app.logging.events import Log
 from app.models.auth.data import SCOPE_DESCRIPTIONS, AuthorizationScope
 from app.routers.administration.hsm_key_version import router as hsm_key_version_router
@@ -322,9 +322,9 @@ def setup_logging() -> None:
     gflog.configure(config=config.logging, loglevel=config.app.loglevel, catalogue=Log)
 
 
-def setup_fastapi() -> FastAPI:
-
-    config = get_config()
+def setup_fastapi(config: Config | None = None) -> FastAPI:
+    if config is None:
+        config = get_config()
 
     openapi_tags = list(TAGS_METADATA)
     if config.app.enable_exchange_services_routes:

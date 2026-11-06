@@ -1,7 +1,7 @@
 from typing import Any, Literal
 
-import requests
 from gfmodules.logging import correlation_headers
+from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -38,7 +38,7 @@ class HttpService:
         self._cert = (mtls_cert, mtls_key) if mtls_cert and mtls_key else None
         self._verify_ca = verify_ca
         adapter = HTTPAdapter(pool_maxsize=_POOL_MAXSIZE, max_retries=_RETRY)
-        self._session = requests.Session()
+        self._session = Session()
         self._session.mount("https://", adapter)
         self._session.mount("http://", adapter)
 
@@ -49,7 +49,7 @@ class HttpService:
         json: Any = None,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> requests.Response:
+    ) -> Response:
         return self._session.request(
             method,
             f"{self._endpoint}{path}",
