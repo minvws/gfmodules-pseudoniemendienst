@@ -50,7 +50,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `DECRYPT_PUBKEY_REJECTED` | 250405 | WARNING | `organization_identifier`, `key_algorithm`, `rejection_reason` |
 | `HSM_OPERATION_FAILED` | 250406 | ERROR | `operation_type`, `error_reason`, `retry_attempt` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
-| `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path`, `oauth_enabled`, `pseudonym_api_enabled` |
+| `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path`, `pseudonym_api_enabled` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
