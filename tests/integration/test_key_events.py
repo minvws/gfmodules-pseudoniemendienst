@@ -91,6 +91,7 @@ def _auth_headers(valid_headers: dict[str, str], org_oin: Oin) -> dict[str, str]
         (Log.DECRYPT_PUBKEY_REGISTERED, "250404", logging.INFO),
         (Log.DECRYPT_PUBKEY_REJECTED, "250405", logging.WARNING),
         (Log.HSM_OPERATION_FAILED, "250406", logging.ERROR),
+        (Log.DECRYPT_PUBKEY_DELETED, "250407", logging.WARNING),
     ],
 )
 def test_key_events_match_logging_spec(
@@ -211,6 +212,34 @@ def test_register_public_key_emits_registered(
         == response.json()["jwk"]["kid"]
     )
     assert not _events(records, Log.DECRYPT_PUBKEY_REJECTED.event_id)
+
+
+def test_delete_public_key_emits_deleted_once(
+    record_logs: Callable[[str], list[logging.LogRecord]],
+    client: TestClient,
+    persisted_organization: OrganizationEntity,
+    valid_headers: dict[str, str],
+) -> None:
+    records = record_logs("app.services.organization_public_key_service")
+    oin = persisted_organization.external_id
+    headers = _auth_headers(valid_headers, oin)
+    private_key, _ = generate_rsa_keypair()
+    created = client.post(
+        "/administration/keys",
+        json={"domains": ["nvi"], "jws": create_signed_jws(private_key, oin)},
+        headers=headers,
+    ).json()
+
+    first = client.delete(f"/administration/keys/{created['id']}", headers=headers)
+    again = client.delete(f"/administration/keys/{created['id']}", headers=headers)
+
+    assert (first.status_code, again.status_code) == (200, 404)
+    events = _events(records, "250407")
+    assert len(events) == 1
+    record = events[0]
+    assert record.levelno == logging.WARNING
+    assert record.organization_identifier == oin.value  # type: ignore[attr-defined]
+    assert record.key_version == created["jwk"]["kid"]  # type: ignore[attr-defined]
 
 
 def test_update_public_key_emits_registered(

@@ -432,6 +432,15 @@ class Log(_Base):
             _SIEM: ("organization_identifier", "key_algorithm", "rejection_reason"),
         },
     )
+    DECRYPT_PUBKEY_DELETED = LogEvent(
+        "250407",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: ("organization_identifier", "key_version"),
+            _SIEM: ("organization_identifier", "key_version"),
+        },
+    )
     HSM_OPERATION_FAILED = LogEvent(  # PRS-KEY-007
         "250406",
         logging.ERROR,
