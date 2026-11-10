@@ -62,15 +62,15 @@ def _key_length(jwk: dict[str, Any]) -> int | None:
     return _CURVE_BITS.get(jwk.get("crv", ""))
 
 
-def _log_rejected(org_id: Oin, key_algoritme: str | None, reason: str) -> None:
+def _log_rejected(org_id: Oin, key_algorithm: str | None, reason: str) -> None:
     # PRS-KEY-006
     gflog.emit(
         logger,
         Log.DECRYPT_PUBKEY_REJECTED,
         "decryption public key registration refused",
         fields={
-            "organisatie_oin": org_id.value,
-            "key_algoritme": key_algoritme,
+            "organization_identifier": org_id.value,
+            "key_algorithm": key_algorithm,
             "rejection_reason": reason,
         },
         stacklevel=2,
@@ -85,10 +85,10 @@ def _log_registered(org_id: Oin, jwk: dict[str, Any]) -> None:
         Log.DECRYPT_PUBKEY_REGISTERED,
         "decryption public key registered",
         fields={
-            "organisatie_oin": org_id.value,
-            "key_algoritme": _key_algorithm(jwk),
-            "key_lengte": _key_length(jwk),
-            "key_versie": jwk.get("kid"),
+            "organization_identifier": org_id.value,
+            "key_algorithm": _key_algorithm(jwk),
+            "key_length": _key_length(jwk),
+            "key_version": jwk.get("kid"),
         },
         stacklevel=2,
     )
@@ -102,17 +102,17 @@ class OrganizationPublicKeyService:
         """
         Validates the self-signed JWS and returns the public key it carries.
         """
-        key_algoritme: str | None = None
+        key_algorithm: str | None = None
         try:
             jws = JWS.from_jose_token(raw_jws)
             if "jwk" in jws.jose_header and isinstance(jws.jose_header["jwk"], dict):
-                key_algoritme = _key_algorithm(jws.jose_header["jwk"])
+                key_algorithm = _key_algorithm(jws.jose_header["jwk"])
             return self._extract_verified_key(jws, org_id)
         except InvalidJWSObject:
-            _log_rejected(org_id, key_algoritme, "JWS invalid")
+            _log_rejected(org_id, key_algorithm, "JWS invalid")
             raise InvalidJwsError("JWS invalid")
         except InvalidJwsError as e:
-            _log_rejected(org_id, key_algoritme, e.message)
+            _log_rejected(org_id, key_algorithm, e.message)
             raise
 
     def _extract_verified_key(self, jws: JWS, org_id: Oin) -> JWK:

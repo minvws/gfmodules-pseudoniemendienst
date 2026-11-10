@@ -154,9 +154,9 @@ def exchange_personal_id(
         "Personal ID exchanged",
         fields={
             **audit.fields(),
-            "domein": req.recipientScope,
-            "sleutel_versie": reversed_pseudonym.version,
-            "ontvanger_pubkey_id": public_key.jwk.get("kid"),
+            "domain": req.recipientScope,
+            "key_version": reversed_pseudonym.version,
+            "recipient_pubkey_id": public_key.jwk.get("kid"),
         },
     )
     return Response(status_code=201, content=token, media_type="application/jwe")

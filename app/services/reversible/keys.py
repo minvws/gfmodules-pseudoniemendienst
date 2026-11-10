@@ -127,9 +127,9 @@ class HsmReversibleKeyOperations(ReversibleKeyOperations):
                 "reversible pseudonym key generated in HSM",
                 fields={
                     "key_type": KEY_TYPE_REVERSIBLE_KEY,
-                    "organisatie_oin": oin.value,
+                    "organization_identifier": oin.value,
                     "secret_id": str(label),
-                    "sleutel_versie": version,
+                    "key_version": version,
                 },
             )
 

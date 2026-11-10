@@ -7,16 +7,16 @@ from app.models.oin import Oin
 
 @dataclass(frozen=True)
 class ExchangeAudit:
-    handelende_oin: str
-    namens_oin: str
-    doel_oin: str
+    acting_organization_identifier: str
+    represented_organization_identifier: str
+    recipient_organization_identifier: str
 
     @classmethod
     def from_auth(cls, auth: AuthContext, recipient: Oin) -> Self:
         return cls(
-            handelende_oin=str(auth.claims.client_organization_id),
-            namens_oin=str(auth.claims.organization_id),
-            doel_oin=str(recipient),
+            acting_organization_identifier=str(auth.claims.client_organization_id),
+            represented_organization_identifier=str(auth.claims.organization_id),
+            recipient_organization_identifier=str(recipient),
         )
 
     def fields(self) -> dict[str, str]:

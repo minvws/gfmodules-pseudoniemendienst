@@ -628,9 +628,9 @@ def test_dual_version_during_grace_returns_both_and_is_audited(
     # Verify audit logging (PSEUDONYM_IRREVERSIBLE_DUAL_CREATED with event_id 220402)
     dual_events = [r for r in records if getattr(r, "event_id", None) == "220402"]
     assert len(dual_events) == 1
-    assert dual_events[0].sleutel_versie_oud == 1  # type: ignore[attr-defined]
-    assert dual_events[0].sleutel_versie_actueel == 2  # type: ignore
-    assert dual_events[0].domein == TEST_SCOPE  # type: ignore[attr-defined]
+    assert dual_events[0].previous_key_version == 1  # type: ignore[attr-defined]
+    assert dual_events[0].current_key_version == 2  # type: ignore
+    assert dual_events[0].domain == TEST_SCOPE  # type: ignore[attr-defined]
 
 
 def test_sender_not_allowed_to_request_is_refused_before_anything_else(

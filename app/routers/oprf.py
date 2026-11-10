@@ -104,8 +104,8 @@ def post_eval(
         "OPRF evaluation succeeded",
         fields={
             **audit.fields(),
-            "oprf_secret_versie": max(result.key_versions),
-            "ontvanger_pubkey_id": organization_public_key.jwk.get("kid"),
+            "oprf_secret_version": max(result.key_versions),
+            "recipient_pubkey_id": organization_public_key.jwk.get("kid"),
         },
     )
     return JSONResponse({"jwe": result.jwe})

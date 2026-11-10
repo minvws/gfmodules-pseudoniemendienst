@@ -86,8 +86,8 @@ def parse_personal_id(
             Log.PERSONAL_ID_VALIDATION_FAILED,
             "Personal ID validation failed",
             fields={
-                "handelende_oin": audit.handelende_oin,
-                "namens_oin": audit.namens_oin,
+                "acting_organization_identifier": audit.acting_organization_identifier,
+                "represented_organization_identifier": audit.represented_organization_identifier,
                 "validation_error": e.kind,
             },
         )

@@ -83,8 +83,8 @@ class HsmIrreversibleKeyOperations(IrreversibleKeyOperations):
             "irreversible pseudonym secret generated in HSM",
             fields={
                 "key_type": KEY_TYPE_IRREVERSIBLE_KEY,
-                "organisatie_oin": label.oin.value,
+                "organization_identifier": label.oin.value,
                 "secret_id": str(label),
-                "sleutel_versie": label.version,
+                "key_version": label.version,
             },
         )

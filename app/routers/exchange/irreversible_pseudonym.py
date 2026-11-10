@@ -184,9 +184,9 @@ def exchange_irreversible_pseudonym(
             "Irreversible pseudonym created for old and current key version",
             fields={
                 **audit.fields(),
-                "domein": req.recipientScope,
-                "sleutel_versie_oud": max(version for version, _ in pseudonym.older),
-                "sleutel_versie_actueel": pseudonym.version,
+                "domain": req.recipientScope,
+                "previous_key_version": max(version for version, _ in pseudonym.older),
+                "current_key_version": pseudonym.version,
             },
         )
     else:
@@ -197,8 +197,8 @@ def exchange_irreversible_pseudonym(
             "Irreversible pseudonym created",
             fields={
                 **audit.fields(),
-                "domein": req.recipientScope,
-                "sleutel_versie": pseudonym.version,
+                "domain": req.recipientScope,
+                "key_version": pseudonym.version,
             },
         )
     return Response(status_code=201, content=token, media_type="application/jwe")

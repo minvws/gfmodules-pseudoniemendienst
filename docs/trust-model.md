@@ -50,7 +50,7 @@ OIN-verifier has set and sanitised:
 | Header          | Meaning                                   | Read in |
 |-----------------|-------------------------------------------|---------|
 | `x-gf-sub`      | Verified OIN of the organisation on whose behalf the request is made (the token subject). All authorization decisions bind to this value. | `app/models/auth/headers.py`, `app/auth.py` |
-| `x-gf-act-sub`  | Verified OIN of the acting client (the party that holds the token). Recorded in audit events as `handelende_oin`. | `app/models/auth/headers.py` |
+| `x-gf-act-sub`  | Verified OIN of the acting client (the party that holds the token). Recorded in audit events as `acting_organization_identifier`. | `app/models/auth/headers.py` |
 | `x-gf-act-cn`   | Common name of the acting client's certificate | `app/models/auth/headers.py` |
 | `x-gf-audience` | Intended audience; checked against a configured allowlist | `app/services/auth/header.py` |
 | `x-gf-scope`    | Space-separated OAuth scopes from the validated token; enforced per route via `require_scopes` | `app/models/auth/headers.py`, `app/auth.py` |
