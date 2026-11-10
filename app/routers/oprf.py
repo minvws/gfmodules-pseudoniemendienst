@@ -97,14 +97,16 @@ def post_eval(
         )
         raise
 
-    # PRS-OPRF-001
+    *older, current = result.key_versions
+    previous = {"previous_oprf_secret_version": older[-1]} if older else {}
     gflog.emit(
         logger,
         Log.OPRF_EVAL_OK,
         "OPRF evaluation succeeded",
         fields={
             **audit.fields(),
-            "oprf_secret_version": max(result.key_versions),
+            "oprf_secret_version": current,
+            **previous,
             "recipient_pubkey_id": organization_public_key.jwk.get("kid"),
         },
     )

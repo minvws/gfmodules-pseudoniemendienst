@@ -35,7 +35,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `PERSONAL_ID_EXCHANGED` | 220405 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `key_version`, `recipient_pubkey_id` |
 | `PERSONAL_ID_EXCHANGE_FAILED` | 220406 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY` | 220407 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
-| `OPRF_EVAL_OK` | 210400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `oprf_secret_version`, `recipient_pubkey_id` |
+| `OPRF_EVAL_OK` | 210400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `oprf_secret_version`, `previous_oprf_secret_version`, `recipient_pubkey_id` |
 | `OPRF_EVAL_FAILED` | 210402 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `OPRF_REFUSED_NO_ACTIVE_PUBKEY` | 210403 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
 | `SAML_EXCHANGE_OK` | 230400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `saml_decrypt_key_version`, `key_version` |

@@ -202,6 +202,7 @@ class Log(_Base):
                 "represented_organization_identifier",
                 "recipient_organization_identifier",
                 "oprf_secret_version",
+                "previous_oprf_secret_version",
                 "recipient_pubkey_id",
             ),
             _SIEM: (
