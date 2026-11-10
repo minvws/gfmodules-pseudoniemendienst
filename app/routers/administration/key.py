@@ -97,5 +97,4 @@ def delete_key(
     ],
 ) -> JSONResponse:
     organization_public_key_service.delete(id, auth_ctx.claims.organization_id)
-    logger.info("key with id %s deleted successfully", id)
     return JSONResponse(status_code=200, content={"message": "key deleted"})

@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy import delete, select
 
@@ -19,10 +20,9 @@ class OrganizationPublicKeyRepository(RepositoryBase):
         )
         return self.db_session.execute(query).scalars().first()
 
-    def delete(self, key_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
-        """
-        Deletes a key entry.
-        """
+    def delete(
+        self, key_id: uuid.UUID, organization_id: uuid.UUID
+    ) -> dict[str, Any] | None:
         query = delete(OrganizationPublicKeyEntity).where(
             OrganizationPublicKeyEntity.id == key_id
         )
@@ -31,6 +31,7 @@ class OrganizationPublicKeyRepository(RepositoryBase):
         )
 
         result = self.db_session.execute(
-            query.returning(OrganizationPublicKeyEntity.id)
+            query.returning(OrganizationPublicKeyEntity.jwk)
         )
-        return result.scalars().first() is not None
+        deleted: dict[str, Any] | None = result.scalars().first()
+        return deleted

@@ -44,7 +44,7 @@ def test_get_by_id_should_return_none_when_not_exists(
     assert result is None
 
 
-def test_delete_should_return_true_when_deleted(
+def test_delete_should_return_the_deleted_jwk(
     organization_public_key_repository: OrganizationPublicKeyRepository,
     organization_public_key: OrganizationPublicKeyEntity,
     db_session: DbSession,
@@ -56,24 +56,24 @@ def test_delete_should_return_true_when_deleted(
         organization_public_key.id, organization_public_key.organization_id
     )
 
-    assert result is True
+    assert result == organization_public_key.jwk
 
     # Verify it was actually deleted
     deleted = organization_public_key_repository.get_by_id(organization_public_key.id)
     assert deleted is None
 
 
-def test_delete_should_return_false_when_not_exists(
+def test_delete_should_return_none_when_not_exists(
     organization_public_key_repository: OrganizationPublicKeyRepository,
 ) -> None:
     non_existent_id = uuid.uuid4()
     organization_id = uuid.uuid4()
     result = organization_public_key_repository.delete(non_existent_id, organization_id)
 
-    assert result is False
+    assert result is None
 
 
-def test_delete_should_return_false_when_organization_mismatch(
+def test_delete_should_return_none_when_organization_mismatch(
     organization_public_key_repository: OrganizationPublicKeyRepository,
     organization_public_key: OrganizationPublicKeyEntity,
     db_session: DbSession,
@@ -87,7 +87,7 @@ def test_delete_should_return_false_when_organization_mismatch(
         organization_public_key.id, wrong_organization_id
     )
 
-    assert result is False
+    assert result is None
 
     # Verify the key still exists
     existing = organization_public_key_repository.get_by_id(organization_public_key.id)
