@@ -7,7 +7,11 @@ import pytest
 import requests
 from conftest import blinded_input, hsm_client
 from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
-from gfmodules.logging.testing import assert_catalogue_complete, capture_records
+from gfmodules.logging.testing import (
+    assert_catalogue_complete,
+    assert_event_overview_current,
+    capture_records,
+)
 from jwcrypto import jwk
 
 from app.exceptions.pseudonym import PseudonymOperationError
@@ -20,6 +24,10 @@ from app.services.oprf.oprf_service import OprfService
 
 def test_catalogue_defines_every_required_event() -> None:
     assert_catalogue_complete(Log)
+
+
+def test_the_event_overview_is_current() -> None:
+    assert_event_overview_current(Log, "docs/log-events.md")
 
 
 def test_emit_attaches_event_id_and_streams() -> None:
