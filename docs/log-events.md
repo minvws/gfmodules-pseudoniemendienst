@@ -26,7 +26,8 @@ Every event carries these on every stream, whenever the request context holds a 
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation` |
+| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation`, `error_reason` |
+| `MISSING_AUTHORIZATION_HEADER` | 200404 | WARNING | `error_reason` |
 | `PSEUDONYM_REVERSIBLE_CREATED` | 220400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `key_version` |
 | `PSEUDONYM_IRREVERSIBLE_CREATED` | 220401 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `key_version` |
 | `PSEUDONYM_IRREVERSIBLE_DUAL_CREATED` | 220402 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `previous_key_version`, `current_key_version` |
@@ -63,7 +64,8 @@ Every event carries these on every stream, whenever the request context holds a 
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation` |
+| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation`, `error_reason` |
+| `MISSING_AUTHORIZATION_HEADER` | 200404 | WARNING | `error_reason` |
 | `PSEUDONYM_REVERSIBLE_CREATED` | 220400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
 | `PSEUDONYM_IRREVERSIBLE_CREATED` | 220401 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
 | `PSEUDONYM_IRREVERSIBLE_DUAL_CREATED` | 220402 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `previous_key_version`, `current_key_version` |

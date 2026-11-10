@@ -1,6 +1,9 @@
 import logging
 
+import gfmodules.logging as gflog
+
 from app.exceptions.access import InvalidAudienceError
+from app.logging.events import Log
 from app.models.auth.headers import AuthHeaders
 
 logger = logging.getLogger(__name__)
@@ -14,8 +17,19 @@ class AuthHeaderService:
         audience = auth_headers.audience
 
         if audience not in self.expected_audiences:
-            logger.error(
-                f"Invalid audience {audience!r}, expected one of {self.expected_audiences}. Check config values in case the incoming value is correct"
+            gflog.emit(
+                logger,
+                Log.AUTHORIZATION_DENIED,
+                f"audience {audience!r} is not one of {self.expected_audiences}",
+                fields={
+                    "acting_organization_identifier": str(
+                        auth_headers.client_organization_id
+                    ),
+                    "represented_organization_identifier": str(
+                        auth_headers.organization_id
+                    ),
+                    "error_reason": "audience_not_accepted",
+                },
             )
             raise InvalidAudienceError()
 
