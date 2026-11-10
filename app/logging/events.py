@@ -462,8 +462,8 @@ class Log(_Base):
         logging.ERROR,
         (_APP, _SIEM),
         {
-            _APP: ("datastore", "error_type", "retry_attempt", "backoff_seconds"),
-            _SIEM: ("datastore", "error_type"),
+            _APP: ("error_type", "retry_attempt", "backoff_seconds"),
+            _SIEM: ("error_type",),
         },
     )
     SYS_HSM_UNREACHABLE = LogEvent(  # PRS-SYS-006

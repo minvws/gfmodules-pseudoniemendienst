@@ -150,7 +150,6 @@ def test_db_retry_emits_connection_events(
 
     retrying = events[0]
     assert retrying.levelno == logging.ERROR
-    assert retrying.datastore == "prs-database"  # type: ignore[attr-defined]
     assert retrying.error_type == "OperationalError"  # type: ignore
     assert retrying.retry_attempt == 1  # type: ignore[attr-defined]
     assert retrying.backoff_seconds == 0.0  # type: ignore[attr-defined]
