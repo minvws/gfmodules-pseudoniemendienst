@@ -32,9 +32,11 @@ Every event carries these on every stream, whenever the request context holds a 
 | `PSEUDONYM_IRREVERSIBLE_DUAL_CREATED` | 220402 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `previous_key_version`, `current_key_version` |
 | `PSEUDONYM_CREATE_FAILED` | 220403 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `PERSONAL_ID_VALIDATION_FAILED` | 220404 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `validation_error` |
-| `PERSONAL_ID_EXCHANGED` | 220405 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `key_version`, `recipient_pubkey_id` |
-| `PERSONAL_ID_EXCHANGE_FAILED` | 220406 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY` | 220407 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
+| `PERSONAL_ID_EXCHANGED` | 240400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `source_artifact_type`, `artifact_version`, `key_version`, `domain`, `recipient_pubkey_id` |
+| `PERSONAL_ID_EXCHANGE_REFUSED` | 240401 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `missing_flag` |
+| `PERSONAL_ID_EXCHANGE_FAILED` | 240402 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type`, `artifact_version` |
+| `PERSONAL_ID_EXCHANGED_FROM_GRACE_VERSION` | 240403 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `artifact_version`, `key_version` |
 | `OPRF_EVAL_OK` | 210400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `oprf_secret_version`, `previous_oprf_secret_version`, `recipient_pubkey_id` |
 | `OPRF_EVAL_FAILED` | 210402 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `OPRF_REFUSED_NO_ACTIVE_PUBKEY` | 210403 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
@@ -67,9 +69,11 @@ Every event carries these on every stream, whenever the request context holds a 
 | `PSEUDONYM_IRREVERSIBLE_DUAL_CREATED` | 220402 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `previous_key_version`, `current_key_version` |
 | `PSEUDONYM_CREATE_FAILED` | 220403 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `PERSONAL_ID_VALIDATION_FAILED` | 220404 | WARNING | `acting_organization_identifier`, `validation_error` |
-| `PERSONAL_ID_EXCHANGED` | 220405 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
-| `PERSONAL_ID_EXCHANGE_FAILED` | 220406 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY` | 220407 | WARNING | `acting_organization_identifier`, `recipient_organization_identifier` |
+| `PERSONAL_ID_EXCHANGED` | 240400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `source_artifact_type` |
+| `PERSONAL_ID_EXCHANGE_REFUSED` | 240401 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `missing_flag` |
+| `PERSONAL_ID_EXCHANGE_FAILED` | 240402 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
+| `PERSONAL_ID_EXCHANGED_FROM_GRACE_VERSION` | 240403 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `artifact_version` |
 | `OPRF_EVAL_OK` | 210400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
 | `OPRF_EVAL_FAILED` | 210402 | ERROR | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `error_type` |
 | `OPRF_REFUSED_NO_ACTIVE_PUBKEY` | 210403 | WARNING | `acting_organization_identifier`, `recipient_organization_identifier` |

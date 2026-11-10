@@ -134,45 +134,6 @@ class Log(_Base):
         },
     )
 
-    PERSONAL_ID_EXCHANGED = LogEvent(
-        "220405",
-        logging.INFO,
-        (_APP, _SIEM),
-        {
-            _APP: (
-                "acting_organization_identifier",
-                "represented_organization_identifier",
-                "recipient_organization_identifier",
-                "domain",
-                "key_version",
-                "recipient_pubkey_id",
-            ),
-            _SIEM: (
-                "acting_organization_identifier",
-                "represented_organization_identifier",
-                "recipient_organization_identifier",
-            ),
-        },
-    )
-    PERSONAL_ID_EXCHANGE_FAILED = LogEvent(
-        "220406",
-        logging.ERROR,
-        (_APP, _SIEM),
-        {
-            _APP: (
-                "acting_organization_identifier",
-                "represented_organization_identifier",
-                "recipient_organization_identifier",
-                "error_type",
-            ),
-            _SIEM: (
-                "acting_organization_identifier",
-                "represented_organization_identifier",
-                "recipient_organization_identifier",
-                "error_type",
-            ),
-        },
-    )
     EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY = LogEvent(
         "220407",
         logging.WARNING,
@@ -186,6 +147,89 @@ class Log(_Base):
             _SIEM: (
                 "acting_organization_identifier",
                 "recipient_organization_identifier",
+            ),
+        },
+    )
+
+    PERSONAL_ID_EXCHANGED = LogEvent(
+        "240400",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "source_artifact_type",
+                "artifact_version",
+                "key_version",
+                "domain",
+                "recipient_pubkey_id",
+            ),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "source_artifact_type",
+            ),
+        },
+    )
+    PERSONAL_ID_EXCHANGE_REFUSED = LogEvent(
+        "240401",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "missing_flag",
+            ),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "missing_flag",
+            ),
+        },
+    )
+    PERSONAL_ID_EXCHANGE_FAILED = LogEvent(
+        "240402",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "error_type",
+                "artifact_version",
+            ),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "error_type",
+            ),
+        },
+    )
+    PERSONAL_ID_EXCHANGED_FROM_GRACE_VERSION = LogEvent(
+        "240403",
+        logging.INFO,
+        (_APP, _SIEM),
+        {
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "artifact_version",
+                "key_version",
+            ),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "artifact_version",
             ),
         },
     )

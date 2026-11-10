@@ -19,6 +19,7 @@ from app.exceptions.pseudonym import (
     HsmUnreachableError,
     InvalidPseudonymError,
     NoActiveKeyVersionError,
+    PseudonymOperationError,
     PseudonymVersionDestroyedError,
 )
 from app.models.oin import Oin
@@ -54,6 +55,7 @@ class ReversedPseudonym:
     recipient_organization: str
     recipient_scope: str
     version: int
+    current_version: int
 
 
 class ReversiblePseudonymService:
@@ -98,7 +100,15 @@ class ReversiblePseudonymService:
 
     def reverse(self, value: str, recipient: Oin) -> ReversedPseudonym:
         version, ciphertext, iv = self._unpack(value)
+        try:
+            return self._reverse(version, ciphertext, iv, recipient)
+        except PseudonymOperationError as e:
+            e.key_version = version
+            raise
 
+    def _reverse(
+        self, version: int, ciphertext: bytes, iv: bytes, recipient: Oin
+    ) -> ReversedPseudonym:
         active = self._key_versions.get_active_version_numbers_by_organization_oin(
             recipient
         )
@@ -139,6 +149,7 @@ class ReversiblePseudonymService:
             recipient_organization=parts[1],
             recipient_scope=parts[2],
             version=version,
+            current_version=max(active),
         )
 
     @staticmethod

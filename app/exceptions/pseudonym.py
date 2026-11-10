@@ -17,6 +17,7 @@ class PseudonymOperationError(PseudonymError):
     """
 
     error_type: PseudonymErrorType
+    key_version: int | None = None
 
 
 class InvalidPseudonymError(PseudonymOperationError):
