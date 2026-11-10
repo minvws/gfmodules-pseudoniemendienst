@@ -6,8 +6,8 @@ BLUE="\033[34m"
 NC="\033[0m"
 RED="\033[31m"
 
-SCRIPT=$(readlink -f $0)
-BASEDIR=$(dirname $SCRIPT)/..
+SCRIPT=$(readlink -f "$0")
+BASEDIR=$(readlink -f "$(dirname "$SCRIPT")/..")
 SQLDIR="$BASEDIR/sql"
 
 # Check for required environment variable DSN
@@ -58,8 +58,8 @@ fi
 
 pending_migrations=()
 
-for file in $SQLDIR/*.sql; do
-  basename="$(basename $file)"
+for file in "$SQLDIR"/*.sql; do
+  basename="$(basename "$file")"
   if [ "$MIGRATION_TABLE_EXISTS" = "f" ]; then
     echo -e "${YELLOW}▶️ Found pending migration: $basename ${NC}"
     pending_migrations+=("$file")
@@ -85,7 +85,7 @@ done
 for file in "${pending_migrations[@]}"; do
   echo "--------------------------------------------------------------------------" >>"$TEMP_FILE"
   echo "-- Migration file: $(basename "$file")" >>"$TEMP_FILE"
-  cat "$file" >>"$TEMP_FILE"
+  printf '%s\n' "\ir '$file'" >>"$TEMP_FILE"
   CHECKSUM=$(sha256sum "$file" | awk '{print $1}')
   echo "-- Update migrations: " >>"$TEMP_FILE"
   echo "INSERT INTO migrations (name, checksum) VALUES ('$(basename "$file")', '${CHECKSUM}');" >>"$TEMP_FILE"
@@ -97,8 +97,6 @@ if psql -v ON_ERROR_STOP=1 $DSN -f "$TEMP_FILE" -q -o /dev/null; then
   echo -e "${GREEN}✅ Successfully applied all migrations and recorded them.${NC}"
 else
   echo -e "${RED}❌ Failed to apply migrations. Transaction rolled back. No permanent changes were made.${NC}"
-  echo -e "Migrations:"
-  cat $TEMP_FILE
   exit 1
 fi
 
