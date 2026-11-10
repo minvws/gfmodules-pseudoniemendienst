@@ -59,6 +59,8 @@ Every event carries these on every stream, whenever the request context holds a 
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
 | `SYS_MISSING_CORRELATION_ID` | 270428 | ERROR | `endpoint`, `method` |
 | `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
+| `SYS_DB_SCHEMA_ERROR` | 270405 | ERROR | `exception_type`, `table`, `column`, `value_length`, `column_limit` |
+| `SYS_DB_OPERATION_FAILED` | 270426 | WARNING | `exception_type`, `table`, `constraint` |
 | `SYS_HSM_UNREACHABLE` | 270406 | CRITICAL | `error_reason`, `retry_attempt` |
 | `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated` |
 

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from gfmodules.logging.testing import capture_records
 from jwcrypto.jwk import JWK
 from requests.exceptions import ConnectionError
-from sqlalchemy.exc import DatabaseError, OperationalError
+from sqlalchemy.exc import DatabaseError, DataError, IntegrityError, OperationalError
 from starlette.testclient import TestClient
 
 from app.db.models.organization import OrganizationEntity
@@ -157,6 +157,58 @@ def test_db_retry_emits_connection_events(
     gave_up = events[1]
     assert gave_up.error_type == "OperationalError"  # type: ignore
     assert gave_up.retry_attempt == 2  # type: ignore[attr-defined]
+
+
+def test_db_rejections_are_logged_without_the_rejected_value(
+    record_logs: RecordLogs, db_session: DbSession
+) -> None:
+    records = record_logs(DB_LOGGER)
+    rejected = "x" * 300
+
+    class StringDataRightTruncation(Exception):
+        class diag:
+            table_name = "organization"
+            column_name = "name"
+
+    class UniqueViolation(Exception):
+        class diag:
+            table_name = "organization_public_key"
+            constraint_name = "uq_organization_public_key"
+
+    rejections: list[DatabaseError] = [
+        DataError(
+            "INSERT",
+            {"name": rejected},
+            StringDataRightTruncation("value too long for type character varying(255)"),
+        ),
+        IntegrityError("INSERT", {"name": rejected}, UniqueViolation(rejected)),
+    ]
+
+    def rejecting(error: DatabaseError) -> Callable[[], None]:
+        def operation() -> None:
+            raise error
+
+        return operation
+
+    for error in rejections:
+        with pytest.raises(DatabaseError):
+            db_session._retry(rejecting(error))
+
+    (schema,) = _events(records, Log.SYS_DB_SCHEMA_ERROR.event_id)
+    assert (
+        schema.exception_type,  # type: ignore[attr-defined]
+        schema.table,  # type: ignore[attr-defined]
+        schema.column,  # type: ignore[attr-defined]
+        schema.value_length,  # type: ignore[attr-defined]
+        schema.column_limit,  # type: ignore[attr-defined]
+    ) == ("StringDataRightTruncation", "organization", "name", 300, 255)
+    (operation,) = _events(records, Log.SYS_DB_OPERATION_FAILED.event_id)
+    assert (
+        operation.exception_type,  # type: ignore[attr-defined]
+        operation.table,  # type: ignore[attr-defined]
+        operation.constraint,  # type: ignore[attr-defined]
+    ) == ("UniqueViolation", "organization_public_key", "uq_organization_public_key")
+    assert all(rejected not in str(vars(record)) for record in records)
 
 
 def test_hsm_unreachable_emits_sys_event(
