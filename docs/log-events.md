@@ -54,7 +54,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
-| `SYS_MISSING_CORRELATION_ID` | 270407 | ERROR | `endpoint`, `method` |
+| `SYS_MISSING_CORRELATION_ID` | 270428 | ERROR | `endpoint`, `method` |
 | `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `datastore`, `error_type`, `retry_attempt`, `backoff_seconds` |
 | `SYS_HSM_UNREACHABLE` | 270406 | CRITICAL | `error_reason`, `retry_attempt` |
 | `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated` |
