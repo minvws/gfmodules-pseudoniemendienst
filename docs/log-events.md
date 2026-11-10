@@ -50,6 +50,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `DECRYPT_PUBKEY_REGISTERED` | 250404 | INFO | `organization_identifier`, `key_algorithm`, `key_length`, `key_version` |
 | `DECRYPT_PUBKEY_REJECTED` | 250405 | WARNING | `organization_identifier`, `key_algorithm`, `rejection_reason` |
 | `DECRYPT_PUBKEY_DELETED` | 250407 | WARNING | `organization_identifier`, `key_version` |
+| `KEY_CLEANUP_FAILED` | 250408 | ERROR | `error_reason` |
 | `HSM_OPERATION_FAILED` | 250406 | ERROR | `operation_type`, `error_reason`, `retry_attempt` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path`, `pseudonym_api_enabled` |
@@ -89,6 +90,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `DECRYPT_PUBKEY_REGISTERED` | 250404 | INFO | `organization_identifier`, `key_algorithm` |
 | `DECRYPT_PUBKEY_REJECTED` | 250405 | WARNING | `organization_identifier`, `key_algorithm`, `rejection_reason` |
 | `DECRYPT_PUBKEY_DELETED` | 250407 | WARNING | `organization_identifier`, `key_version` |
+| `KEY_CLEANUP_FAILED` | 250408 | ERROR | `error_reason` |
 | `HSM_OPERATION_FAILED` | 250406 | ERROR | `operation_type`, `error_reason` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |

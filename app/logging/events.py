@@ -441,6 +441,12 @@ class Log(_Base):
             _SIEM: ("organization_identifier", "key_version"),
         },
     )
+    KEY_CLEANUP_FAILED = LogEvent(
+        "250408",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {_APP: ("error_reason",), _SIEM: ("error_reason",)},
+    )
     HSM_OPERATION_FAILED = LogEvent(  # PRS-KEY-007
         "250406",
         logging.ERROR,
