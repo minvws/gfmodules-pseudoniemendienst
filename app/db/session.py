@@ -1,5 +1,6 @@
 import logging
 import random
+import re
 import types
 from collections.abc import Callable
 from time import sleep
@@ -7,7 +8,12 @@ from typing import Any, TypeVar
 
 import gfmodules.logging as gflog
 from sqlalchemy import Engine, Result
-from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
+from sqlalchemy.exc import (
+    DatabaseError,
+    DataError,
+    OperationalError,
+    PendingRollbackError,
+)
 from sqlalchemy.orm import Session
 from typing_extensions import Self
 
@@ -32,6 +38,49 @@ Usage:
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+_VARCHAR_LIMIT = re.compile(r"character varying\((\d+)\)")
+
+
+def _longest_value(params: Any) -> int | None:
+    if isinstance(params, dict):
+        params = params.values()
+    elif not isinstance(params, (list, tuple)):
+        params = (params,)
+    return max(
+        (len(value) for value in params if isinstance(value, (str, bytes))),
+        default=None,
+    )
+
+
+def _present(fields: dict[str, Any]) -> dict[str, Any]:
+    return {name: value for name, value in fields.items() if value is not None}
+
+
+def _schema_error_fields(exc: DataError) -> dict[str, Any]:
+    diag = getattr(exc.orig, "diag", None)
+    limit = _VARCHAR_LIMIT.search(str(exc.orig))
+    return _present(
+        {
+            "exception_type": type(exc.orig).__name__,
+            "table": getattr(diag, "table_name", None),
+            "column": getattr(diag, "column_name", None),
+            "value_length": _longest_value(exc.params),
+            "column_limit": int(limit.group(1)) if limit else None,
+        }
+    )
+
+
+def _operation_error_fields(exc: DatabaseError) -> dict[str, Any]:
+    diag = getattr(exc.orig, "diag", None)
+    return _present(
+        {
+            "exception_type": type(exc.orig).__name__,
+            "table": getattr(diag, "table_name", None),
+            "constraint": getattr(diag, "constraint_name", None),
+        }
+    )
 
 
 class DbSession:
@@ -141,6 +190,23 @@ class DbSession:
         """
         return self._retry(self.session.begin)
 
+    @staticmethod
+    def _log_database_error(exc: DatabaseError) -> None:
+        if isinstance(exc, DataError):
+            gflog.emit(
+                logger,
+                Log.SYS_DB_SCHEMA_ERROR,
+                "Database rejected the data for its schema",
+                fields=_schema_error_fields(exc),
+            )
+        else:
+            gflog.emit(
+                logger,
+                Log.SYS_DB_OPERATION_FAILED,
+                "Database rejected the operation",
+                fields=_operation_error_fields(exc),
+            )
+
     def _retry(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> T:
         """
         Retry a function call in case of database errors
@@ -160,9 +226,7 @@ class DbSession:
                 logger.warning("retrying operation due to OperationalError: %s", e)
                 error = e
             except DatabaseError as e:
-                logger.warning(
-                    "operation failed with a non-retryable DatabaseError: %s", e
-                )
+                self._log_database_error(e)
                 raise
             except Exception as e:
                 logger.warning("generic Exception during operation: %s", e)
