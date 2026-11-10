@@ -449,7 +449,7 @@ class Log(_Base):
         },
     )
     SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("270401").add_fields(  # PRS-SYS-001
-        fields={_APP: ("oauth_enabled", "pseudonym_api_enabled")},
+        fields={_APP: ("pseudonym_api_enabled",)},
     )
     SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("270402")  # PRS-SYS-002
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("270402")  # PRS-SYS-002

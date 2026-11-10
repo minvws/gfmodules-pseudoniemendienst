@@ -102,7 +102,7 @@ def test_the_started_event_keeps_the_shared_allow_list_and_adds_this_services_ow
     assert set(DefaultEventCatalogue.SYS_APP_STARTED.fields[LoggingStreams.APP]) <= set(
         allowed
     )
-    assert {"oauth_enabled", "pseudonym_api_enabled"} <= set(allowed)
+    assert "pseudonym_api_enabled" in allowed
 
 
 def test_emit_includes_exc_info() -> None:
