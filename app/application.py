@@ -9,6 +9,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
+from gfmodules.logging.exceptions import log_unhandled_exception
 from gfmodules.logging.middleware import (
     RequestContextMiddleware,
     restore_request_context,
@@ -307,13 +308,7 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 @restore_request_context
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    gflog.emit(
-        logger,
-        Log.SYS_UNHANDLED_EXCEPTION,
-        "Unhandled exception",
-        fields={"exception_type": type(exc).__name__},
-        exc_info=exc,
-    )
+    log_unhandled_exception(logger, request, exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
@@ -350,7 +345,6 @@ def setup_fastapi() -> FastAPI:
 
     container.configure()
 
-    fastapi.add_middleware(RequestContextMiddleware)
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
     install_app_error_handler(fastapi)
     install_validation_error_handler(fastapi)
@@ -396,4 +390,5 @@ def setup_fastapi() -> FastAPI:
             ],
         )
     install_openapi_extensions(fastapi, config.uvicorn.document_gf_headers)
+    fastapi.add_middleware(RequestContextMiddleware)
     return fastapi
