@@ -11,8 +11,8 @@ from gfmodules.logging.testing import assert_fields_absent, capture_stream
 from app.logging.events import Log
 
 _LOGGER_NAME = "app.test_stream_routing"
-_HANDELENDE_OIN = "00000099000000001000"
-_DOEL_OIN = "oin:00000099000000002000"
+_ACTING_OIN = "00000099000000001000"
+_RECIPIENT_OIN = "oin:00000099000000002000"
 
 Routed = dict[LoggingStreams, list[dict[str, Any]]]
 Route = Callable[..., Routed]
@@ -102,24 +102,24 @@ class TestOprfEvalOk:
         return route(
             Log.OPRF_EVAL_OK,
             "evaluated",
-            handelende_oin=_HANDELENDE_OIN,
-            doel_oin=_DOEL_OIN,
-            oprf_secret_versie=3,
-            ontvanger_pubkey_id="key-1",
+            acting_organization_identifier=_ACTING_OIN,
+            recipient_organization_identifier=_RECIPIENT_OIN,
+            oprf_secret_version=3,
+            recipient_pubkey_id="key-1",
         )
 
     def test_siem_does_not_receive_the_key_versions(self, routed: Routed) -> None:
         app_message = routed[LoggingStreams.APP][0]
-        assert app_message["oprf_secret_versie"] == 3
-        assert app_message["ontvanger_pubkey_id"] == "key-1"
+        assert app_message["oprf_secret_version"] == 3
+        assert app_message["recipient_pubkey_id"] == "key-1"
         assert_fields_absent(
-            routed[LoggingStreams.SIEM], "oprf_secret_versie", "ontvanger_pubkey_id"
+            routed[LoggingStreams.SIEM], "oprf_secret_version", "recipient_pubkey_id"
         )
 
     def test_both_streams_receive_the_oins(self, routed: Routed) -> None:
         for message in (routed[LoggingStreams.APP][0], routed[LoggingStreams.SIEM][0]):
-            assert message["handelende_oin"] == _HANDELENDE_OIN
-            assert message["doel_oin"] == _DOEL_OIN
+            assert message["acting_organization_identifier"] == _ACTING_OIN
+            assert message["recipient_organization_identifier"] == _RECIPIENT_OIN
 
     def test_correlation_metadata_is_retained_in_every_routed_stream(
         self, routed: Routed

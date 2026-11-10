@@ -139,11 +139,11 @@ def test_lazy_oprf_key_generation_emits_key_generated(
     record = events[0]
     assert record.levelno == logging.INFO
     assert record.key_type == "oprf_secret"  # type: ignore[attr-defined]
-    assert record.organisatie_oin == persisted_organization.external_id.value  # type: ignore[attr-defined]
+    assert record.organization_identifier == persisted_organization.external_id.value  # type: ignore[attr-defined]
     assert record.secret_id == str(  # type: ignore[attr-defined]
         OprfHsmKeyLabel(persisted_organization.external_id, 1)
     )
-    assert record.sleutel_versie == 1  # type: ignore[attr-defined]
+    assert record.key_version == 1  # type: ignore[attr-defined]
     assert not _events(records, Log.HSM_OPERATION_FAILED.event_id)
 
 
@@ -174,10 +174,10 @@ def test_cleanup_emits_key_version_destroyed(
     for record in events:
         assert record.levelno == logging.WARNING
         assert (
-            record.organisatie_oin  # type: ignore[attr-defined]
+            record.organization_identifier  # type: ignore[attr-defined]
             == persisted_organization.external_id.value
         )
-        assert record.vernietigde_versie == 7  # type: ignore[attr-defined]
+        assert record.destroyed_version == 7  # type: ignore[attr-defined]
     assert not _events(records, Log.HSM_OPERATION_FAILED.event_id)
 
 
@@ -203,11 +203,11 @@ def test_register_public_key_emits_registered(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.INFO
-    assert record.organisatie_oin == oin.value  # type: ignore[attr-defined]
-    assert record.key_algoritme == "RSA"  # type: ignore[attr-defined]
-    assert record.key_lengte == 3072  # type: ignore[attr-defined]
+    assert record.organization_identifier == oin.value  # type: ignore[attr-defined]
+    assert record.key_algorithm == "RSA"  # type: ignore[attr-defined]
+    assert record.key_length == 3072  # type: ignore[attr-defined]
     assert (
-        record.key_versie  # type: ignore[attr-defined]
+        record.key_version  # type: ignore[attr-defined]
         == response.json()["jwk"]["kid"]
     )
     assert not _events(records, Log.DECRYPT_PUBKEY_REJECTED.event_id)
@@ -241,10 +241,10 @@ def test_update_public_key_emits_registered(
     events = _events(records, Log.DECRYPT_PUBKEY_REGISTERED.event_id)
     assert len(events) == 2
     assert (
-        events[1].key_versie  # type: ignore[attr-defined]
+        events[1].key_version  # type: ignore[attr-defined]
         == response.json()["jwk"]["kid"]
     )
-    assert events[1].key_versie != events[0].key_versie  # type: ignore[attr-defined]
+    assert events[1].key_version != events[0].key_version  # type: ignore[attr-defined]
 
 
 def test_register_public_key_for_other_oin_emits_rejected(
@@ -272,8 +272,8 @@ def test_register_public_key_for_other_oin_emits_rejected(
     assert len(events) == 1
     record = events[0]
     assert record.levelno == logging.WARNING
-    assert record.organisatie_oin == oin.value  # type: ignore[attr-defined]
-    assert record.key_algoritme == "RSA"  # type: ignore[attr-defined]
+    assert record.organization_identifier == oin.value  # type: ignore[attr-defined]
+    assert record.key_algorithm == "RSA"  # type: ignore[attr-defined]
     assert record.rejection_reason == "Unauthorized for supplied `oin`"  # type: ignore[attr-defined]
     assert not _events(records, Log.DECRYPT_PUBKEY_REGISTERED.event_id)
 
@@ -303,7 +303,7 @@ def test_register_non_rsa_public_key_emits_rejected(
     assert response.status_code == 422
     events = _events(records, Log.DECRYPT_PUBKEY_REJECTED.event_id)
     assert len(events) == 1
-    assert events[0].key_algoritme == "EC/P-256"  # type: ignore
+    assert events[0].key_algorithm == "EC/P-256"  # type: ignore
     assert events[0].rejection_reason == "'jwk' must be an RSA key"  # type: ignore
     assert not _events(records, Log.DECRYPT_PUBKEY_REGISTERED.event_id)
 
@@ -327,7 +327,7 @@ def test_register_malformed_jws_emits_rejected_without_algorithm(
     assert response.status_code == 422
     events = _events(records, Log.DECRYPT_PUBKEY_REJECTED.event_id)
     assert len(events) == 1
-    assert events[0].key_algoritme is None  # type: ignore[attr-defined]
+    assert events[0].key_algorithm is None  # type: ignore[attr-defined]
     assert events[0].rejection_reason == "JWS invalid"  # type: ignore
 
 
@@ -354,7 +354,7 @@ def test_register_public_key_duplicate_domain_emits_rejected(
     assert len(_events(records, Log.DECRYPT_PUBKEY_REGISTERED.event_id)) == 1
     rejected = _events(records, Log.DECRYPT_PUBKEY_REJECTED.event_id)
     assert len(rejected) == 1
-    assert rejected[0].key_algoritme == "RSA"  # type: ignore[attr-defined]
+    assert rejected[0].key_algorithm == "RSA"  # type: ignore[attr-defined]
     assert rejected[0].rejection_reason == "domain already registered"  # type: ignore
 
 
@@ -559,11 +559,11 @@ def test_create_key_version_emits_rotation_started(
     assert record.levelno == logging.WARNING
     assert record.key_type == "oprf_secret"  # type: ignore[attr-defined]
     assert (
-        record.organisatie_oin  # type: ignore[attr-defined]
+        record.organization_identifier  # type: ignore[attr-defined]
         == persisted_organization.external_id.value
     )
-    assert record.oude_versie == 1  # type: ignore[attr-defined]
-    assert record.nieuwe_versie == 2  # type: ignore[attr-defined]
+    assert record.previous_version == 1  # type: ignore[attr-defined]
+    assert record.new_version == 2  # type: ignore[attr-defined]
 
 
 def test_update_key_version_with_until_dt_emits_grace_started(
@@ -591,11 +591,11 @@ def test_update_key_version_with_until_dt_emits_grace_started(
     assert record.levelno == logging.INFO
     assert record.key_type == "oprf_secret"  # type: ignore[attr-defined]
     assert (
-        record.organisatie_oin  # type: ignore[attr-defined]
+        record.organization_identifier  # type: ignore[attr-defined]
         == persisted_organization.external_id.value
     )
-    assert record.oude_versie == created["version"]  # type: ignore
-    assert record.grace_eind == until_dt.isoformat()  # type: ignore
+    assert record.previous_version == created["version"]  # type: ignore
+    assert record.grace_end == until_dt.isoformat()  # type: ignore
     grace_start = datetime.fromisoformat(record.grace_start)  # type: ignore[attr-defined]
     assert grace_start <= datetime.now(timezone.utc)
 

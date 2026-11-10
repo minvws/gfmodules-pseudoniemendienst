@@ -23,12 +23,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
                 "requested_operation",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "requested_operation"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "requested_operation",
+            ),
         },
     )
 
@@ -42,13 +47,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "domein",
-                "sleutel_versie",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "domain",
+                "key_version",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
     PSEUDONYM_IRREVERSIBLE_CREATED = LogEvent(  # PRS-PSE-002
@@ -57,13 +66,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "domein",
-                "sleutel_versie",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "domain",
+                "key_version",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
     PSEUDONYM_IRREVERSIBLE_DUAL_CREATED = LogEvent(  # PRS-PSE-003
@@ -72,19 +85,19 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "domein",
-                "sleutel_versie_oud",
-                "sleutel_versie_actueel",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "domain",
+                "previous_key_version",
+                "current_key_version",
             ),
             _SIEM: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "sleutel_versie_oud",
-                "sleutel_versie_actueel",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "previous_key_version",
+                "current_key_version",
             ),
         },
     )
@@ -94,12 +107,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
                 "error_type",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "error_type",
+            ),
         },
     )
     PERSONAL_ID_VALIDATION_FAILED = LogEvent(  # PRS-PSE-005
@@ -107,8 +125,12 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "namens_oin", "validation_error"),
-            _SIEM: ("handelende_oin", "validation_error"),
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "validation_error",
+            ),
+            _SIEM: ("acting_organization_identifier", "validation_error"),
         },
     )
 
@@ -118,14 +140,18 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "domein",
-                "sleutel_versie",
-                "ontvanger_pubkey_id",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "domain",
+                "key_version",
+                "recipient_pubkey_id",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
     PERSONAL_ID_EXCHANGE_FAILED = LogEvent(
@@ -134,12 +160,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
                 "error_type",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "error_type",
+            ),
         },
     )
     EXCHANGE_REFUSED_NO_ACTIVE_PUBKEY = LogEvent(
@@ -147,8 +178,15 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "namens_oin", "doel_oin"),
-            _SIEM: ("handelende_oin", "doel_oin"),
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
+            _SIEM: (
+                "acting_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
 
@@ -160,13 +198,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "oprf_secret_versie",
-                "ontvanger_pubkey_id",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "oprf_secret_version",
+                "recipient_pubkey_id",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
     OPRF_EVAL_FAILED = LogEvent(  # PRS-OPRF-003
@@ -175,12 +217,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
                 "error_type",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "error_type",
+            ),
         },
     )
     OPRF_REFUSED_NO_ACTIVE_PUBKEY = LogEvent(  # PRS-OPRF-004
@@ -188,8 +235,15 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "namens_oin", "doel_oin"),
-            _SIEM: ("handelende_oin", "doel_oin"),
+            _APP: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
+            _SIEM: (
+                "acting_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
 
@@ -204,14 +258,18 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
-                "domein",
-                "saml_decrypt_key_versie",
-                "sleutel_versie",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "domain",
+                "saml_decrypt_key_version",
+                "key_version",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+            ),
         },
     )
     SAML_EXCHANGE_FAILED = LogEvent(  # PRS-SAML-002
@@ -220,12 +278,17 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
-                "handelende_oin",
-                "namens_oin",
-                "doel_oin",
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
                 "error_type",
             ),
-            _SIEM: ("handelende_oin", "namens_oin", "doel_oin", "error_type"),
+            _SIEM: (
+                "acting_organization_identifier",
+                "represented_organization_identifier",
+                "recipient_organization_identifier",
+                "error_type",
+            ),
         },
     )
 
@@ -241,12 +304,12 @@ class Log(_Base):
         {
             _APP: (
                 "key_type",
-                "organisatie_oin",
-                "domein",
+                "organization_identifier",
+                "domain",
                 "secret_id",
-                "sleutel_versie",
+                "key_version",
             ),
-            _SIEM: ("key_type", "organisatie_oin"),
+            _SIEM: ("key_type", "organization_identifier"),
         },
     )
     KEY_ROTATION_STARTED = LogEvent(  # PRS-KEY-002
@@ -256,12 +319,17 @@ class Log(_Base):
         {
             _APP: (
                 "key_type",
-                "organisatie_oin",
-                "domein",
-                "oude_versie",
-                "nieuwe_versie",
+                "organization_identifier",
+                "domain",
+                "previous_version",
+                "new_version",
             ),
-            _SIEM: ("key_type", "organisatie_oin", "oude_versie", "nieuwe_versie"),
+            _SIEM: (
+                "key_type",
+                "organization_identifier",
+                "previous_version",
+                "new_version",
+            ),
         },
     )
     KEY_GRACE_STARTED = LogEvent(  # PRS-KEY-003
@@ -271,12 +339,12 @@ class Log(_Base):
         {
             _APP: (
                 "key_type",
-                "organisatie_oin",
-                "oude_versie",
+                "organization_identifier",
+                "previous_version",
                 "grace_start",
-                "grace_eind",
+                "grace_end",
             ),
-            _SIEM: ("key_type", "organisatie_oin", "oude_versie"),
+            _SIEM: ("key_type", "organization_identifier", "previous_version"),
         },
     )
     KEY_VERSION_DESTROYED = LogEvent(  # PRS-KEY-004
@@ -284,8 +352,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("key_type", "organisatie_oin", "vernietigde_versie"),
-            _SIEM: ("key_type", "organisatie_oin", "vernietigde_versie"),
+            _APP: ("key_type", "organization_identifier", "destroyed_version"),
+            _SIEM: ("key_type", "organization_identifier", "destroyed_version"),
         },
     )
     DECRYPT_PUBKEY_REGISTERED = LogEvent(  # PRS-KEY-005
@@ -293,8 +361,13 @@ class Log(_Base):
         logging.INFO,
         (_APP, _SIEM),
         {
-            _APP: ("organisatie_oin", "key_algoritme", "key_lengte", "key_versie"),
-            _SIEM: ("organisatie_oin", "key_algoritme"),
+            _APP: (
+                "organization_identifier",
+                "key_algorithm",
+                "key_length",
+                "key_version",
+            ),
+            _SIEM: ("organization_identifier", "key_algorithm"),
         },
     )
     DECRYPT_PUBKEY_REJECTED = LogEvent(  # PRS-KEY-006
@@ -302,8 +375,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("organisatie_oin", "key_algoritme", "rejection_reason"),
-            _SIEM: ("organisatie_oin", "key_algoritme", "rejection_reason"),
+            _APP: ("organization_identifier", "key_algorithm", "rejection_reason"),
+            _SIEM: ("organization_identifier", "key_algorithm", "rejection_reason"),
         },
     )
     HSM_OPERATION_FAILED = LogEvent(  # PRS-KEY-007
@@ -331,7 +404,7 @@ class Log(_Base):
         },
     )
     SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("270401").add_fields(  # PRS-SYS-001
-        fields={_APP: ("oauth_enabled", "pseudoniem_api_enabled")},
+        fields={_APP: ("oauth_enabled", "pseudonym_api_enabled")},
     )
     SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("270402")  # PRS-SYS-002
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("270402")  # PRS-SYS-002

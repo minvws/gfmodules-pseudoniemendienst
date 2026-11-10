@@ -171,8 +171,8 @@ def exchange_reversible_pseudonym(
         "Reversible pseudonym created",
         fields={
             **audit.fields(),
-            "domein": req.recipientScope,
-            "sleutel_versie": pseudonym.version,
+            "domain": req.recipientScope,
+            "key_version": pseudonym.version,
         },
     )
     return Response(status_code=201, content=token, media_type="application/jwe")

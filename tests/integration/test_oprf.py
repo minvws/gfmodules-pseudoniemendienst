@@ -225,18 +225,18 @@ def test_oprf_eval_success_emits_audit_event(
     record = events[0]
     assert record.levelno == logging.INFO
     assert (
-        record.handelende_oin == valid_client_organization_id.value  # type: ignore
+        record.acting_organization_identifier == valid_client_organization_id.value  # type: ignore
     )
     assert (
-        record.namens_oin  # type: ignore
+        record.represented_organization_identifier  # type: ignore
         == valid_organization_id.value
     )
     assert (
-        record.doel_oin  # type: ignore
+        record.recipient_organization_identifier  # type: ignore
         == oprf_context.recipient_organization
     )
-    assert record.oprf_secret_versie == 1  # type: ignore[attr-defined]
-    assert record.ontvanger_pubkey_id  # type: ignore[attr-defined]
+    assert record.oprf_secret_version == 1  # type: ignore[attr-defined]
+    assert record.recipient_pubkey_id  # type: ignore[attr-defined]
     assert LoggingStreams.SIEM in record.stream  # type: ignore
 
     # Ensure no failure events were emitted
@@ -284,8 +284,14 @@ def test_oprf_eval_unknown_scope_emits_refused_event(
     assert len(events) == 1
     entry = events[0]
     assert entry.record.levelno == logging.WARNING
-    assert entry.message["handelende_oin"] == valid_client_organization_id.value
-    assert entry.message["doel_oin"] == oprf_context.recipient_organization
+    assert (
+        entry.message["acting_organization_identifier"]
+        == valid_client_organization_id.value
+    )
+    assert (
+        entry.message["recipient_organization_identifier"]
+        == oprf_context.recipient_organization
+    )
     assert not captured.for_event(Log.OPRF_EVAL_OK)
 
 
@@ -336,7 +342,7 @@ def test_oprf_eval_unknown_recipient_emits_refused_event(
     events = [r for r in handler.records if getattr(r, "event_id", None) == "210403"]
     assert len(events) == 1
     assert (
-        events[0].doel_oin  # type: ignore
+        events[0].recipient_organization_identifier  # type: ignore
         == f"oin:{persisted_organization.external_id.value}"
     )
     assert not [r for r in handler.records if getattr(r, "event_id", None) == "210400"]
@@ -376,7 +382,10 @@ def test_oprf_eval_sender_not_allowed_to_request_is_refused_and_audited(
     events = captured.for_event(Log.AUTHORIZATION_DENIED)
     assert len(events) == 1
     assert events[0].message["requested_operation"] == "oprf:eval"
-    assert events[0].message["doel_oin"] == oprf_context.recipient_organization
+    assert (
+        events[0].message["recipient_organization_identifier"]
+        == oprf_context.recipient_organization
+    )
     assert not captured.for_event(Log.OPRF_EVAL_OK)
 
 
@@ -428,8 +437,11 @@ def test_oprf_eval_failure_emits_failed_event_with_error_type(
     record = events[0]
     assert record.levelno == logging.ERROR
     assert record.error_type == "invalid_blinded_input"  # type: ignore
-    assert record.handelende_oin == valid_client_organization_id.value  # type: ignore
-    assert record.doel_oin == oprf_context.recipient_organization  # type: ignore
+    assert record.acting_organization_identifier == valid_client_organization_id.value  # type: ignore
+    assert (
+        record.recipient_organization_identifier  # type: ignore
+        == oprf_context.recipient_organization
+    )
     assert not [r for r in handler.records if getattr(r, "event_id", None) == "210400"]
 
 

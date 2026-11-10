@@ -34,13 +34,18 @@ def test_the_event_overview_is_current() -> None:
 def test_emit_attaches_event_id_and_streams() -> None:
     logger = logging.getLogger("app.test_events")
     with capture_records("app.test_events") as records:
-        gflog.emit(logger, Log.OPRF_EVAL_OK, "evaluated", fields={"doel_oin": "oin:x"})
+        gflog.emit(
+            logger,
+            Log.OPRF_EVAL_OK,
+            "evaluated",
+            fields={"recipient_organization_identifier": "oin:x"},
+        )
 
     record = records.entries[-1].record
     assert record.event_id == Log.OPRF_EVAL_OK.event_id  # type: ignore
     assert LoggingStreams.APP in record.stream  # type: ignore[attr-defined]
     assert LoggingStreams.SIEM in record.stream  # type: ignore[attr-defined]
-    assert record.doel_oin == "oin:x"  # type: ignore[attr-defined]
+    assert record.recipient_organization_identifier == "oin:x"  # type: ignore[attr-defined]
     assert record.levelno == logging.INFO
 
 
@@ -95,7 +100,7 @@ def test_the_started_event_keeps_the_shared_allow_list_and_adds_this_services_ow
     assert set(DefaultEventCatalogue.SYS_APP_STARTED.fields[LoggingStreams.APP]) <= set(
         allowed
     )
-    assert {"oauth_enabled", "pseudoniem_api_enabled"} <= set(allowed)
+    assert {"oauth_enabled", "pseudonym_api_enabled"} <= set(allowed)
 
 
 def test_emit_includes_exc_info() -> None:
