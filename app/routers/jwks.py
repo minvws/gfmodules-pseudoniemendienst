@@ -8,11 +8,11 @@ from app.services.jwt_signer import JwtSigningService
 
 router = APIRouter()
 
-JWKS_MAX_AGE_SECONDS = 15 * 60
+JWKS_MAX_AGE_SECONDS = 60 * 60
 
 
 @router.get(
-    "/.well-known/jwks",
+    "/.well-known/jwks.json",
     summary="Public keys for verifying signed pseudonyms",
     description=(
         "Returns the JSON Web Key Set (RFC 7517) with the public keys the PRS "
