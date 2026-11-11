@@ -264,7 +264,6 @@ def run() -> None:
 def application_init() -> None:
     setup_logging()
     gflog.install_excepthook(logger)
-    gflog.install_signal_handlers()
 
 
 def create_fastapi_app() -> FastAPI:
@@ -349,10 +348,7 @@ def setup_fastapi() -> FastAPI:
         dependencies=gf_header_params(config.uvicorn.document_gf_headers),
     )
 
-    fastapi.add_middleware(
-        RequestContextMiddleware,
-        correlation_id_expected=config.logging.correlation_id_expected,
-    )
+    fastapi.add_middleware(RequestContextMiddleware)
     fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
     install_app_error_handler(fastapi)
     install_validation_error_handler(fastapi)
