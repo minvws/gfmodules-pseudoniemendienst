@@ -5,7 +5,11 @@ from gfmodules.logging import LogEvent
 
 from app.db.models.organization_public_key import OrganizationPublicKeyEntity
 from app.enums.personal_id_type import PersonalIdType
-from app.exceptions.access import AccessError
+from app.exceptions.access import (
+    AccessError,
+    NotAllowedToRequestError,
+    RecipientNotFoundError,
+)
 from app.exceptions.base import AppError
 from app.exceptions.pseudonym import InvalidPersonalIdError, PseudonymOperationError
 from app.logging.events import Log
@@ -30,15 +34,24 @@ def authorize_exchange(
     personal_id_type: PersonalIdType,
     operation: str,
 ) -> None:
-    def deny(reason: str, error: AccessError) -> None:
+    audit = ExchangeAudit.from_auth(auth, recipient).fields()
+
+    def deny(reason: str, missing_flag: str, error: AccessError) -> None:
+        if personal_id_type is PersonalIdType.PERSONAL_ID and isinstance(
+            error, (NotAllowedToRequestError, RecipientNotFoundError)
+        ):
+            gflog.emit(
+                logger,
+                Log.PERSONAL_ID_EXCHANGE_REFUSED,
+                f"Personal ID exchange refused ({reason}): {error.message}",
+                fields={**audit, "missing_flag": missing_flag},
+            )
+            return
         gflog.emit(
             logger,
             Log.AUTHORIZATION_DENIED,
             f"Authorization denied ({reason}): {error.message}",
-            fields={
-                **ExchangeAudit.from_auth(auth, recipient).fields(),
-                "requested_operation": operation,
-            },
+            fields={**audit, "requested_operation": operation},
         )
 
     try:
@@ -46,13 +59,13 @@ def authorize_exchange(
             auth.claims.organization_id, personal_id_type
         )
     except AccessError as e:
-        deny(f"sender_may_not_request_{personal_id_type}", e)
+        deny(f"sender_may_not_request_{personal_id_type}", "request_personal_id", e)
         raise
 
     try:
         authorization_service.validate_allowed_to_receive(recipient, personal_id_type)
     except AccessError as e:
-        deny(f"recipient_may_not_receive_{personal_id_type}", e)
+        deny(f"recipient_may_not_receive_{personal_id_type}", "receive_personal_id", e)
         raise
 
 

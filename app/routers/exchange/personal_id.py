@@ -15,11 +15,7 @@ from app.logging.exchange_audit import ExchangeAudit
 from app.models.auth.context import AuthContext
 from app.models.auth.data import AuthorizationScope
 from app.models.requests.exchange import ReversiblePseudonymInputRequest
-from app.routers.exchange.support import (
-    authorize_exchange,
-    get_recipient_public_key,
-    log_pseudonym_failure,
-)
+from app.routers.exchange.support import authorize_exchange, get_recipient_public_key
 from app.services.authorization_service import AuthorizationService
 from app.services.jwe_token import JweTokenService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -132,12 +128,16 @@ def exchange_personal_id(
             req.reversiblePseudonym, auth.claims.organization_id
         )
     except PseudonymOperationError as e:
-        log_pseudonym_failure(
+        gflog.emit(
             logger,
-            audit,
-            e,
             Log.PERSONAL_ID_EXCHANGE_FAILED,
             "Personal ID exchange failed",
+            exc_info=e,
+            fields={
+                **audit.fields(),
+                "error_type": e.error_type,
+                "artifact_version": e.key_version,
+            },
         )
         raise
 
@@ -148,15 +148,27 @@ def exchange_personal_id(
         pub_key=JWK(**public_key.jwk),
     )
 
+    versions = {
+        "artifact_version": reversed_pseudonym.version,
+        "key_version": reversed_pseudonym.current_version,
+    }
     gflog.emit(
         logger,
         Log.PERSONAL_ID_EXCHANGED,
         "Personal ID exchanged",
         fields={
             **audit.fields(),
+            **versions,
+            "source_artifact_type": "reversible_pseudonym",
             "domain": req.recipientScope,
-            "key_version": reversed_pseudonym.version,
             "recipient_pubkey_id": public_key.jwk.get("kid"),
         },
     )
+    if reversed_pseudonym.version < reversed_pseudonym.current_version:
+        gflog.emit(
+            logger,
+            Log.PERSONAL_ID_EXCHANGED_FROM_GRACE_VERSION,
+            "Personal ID exchanged from a key version in its grace period",
+            fields={**audit.fields(), **versions},
+        )
     return Response(status_code=201, content=token, media_type="application/jwe")
