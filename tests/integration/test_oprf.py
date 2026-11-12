@@ -29,7 +29,7 @@ from app.logging.events import Log
 from app.models.oin import Oin
 from app.services.authorization_service import AuthorizationService
 from app.services.oprf.evaluators import LocalOprfEvaluator
-from app.services.oprf.oprf_service import OprfService
+from app.services.oprf.oprf_service import OprfEvalResult, OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
 from tests.conftest import setup_org_and_key
 
@@ -236,6 +236,7 @@ def test_oprf_eval_success_emits_audit_event(
         == oprf_context.recipient_organization
     )
     assert record.oprf_secret_version == 1  # type: ignore[attr-defined]
+    assert not hasattr(record, "previous_oprf_secret_version")
     assert record.recipient_pubkey_id  # type: ignore[attr-defined]
     assert LoggingStreams.SIEM in record.stream  # type: ignore
 
@@ -248,6 +249,53 @@ def test_oprf_eval_success_emits_audit_event(
         r for r in handler.records if getattr(r, "event_id", None) == "210403"
     ]
     assert len(no_active_key_events) == 0
+
+
+def test_oprf_eval_during_grace_logs_the_previous_secret_version(
+    app: FastAPI,
+    client: TestClient,
+    oprf_context: OprfIntegrationContext,
+    valid_headers: dict[str, str],
+    valid_client_organization_id: Oin,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class GraceOprfService:
+        def eval_blind(self, req: object, pub_key_jwk: object) -> OprfEvalResult:
+            return OprfEvalResult(jwe="jwe", key_versions=(1, 2))
+
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        container.get_oprf_service,
+        lambda: GraceOprfService(),
+    )
+
+    with capture_records("app.routers.oprf") as captured:
+        response = client.post(
+            "/oprf/eval",
+            json={
+                "encryptedPersonalId": "Zm9v",
+                "recipientOrganization": oprf_context.recipient_organization,
+                "recipientScope": oprf_context.recipient_scope,
+            },
+            headers=valid_headers,
+        )
+
+    assert response.status_code == 200
+    events = captured.for_event(Log.OPRF_EVAL_OK)
+    assert len(events) == 1
+    entry = events[0]
+    assert entry.record.levelno == logging.INFO
+    assert entry.message["previous_oprf_secret_version"] == 1
+    assert entry.message["oprf_secret_version"] == 2
+    assert entry.message["recipient_pubkey_id"]
+    assert (
+        entry.message["acting_organization_identifier"]
+        == valid_client_organization_id.value
+    )
+    assert (
+        entry.message["recipient_organization_identifier"]
+        == oprf_context.recipient_organization
+    )
 
 
 def test_oprf_eval_unknown_scope_emits_refused_event(
