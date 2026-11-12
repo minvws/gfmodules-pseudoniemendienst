@@ -441,6 +441,12 @@ class Log(_Base):
             _SIEM: ("organization_identifier", "key_version"),
         },
     )
+    KEY_CLEANUP_FAILED = LogEvent(
+        "250408",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {_APP: ("error_reason",), _SIEM: ("error_reason",)},
+    )
     HSM_OPERATION_FAILED = LogEvent(  # PRS-KEY-007
         "250406",
         logging.ERROR,
@@ -482,6 +488,26 @@ class Log(_Base):
             _APP: ("error_type", "retry_attempt", "backoff_seconds"),
             _SIEM: ("error_type",),
         },
+    )
+    SYS_DB_SCHEMA_ERROR = LogEvent(
+        "270405",
+        logging.ERROR,
+        (_APP,),
+        {
+            _APP: (
+                "exception_type",
+                "table",
+                "column",
+                "value_length",
+                "column_limit",
+            ),
+        },
+    )
+    SYS_DB_OPERATION_FAILED = LogEvent(
+        "270426",
+        logging.WARNING,
+        (_APP,),
+        {_APP: ("exception_type", "table", "constraint")},
     )
     SYS_HSM_UNREACHABLE = LogEvent(  # PRS-SYS-006
         "270406",
