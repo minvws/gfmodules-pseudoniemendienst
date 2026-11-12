@@ -26,7 +26,8 @@ Every event carries these on every stream, whenever the request context holds a 
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation` |
+| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation`, `error_reason` |
+| `MISSING_AUTHORIZATION_HEADER` | 200404 | WARNING | `error_reason` |
 | `PSEUDONYM_REVERSIBLE_CREATED` | 220400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `key_version` |
 | `PSEUDONYM_IRREVERSIBLE_CREATED` | 220401 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `key_version` |
 | `PSEUDONYM_IRREVERSIBLE_DUAL_CREATED` | 220402 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `domain`, `previous_key_version`, `current_key_version` |
@@ -48,6 +49,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `KEY_VERSION_DESTROYED` | 250403 | WARNING | `key_type`, `organization_identifier`, `destroyed_version` |
 | `DECRYPT_PUBKEY_REGISTERED` | 250404 | INFO | `organization_identifier`, `key_algorithm`, `key_length`, `key_version` |
 | `DECRYPT_PUBKEY_REJECTED` | 250405 | WARNING | `organization_identifier`, `key_algorithm`, `rejection_reason` |
+| `DECRYPT_PUBKEY_DELETED` | 250407 | WARNING | `organization_identifier`, `key_version` |
 | `HSM_OPERATION_FAILED` | 250406 | ERROR | `operation_type`, `error_reason`, `retry_attempt` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path`, `pseudonym_api_enabled` |
@@ -63,7 +65,8 @@ Every event carries these on every stream, whenever the request context holds a 
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation` |
+| `AUTHORIZATION_DENIED` | 200402 | WARNING | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `requested_operation`, `error_reason` |
+| `MISSING_AUTHORIZATION_HEADER` | 200404 | WARNING | `error_reason` |
 | `PSEUDONYM_REVERSIBLE_CREATED` | 220400 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
 | `PSEUDONYM_IRREVERSIBLE_CREATED` | 220401 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier` |
 | `PSEUDONYM_IRREVERSIBLE_DUAL_CREATED` | 220402 | INFO | `acting_organization_identifier`, `represented_organization_identifier`, `recipient_organization_identifier`, `previous_key_version`, `current_key_version` |
@@ -85,6 +88,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `KEY_VERSION_DESTROYED` | 250403 | WARNING | `key_type`, `organization_identifier`, `destroyed_version` |
 | `DECRYPT_PUBKEY_REGISTERED` | 250404 | INFO | `organization_identifier`, `key_algorithm` |
 | `DECRYPT_PUBKEY_REJECTED` | 250405 | WARNING | `organization_identifier`, `key_algorithm`, `rejection_reason` |
+| `DECRYPT_PUBKEY_DELETED` | 250407 | WARNING | `organization_identifier`, `key_version` |
 | `HSM_OPERATION_FAILED` | 250406 | ERROR | `operation_type`, `error_reason` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |

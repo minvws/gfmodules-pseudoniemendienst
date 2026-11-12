@@ -51,7 +51,7 @@ def authorize_exchange(
             logger,
             Log.AUTHORIZATION_DENIED,
             f"Authorization denied ({reason}): {error.message}",
-            fields={**audit, "requested_operation": operation},
+            fields={**audit, "requested_operation": operation, "error_reason": reason},
         )
 
     try:
