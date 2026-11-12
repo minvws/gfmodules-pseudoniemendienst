@@ -6,7 +6,7 @@ including authorization, pseudonym generation, JWE encryption, and audit logging
 
 import logging
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -70,7 +70,7 @@ def irreversible_pseudonym_sender_org(
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(org)
@@ -658,7 +658,7 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
         receive_personal_id_types=[],
         request_personal_id_types=list(personal_ids),  # Only reversible
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(unauthorized_sender)
@@ -720,7 +720,7 @@ def test_recipient_not_allowed_to_receive_is_refused(
         receive_personal_id_types=list(personal_ids),  # Only reversible
         request_personal_id_types=[],
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(unauthorized_recipient)
@@ -776,7 +776,7 @@ def test_recipient_without_public_key_for_scope_is_not_found(
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=[],
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(recipient_org)
@@ -902,7 +902,7 @@ def test_reversible_pseudonym_with_destroyed_key_version_is_gone(
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=[],
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(recipient_org)

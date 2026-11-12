@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import gfmodules.logging as gflog
@@ -146,7 +146,7 @@ class OrganizationPublicKeyService:
         if "oin" not in payload:
             raise InvalidJwsError("Missing 'oin' in payload")
         if (
-            datetime.fromtimestamp(payload["iat"], tz=timezone.utc) + timedelta(hours=1)
+            datetime.fromtimestamp(payload["iat"], tz=UTC) + timedelta(hours=1)
             < now_utc()
         ):
             raise InvalidJwsError("JWS expired")

@@ -5,7 +5,7 @@ for various endpoints, including OPRF, administration, and reversible pseudonym 
 """
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from starlette.testclient import TestClient
@@ -248,7 +248,7 @@ def test_exchange_routes_require_authentication(
         receive_personal_id_types=list(id_types),
         request_personal_id_types=list(id_types),
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(test_org)

@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -274,7 +274,7 @@ def test_pseudonym_changes_with_input_scope_organization_and_version_local(
         receive_personal_id_types=[],
         request_personal_id_types=[],
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(other_org)
@@ -500,7 +500,7 @@ def test_latest_active_version_is_used_and_older_ones_still_reverse_local(
     )
 
     # Add version 2 for the organization
-    new_version = HsmKeyVersionEntity(version=2, from_dt=datetime.now(timezone.utc))
+    new_version = HsmKeyVersionEntity(version=2, from_dt=datetime.now(UTC))
     persisted_organization.hsm_key_versions.append(new_version)
     db_session.commit()
 
@@ -563,7 +563,7 @@ def test_reverse_for_another_organization_fails_local(
         receive_personal_id_types=[],
         request_personal_id_types=[],
         hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         ],
     )
     db_session.add(other_org)

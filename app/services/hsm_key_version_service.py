@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import gfmodules.logging as gflog
@@ -184,7 +184,7 @@ class HsmKeyVersionService:
                         "key_type": KEY_TYPE_OPRF_SECRET,
                         "organization_identifier": organization_external_id.value,
                         "previous_version": version.version,
-                        "grace_start": datetime.now(timezone.utc).isoformat(),
+                        "grace_start": datetime.now(UTC).isoformat(),
                         "grace_end": until_dt.isoformat(),
                     },
                 )
