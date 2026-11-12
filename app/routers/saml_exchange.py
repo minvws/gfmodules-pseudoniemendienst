@@ -47,7 +47,7 @@ def post_reversible_pseudonym(
         SamlServiceClient, Depends(container.get_saml_service_client)
     ],
 ) -> JSONResponse:
-    handelende_oin = str(auth.claims.client_organization_id)
+    acting_organization_identifier = str(auth.claims.client_organization_id)
 
     try:
         result = saml_client.decrypt(payload)
@@ -57,7 +57,7 @@ def post_reversible_pseudonym(
             Log.SAML_EXCHANGE_FAILED,
             "SAML exchange failed: PRS-SAML service error",
             fields={
-                "handelende_oin": handelende_oin,
+                "acting_organization_identifier": acting_organization_identifier,
                 "error_type": e.error_type,
             },
         )
@@ -67,6 +67,6 @@ def post_reversible_pseudonym(
         logger,
         Log.SAML_EXCHANGE_OK,
         "SAML exchange succeeded (mock: request echoed via PRS-SAML)",
-        fields={"handelende_oin": handelende_oin},
+        fields={"acting_organization_identifier": acting_organization_identifier},
     )
     return JSONResponse(jsonable_encoder(result))

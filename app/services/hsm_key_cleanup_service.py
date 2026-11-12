@@ -79,7 +79,7 @@ class HsmKeyCleanupService:
                     "expired HSM key version destroyed",
                     fields={
                         "key_type": key_type,
-                        "organisatie_oin": oin.value,
-                        "vernietigde_versie": version.version,
+                        "organization_identifier": oin.value,
+                        "destroyed_version": version.version,
                     },
                 )

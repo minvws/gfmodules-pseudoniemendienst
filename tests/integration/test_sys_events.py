@@ -62,7 +62,7 @@ def test_startup_emits_sys_app_started(record_logs: RecordLogs, app: FastAPI) ->
     record = events[0]
     assert record.levelno == logging.INFO
     assert record.version  # type: ignore[attr-defined]
-    assert record.pseudoniem_api_enabled is True  # type: ignore[attr-defined]
+    assert record.pseudonym_api_enabled is True  # type: ignore[attr-defined]
 
 
 def test_lifespan_shutdown_emits_sys_app_stopped(

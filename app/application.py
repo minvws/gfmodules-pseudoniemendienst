@@ -299,7 +299,7 @@ async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
         version=_read_version(),
         config_path=os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME, _PATH),
         started_fields={
-            "pseudoniem_api_enabled": config.app.enable_exchange_services_routes,
+            "pseudonym_api_enabled": config.app.enable_exchange_services_routes,
         },
     ):
         yield

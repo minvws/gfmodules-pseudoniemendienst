@@ -146,9 +146,9 @@ class HsmKeyVersionService:
                 "HSM key version rotation started",
                 fields={
                     "key_type": KEY_TYPE_OPRF_SECRET,
-                    "organisatie_oin": organization_external_id.value,
-                    "oude_versie": current_version,
-                    "nieuwe_versie": hsm_key_version.version,
+                    "organization_identifier": organization_external_id.value,
+                    "previous_version": current_version,
+                    "new_version": hsm_key_version.version,
                 },
             )
             return hsm_key_version
@@ -182,10 +182,10 @@ class HsmKeyVersionService:
                     "HSM key version grace period started",
                     fields={
                         "key_type": KEY_TYPE_OPRF_SECRET,
-                        "organisatie_oin": organization_external_id.value,
-                        "oude_versie": version.version,
+                        "organization_identifier": organization_external_id.value,
+                        "previous_version": version.version,
                         "grace_start": datetime.now(timezone.utc).isoformat(),
-                        "grace_eind": until_dt.isoformat(),
+                        "grace_end": until_dt.isoformat(),
                     },
                 )
             return version.to_dict()
