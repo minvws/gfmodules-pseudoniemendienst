@@ -273,9 +273,7 @@ def test_pseudonym_changes_with_input_scope_organization_and_version_local(
         name="other org",
         receive_personal_id_types=[],
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(other_org)
     db_session.commit()
@@ -562,9 +560,7 @@ def test_reverse_for_another_organization_fails_local(
         name="other org",
         receive_personal_id_types=[],
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(other_org)
     db_session.commit()

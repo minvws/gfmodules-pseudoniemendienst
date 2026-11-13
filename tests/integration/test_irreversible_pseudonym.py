@@ -69,9 +69,7 @@ def irreversible_pseudonym_sender_org(
         name="irreversible pseudonym sender org",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(org)
     db_session.commit()
@@ -657,9 +655,7 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
         name="unauthorized sender org",
         receive_personal_id_types=[],
         request_personal_id_types=list(personal_ids),  # Only reversible
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(unauthorized_sender)
     db_session.commit()
@@ -719,9 +715,7 @@ def test_recipient_not_allowed_to_receive_is_refused(
         name="unauthorized recipient org",
         receive_personal_id_types=list(personal_ids),  # Only reversible
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(unauthorized_recipient)
     db_session.commit()
@@ -775,9 +769,7 @@ def test_recipient_without_public_key_for_scope_is_not_found(
         name="recipient without public key for scope",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(recipient_org)
     db_session.commit()
@@ -901,9 +893,7 @@ def test_reversible_pseudonym_with_destroyed_key_version_is_gone(
         name="recipient org for destroyed key version test",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(recipient_org)
     db_session.commit()

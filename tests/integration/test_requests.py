@@ -235,9 +235,7 @@ def test_hsm_key_version_request_until_dt_with_no_from_dt_defaults_to_now() -> N
 
 
 def test_hsm_key_version_request_rejects_naive_datetimes() -> None:
-    naive_from_dt = (datetime.now(UTC) + timedelta(days=1)).replace(
-        tzinfo=None
-    )
+    naive_from_dt = (datetime.now(UTC) + timedelta(days=1)).replace(tzinfo=None)
 
     try:
         HsmKeyVersionRequest(from_dt=naive_from_dt)
@@ -263,9 +261,7 @@ def test_hsm_key_version_update_request_rejects_unknown_fields() -> None:
 
 
 def test_hsm_key_version_update_request_rejects_naive_datetime() -> None:
-    naive_until_dt = (datetime.now(UTC) + timedelta(days=1)).replace(
-        tzinfo=None
-    )
+    naive_until_dt = (datetime.now(UTC) + timedelta(days=1)).replace(tzinfo=None)
 
     try:
         HsmKeyVersionUpdateRequest(until_dt=naive_until_dt)
@@ -308,9 +304,7 @@ def test_hsm_key_version_request_accepts_timezone_aware_dates() -> None:
     assert request.from_dt.tzinfo is not None
     assert request.until_dt.tzinfo is not None
     assert request.from_dt.astimezone(UTC) == from_dt.astimezone(UTC)
-    assert request.until_dt.astimezone(UTC) == until_dt.astimezone(
-        UTC
-    )
+    assert request.until_dt.astimezone(UTC) == until_dt.astimezone(UTC)
 
 
 def test_hsm_key_version_update_request_accepts_timezone_aware_dates() -> None:

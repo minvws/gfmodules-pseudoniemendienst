@@ -247,9 +247,7 @@ def test_exchange_routes_require_authentication(
         name="test_org_exchange",
         receive_personal_id_types=list(id_types),
         request_personal_id_types=list(id_types),
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(test_org)
     db_session.commit()

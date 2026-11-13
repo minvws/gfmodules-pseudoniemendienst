@@ -48,9 +48,7 @@ def test_hsm_key_version_request_should_raise_when_until_dt_before_from_dt() -> 
 
 
 def test_hsm_key_version_update_request_should_validate() -> None:
-    request = HsmKeyVersionUpdateRequest(
-        until_dt=datetime(2027, 1, 1, tzinfo=UTC)
-    )
+    request = HsmKeyVersionUpdateRequest(until_dt=datetime(2027, 1, 1, tzinfo=UTC))
     assert request.until_dt == datetime(2027, 1, 1, tzinfo=UTC)
 
 
