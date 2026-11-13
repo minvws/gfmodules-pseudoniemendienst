@@ -3,13 +3,12 @@ import random
 import types
 from collections.abc import Callable
 from time import sleep
-from typing import Any, TypeVar
+from typing import Any, Self, TypeVar
 
 import gfmodules.logging as gflog
 from sqlalchemy import Engine, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
-from typing_extensions import Self
 
 from app.config import get_config
 from app.db.models.base import Base

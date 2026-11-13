@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -28,7 +28,7 @@ def test_cleanup_removes_expired_keys_from_hsm_and_db(
     """Tests that expired keys are removed from HSM and marked as removed in DB."""
 
     version = persisted_organization.hsm_key_versions[0]
-    version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     mock_oprf_destroy = MagicMock(return_value=True)
@@ -75,7 +75,7 @@ def test_cleanup_destroys_every_pseudonym_key_of_the_version(
     """Tests that all pseudonym keys (OPRF, irreversible, reversible) are destroyed for a version."""
 
     version = persisted_organization.hsm_key_versions[0]
-    version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     mock_oprf_destroy = MagicMock(return_value=True)
@@ -119,7 +119,7 @@ def test_cleanup_marks_version_removed_when_no_keys_were_ever_created(
     """Tests that a version is marked as removed even if no HSM keys were ever created."""
 
     version = persisted_organization.hsm_key_versions[0]
-    version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     mock_oprf_destroy = MagicMock(return_value=False)
@@ -165,7 +165,7 @@ def test_cleanup_marks_version_removed_without_hsm(
     """Tests that a version is marked as removed without HSM (local keys only)."""
 
     version = persisted_organization.hsm_key_versions[0]
-    version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     mock_oprf_destroy = MagicMock(return_value=False)
@@ -213,7 +213,7 @@ def test_cleanup_keeps_version_when_hsm_destroy_fails(
     """Tests that a version is NOT marked as removed when HSM destroy fails."""
     # Mark the version as expired
     version = persisted_organization.hsm_key_versions[0]
-    version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     mock_expired_version = MagicMock(return_value=[version])

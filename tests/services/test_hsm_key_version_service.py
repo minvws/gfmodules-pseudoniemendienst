@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -90,7 +90,7 @@ def test_get_expired_versions_should_succeed(
     persisted_organization: OrganizationEntity,
 ) -> None:
     expired_version = persisted_organization.hsm_key_versions[0]
-    expired_version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    expired_version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     result = hsm_key_version_service.get_expired_versions()
@@ -157,7 +157,7 @@ def test_update_version_by_organization_id_should_succeed(
     persisted_organization: OrganizationEntity,
 ) -> None:
     version = persisted_organization.hsm_key_versions[0]
-    new_until_dt = datetime.now(timezone.utc) + timedelta(days=1)
+    new_until_dt = datetime.now(UTC) + timedelta(days=1)
 
     result = hsm_key_version_service.update_version_by_organization_id(
         version.id, persisted_organization.external_id, until_dt=new_until_dt
@@ -193,7 +193,7 @@ def test_update_version_by_organization_id_should_raise_when_version_removed(
     persisted_organization: OrganizationEntity,
 ) -> None:
     version = persisted_organization.hsm_key_versions[0]
-    version.removed_at = datetime.now(timezone.utc)
+    version.removed_at = datetime.now(UTC)
     db_session.commit()
 
     with pytest.raises(KeyVersionRemovedError):
@@ -229,7 +229,7 @@ def test_mark_removed_should_return_none_when_version_already_removed(
     persisted_organization: OrganizationEntity,
 ) -> None:
     version = persisted_organization.hsm_key_versions[0]
-    version.removed_at = datetime.now(timezone.utc)
+    version.removed_at = datetime.now(UTC)
     db_session.commit()
 
     result = hsm_key_version_service.mark_removed(version.id)
@@ -260,7 +260,7 @@ def test_get_active_versions_by_organization_id_should_return_empty_list(
     persisted_organization: OrganizationEntity,
 ) -> None:
     version = persisted_organization.hsm_key_versions[0]
-    version.until_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    version.until_dt = datetime.now(UTC) - timedelta(days=1)
     db_session.commit()
 
     result = hsm_key_version_service.get_active_versions_by_organization_id(
@@ -275,7 +275,7 @@ def test_get_expired_versions_filters(
     db_session: DbSession,
 ) -> None:
     """Tests that get_expired_versions() correctly filters expired versions."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Create 4 versions with different states and unique version numbers
     # 1. Expired (until_dt in the past)

@@ -8,7 +8,7 @@ and public key registration.
 import base64
 import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -60,7 +60,7 @@ def _add_expired_version(
     database: Database, organization: OrganizationEntity, version: int
 ) -> None:
     """Helper to add an expired HSM key version to the database."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with database.get_db_session() as session:
         session.add(
             HsmKeyVersionEntity(
@@ -576,7 +576,7 @@ def test_update_key_version_with_until_dt_emits_grace_started(
     records = record_logs("app.services.hsm_key_version_service")
     # Create a new key version first
     created = client.post("/administration/key-versions", headers=valid_headers).json()
-    until_dt = datetime.now(timezone.utc) + timedelta(days=30)
+    until_dt = datetime.now(UTC) + timedelta(days=30)
 
     response = client.put(
         f"/administration/key-versions/{created['id']}",
@@ -597,7 +597,7 @@ def test_update_key_version_with_until_dt_emits_grace_started(
     assert record.previous_version == created["version"]  # type: ignore
     assert record.grace_end == until_dt.isoformat()  # type: ignore
     grace_start = datetime.fromisoformat(record.grace_start)  # type: ignore[attr-defined]
-    assert grace_start <= datetime.now(timezone.utc)
+    assert grace_start <= datetime.now(UTC)
 
 
 def test_update_key_version_clearing_until_dt_emits_nothing(

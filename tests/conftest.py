@@ -3,7 +3,7 @@ import json
 import logging
 import secrets
 from collections.abc import Callable, Generator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -590,9 +590,7 @@ def org_with_irreversible_pseudonym_type(
         name="test org 2",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(new_org)
     db_session.commit()
@@ -627,9 +625,7 @@ def org_with_personal_id_type(
         name="test org 2",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(new_org)
     db_session.commit()
@@ -655,9 +651,7 @@ def create_organization(
         name="test_org",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(org)
     db_session.commit()
@@ -688,7 +682,7 @@ def create_signed_jws(
 ) -> str:
     key = JWK.from_pem(private_key_pem.encode())
     claims = {
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "iat": int(datetime.now(UTC).timestamp()),
         "oin": oin.value,
     }
     header = {"alg": algorithm, "jwk": key.export_public(as_dict=True)}

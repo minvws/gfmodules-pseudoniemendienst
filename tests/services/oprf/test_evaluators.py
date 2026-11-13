@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pyoprf
@@ -68,7 +68,7 @@ def test_hsm_oprf_evaluator_evaluate_should_return_results_for_multiple_versions
     persisted_organization: OrganizationEntity,
     db_session: DbSession,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     version2 = HsmKeyVersionEntity(
         organization_id=persisted_organization.id,
         version=2,

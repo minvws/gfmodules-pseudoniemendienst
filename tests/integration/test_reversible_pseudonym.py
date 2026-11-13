@@ -6,7 +6,7 @@ including authorization, pseudonym generation, JWE encryption, and audit logging
 
 import logging
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -140,9 +140,7 @@ def reversible_pseudonym_sender_org(
         name="reversible pseudonym sender org",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(org)
     db_session.commit()
@@ -163,7 +161,7 @@ def reversible_pseudonym_recipient_org(
     # Ensure the org has active key versions
     if not org_with_reversible_pseudonym_type.hsm_key_versions:
         org_with_reversible_pseudonym_type.hsm_key_versions.append(
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
+            HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))
         )
         db_session.commit()
 
@@ -240,9 +238,7 @@ def reversible_pseudonym_recipient_org_for_scope_test(
         name="reversible pseudonym recipient org for scope test",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(org)
     db_session.commit()
@@ -944,9 +940,7 @@ def test_sender_not_allowed_to_request_is_refused_before_anything_else(
         name="unauthorized sender org",
         receive_personal_id_types=[],
         request_personal_id_types=list(personal_ids),  # Only irreversible
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(unauthorized_sender)
     db_session.commit()
@@ -1004,9 +998,7 @@ def test_sender_permission_is_read_from_the_verified_caller_not_the_acting_org(
         name="unauthorized sender org",
         receive_personal_id_types=[],
         request_personal_id_types=list(personal_ids),  # Only irreversible
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(unauthorized_sender)
     db_session.commit()
@@ -1019,9 +1011,7 @@ def test_sender_permission_is_read_from_the_verified_caller_not_the_acting_org(
         request_personal_id_types=list(
             personal_ids
         ),  # Only irreversible (but this shouldn't matter)
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(authorized_acting)
     db_session.commit()
@@ -1073,9 +1063,7 @@ def test_recipient_not_allowed_to_receive_is_refused(
         name="unauthorized recipient org",
         receive_personal_id_types=list(personal_ids),  # Only irreversible
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(unauthorized_recipient)
     db_session.commit()
@@ -1156,9 +1144,7 @@ def test_recipient_permission_is_read_from_the_recipient_organization(
         name="authorized recipient org",
         receive_personal_id_types=list(personal_ids),  # Allowed to receive
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(authorized_recipient)
     db_session.commit()
@@ -1210,9 +1196,7 @@ def test_recipient_without_public_key_for_scope_is_not_found(
         name="recipient org without public key for scope",
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=[],
-        hsm_key_versions=[
-            HsmKeyVersionEntity(version=1, from_dt=datetime.now(timezone.utc))
-        ],
+        hsm_key_versions=[HsmKeyVersionEntity(version=1, from_dt=datetime.now(UTC))],
     )
     db_session.add(recipient_org)
     db_session.commit()
@@ -1285,7 +1269,7 @@ def test_recipient_without_active_key_version_is_not_found(
     # Now, mark all key versions as inactive
     for version in recipient_org.hsm_key_versions:
         # Mark as inactive
-        version.to_dt = datetime.now(timezone.utc)  # type: ignore
+        version.to_dt = datetime.now(UTC)  # type: ignore
     db_session.commit()
 
     # Attach the handler BEFORE making the request
