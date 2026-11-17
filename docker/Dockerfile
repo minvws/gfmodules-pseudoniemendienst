@@ -64,9 +64,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
     pip install poetry==${POETRY_VERSION}
 
-# Compile liboprf
+# Compile liboprf, pinned to the commit of tag v0.9.4: a tag can be moved, a commit hash cannot
+ARG LIBOPRF_COMMIT=ba45204806daeb5b1b249d7b35ca0035cba3d641
 WORKDIR /liboprf
-RUN git clone --depth 1 --branch v0.9.4 https://github.com/stef/liboprf.git . && \
+RUN git init -q . && \
+    git fetch --depth 1 https://github.com/stef/liboprf.git "${LIBOPRF_COMMIT}" && \
+    git checkout -q FETCH_HEAD && \
+    test "$(git rev-parse HEAD)" = "${LIBOPRF_COMMIT}" && \
     cd src && \
     make
 
