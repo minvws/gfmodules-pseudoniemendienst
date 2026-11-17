@@ -110,21 +110,32 @@ class ReversiblePseudonymService:
             )
             raise PseudonymVersionDestroyedError()
 
+        # The HSM removes the PKCS#7 padding itself (AES_CBC_PAD), so a bad
+        # padding fails the decrypt. To avoid a padding oracle through timing,
+        # a failed decrypt still derives an IV (the same two HSM HMAC calls as
+        # a valid one) and fails with the same error as an IV mismatch.
+        decrypt_error: Exception | None = None
         try:
             subject = self._keys.decrypt(recipient, version, iv, ciphertext)
+        except HSM_UNREACHABLE_ERRORS as e:
+            raise HsmUnreachableError() from e
+        except Exception as e:  # noqa: BLE001 - every decrypt failure must look alike, raised below
+            # wrong key, bad padding or corrupted data
+            decrypt_error = e
+            subject = ciphertext
+
+        try:
             expected_iv = self._derive_iv(recipient, version, subject)
         except HSM_UNREACHABLE_ERRORS as e:
             raise HsmUnreachableError() from e
         except Exception as e:
-            # wrong key, bad padding or corrupted data
-            logger.warning(
-                "reversible pseudonym decryption failed: %s", type(e).__name__
-            )
+            logger.warning("reversible pseudonym could not be verified")
             raise InvalidPseudonymError() from e
 
-        if not hmac.compare_digest(iv, expected_iv):
-            logger.warning("reversible pseudonym integrity check failed")
-            raise InvalidPseudonymError()
+        iv_matches = hmac.compare_digest(iv, expected_iv)
+        if decrypt_error is not None or not iv_matches:
+            logger.warning("reversible pseudonym could not be verified")
+            raise InvalidPseudonymError() from decrypt_error
 
         parts = subject.decode("utf-8").split(DELIMITER)
         if len(parts) != 3 or parts[1] != recipient_organization(recipient):
