@@ -395,6 +395,39 @@ def test_reverse_should_raise_when_invalid_pseudonym_decryption_failed_hsm(
     assert exc_info.value.error_type == PseudonymErrorType.INVALID_PSEUDONYM
 
 
+def test_reverse_does_the_same_hsm_work_for_bad_padding_as_for_iv_mismatch_hsm(
+    reversible_pseudonym_service: ReversiblePseudonymService,
+    persisted_organization: OrganizationEntity,
+    version: int,
+    ciphertext: bytes,
+    iv: bytes,
+) -> None:
+    # A padding oracle needs bad padding to be distinguishable from a valid
+    # padding with a wrong IV; both must do the two HMAC calls and fail alike.
+    blob = bytes([1]) + version.to_bytes(2, "big") + ciphertext + iv
+    value = base64.urlsafe_b64encode(blob).decode("ascii")
+    hmac_mock = MagicMock(return_value=b"different_iv_data")
+    reversible_pseudonym_service._keys.hmac = hmac_mock  # type: ignore
+
+    reversible_pseudonym_service._keys.decrypt = MagicMock(  # type: ignore
+        side_effect=ValueError("Invalid padding")
+    )
+    with pytest.raises(InvalidPseudonymError) as bad_padding:
+        reversible_pseudonym_service.reverse(value, persisted_organization.external_id)
+    bad_padding_calls = hmac_mock.call_count
+
+    hmac_mock.reset_mock()
+    reversible_pseudonym_service._keys.decrypt = MagicMock(  # type: ignore
+        return_value=b"valid padding, wrong iv"
+    )
+    with pytest.raises(InvalidPseudonymError) as iv_mismatch:
+        reversible_pseudonym_service.reverse(value, persisted_organization.external_id)
+
+    assert bad_padding_calls == hmac_mock.call_count == 2
+    assert bad_padding.value.error_type == iv_mismatch.value.error_type
+    assert str(bad_padding.value) == str(iv_mismatch.value)
+
+
 def test_reverse_should_raise_when_iv_mismatch_hsm(
     reversible_pseudonym_service: ReversiblePseudonymService,
     persisted_organization: OrganizationEntity,
