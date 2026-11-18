@@ -209,6 +209,18 @@ docker run -ti --rm -p 6502:6502 \
   gfmodules-pseudoniemendienst
 ```
 
+## HSM JWT-signing key provisioning
+
+After migrations, run the module directly from the application root:
+
+```bash
+python -m tools.provision_hsm_keys
+```
+
+Uses JWT-signing settings and HSM mTLS, without database access.
+Disabled signing is a no-op; existing keys are reused, never replaced.
+See [the script](tools/provision_hsm_keys.py) for configuration details.
+
 ## OPRF Testing
 
 This system uses OPRF for pseudonym generation. To test this, there are some available endpoints:
