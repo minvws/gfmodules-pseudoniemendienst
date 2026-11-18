@@ -65,7 +65,9 @@ root_path =
 # ca_cert_file=secrets/hsm-ca.crt
 
 [local_keys]
-# Keys for dev and testing, used when [hsm] url is not set
+# Keys for dev and testing, used when [hsm] url is not set.
+# Must be enabled explicitly: without an HSM url and with enabled=False the service refuses to start.
+enabled=True
 # Master key for hkdf
 master_key=
 # File with base64 OPRF server key

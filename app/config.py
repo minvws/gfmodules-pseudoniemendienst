@@ -95,6 +95,9 @@ class ConfigHsm(BaseModel):
 class ConfigLocalKeys(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # Off by default, so a deployment without an HSM URL fails to start instead of
+    # silently falling back to these keys. Only for development and testing.
+    enabled: bool = Field(default=False)
     # SecretStr so the key material never appears in reprs or logs
     master_key: SecretStr = Field(default=SecretStr(""))
     oprf_server_key_file: str | None = Field(default=None)

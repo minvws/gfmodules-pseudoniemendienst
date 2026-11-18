@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from app.config import Config, ConfigHsm, ConfigLocalKeys
 from app.services.hsm_key_version_service import HsmKeyVersionService
@@ -44,6 +45,7 @@ def test_from_config_should_return_local_operations_when_url_is_not_set(
     config.hsm = MagicMock(spec=ConfigHsm)
     config.hsm.url = None
     config.local_keys = MagicMock(spec=ConfigLocalKeys)
+    config.local_keys.enabled = True
     config.local_keys.master_key = MagicMock()
     config.local_keys.master_key.get_secret_value.return_value = "valid_base64_key"
     config.local_keys.oprf_server_key_file = "/path/to/oprf_key"
@@ -73,6 +75,7 @@ def test_from_config_should_raise_value_error_when_master_key_is_empty(
     config.hsm = MagicMock(spec=ConfigHsm)
     config.hsm.url = None
     config.local_keys = MagicMock(spec=ConfigLocalKeys)
+    config.local_keys.enabled = True
     config.local_keys.master_key = MagicMock()
     config.local_keys.master_key.get_secret_value.return_value = ""
     config.local_keys.oprf_server_key_file = "/path/to/oprf_key"
@@ -88,6 +91,7 @@ def test_from_config_should_raise_value_error_when_master_key_is_too_short(
     config.hsm = MagicMock(spec=ConfigHsm)
     config.hsm.url = None
     config.local_keys = MagicMock(spec=ConfigLocalKeys)
+    config.local_keys.enabled = True
     config.local_keys.master_key = MagicMock()
     # "test" in base64 (4 bytes when decoded, which is < 32 bytes)
     config.local_keys.master_key.get_secret_value.return_value = "dGVzdA=="
@@ -104,6 +108,7 @@ def test_from_config_should_raise_file_not_found_error_when_oprf_key_file_missin
     config.hsm = MagicMock(spec=ConfigHsm)
     config.hsm.url = None
     config.local_keys = MagicMock(spec=ConfigLocalKeys)
+    config.local_keys.enabled = True
     config.local_keys.master_key = MagicMock()
     # 32 bytes when decoded: 44 'A' characters + 1 padding '=' = 32 null bytes (\x00 * 32)
     # Base64: 44 chars = 11 groups of 4 chars, each encoding 3 bytes = 33 bytes,
@@ -125,6 +130,7 @@ def test_from_config_should_raise_value_error_when_oprf_key_file_is_empty(
     config.hsm = MagicMock(spec=ConfigHsm)
     config.hsm.url = None
     config.local_keys = MagicMock(spec=ConfigLocalKeys)
+    config.local_keys.enabled = True
     config.local_keys.master_key = MagicMock()
     config.local_keys.master_key.get_secret_value.return_value = (
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
@@ -143,3 +149,27 @@ def test_from_config_should_raise_value_error_when_oprf_key_file_is_empty(
         pytest.raises(ValueError, match="OPRF server key file is empty"),
     ):
         KeyOperations.from_config(config, hsm_key_version_service)
+
+
+def test_from_config_should_refuse_local_keys_when_not_enabled(
+    hsm_key_version_service: HsmKeyVersionService,
+) -> None:
+    config = MagicMock(spec=Config)
+    config.hsm = MagicMock(spec=ConfigHsm)
+    config.hsm.url = None
+    config.local_keys = ConfigLocalKeys(
+        master_key=SecretStr("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="),
+        oprf_server_key_file="/path/to/oprf_key",
+    )
+
+    with (
+        patch("app.services.key_operations._load_master_key") as load_master_key,
+        pytest.raises(ValueError, match="No key backend configured"),
+    ):
+        KeyOperations.from_config(config, hsm_key_version_service)
+
+    load_master_key.assert_not_called()
+
+
+def test_local_keys_are_disabled_by_default() -> None:
+    assert ConfigLocalKeys().enabled is False
