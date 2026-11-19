@@ -73,6 +73,11 @@ class KeyOperations:
     def from_config(cls, config: Config, version_service: HsmKeyVersionService) -> Self:
         if config.hsm.url:
             return cls._hsm(config.hsm, version_service)
+        if not config.local_keys.enabled:
+            raise ValueError(
+                "No key backend configured: set hsm.url, or set local_keys.enabled=True "
+                "to use keys derived from the master key (development and testing only)."
+            )
         return cls._local(config.local_keys)
 
     @classmethod
@@ -95,7 +100,9 @@ class KeyOperations:
 
     @classmethod
     def _local(cls, config: ConfigLocalKeys) -> Self:
-        logger.info("HSM not configured, using keys derived from the master key")
+        logger.warning(
+            "HSM not configured, using keys derived from the master key (development and testing only)"
+        )
         master_key = _load_master_key(config.master_key.get_secret_value())
         return cls(
             oprf_evaluator=LocalOprfEvaluator(

@@ -143,7 +143,8 @@ The container entrypoint (`docker/init.sh`) prepares everything automatically. W
 steps by hand, with a database available (for example `docker compose up -d postgres`):
 
 1. Create `app.conf` from `app.conf.example` and set `local_keys.master_key` to a base64 encoded key of at least 32
-   bytes, for example the output of `openssl rand -base64 32`.
+   bytes, for example the output of `openssl rand -base64 32`. The example enables the local keys
+   (`local_keys.enabled=True`); without an `hsm.url` and with local keys disabled, the service refuses to start.
 2. Generate the OPRF server key: `poetry run python app/generate_oprf_key.py > secrets/oprf-server.key`
 3. Run the database migrations:
 
