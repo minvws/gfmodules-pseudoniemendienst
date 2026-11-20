@@ -1,10 +1,8 @@
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
-import inject
 import pytest
 
-import app.container
 from app import cleanup
 
 
@@ -12,14 +10,6 @@ from app import cleanup
 def service() -> Iterator[MagicMock]:
     with patch("app.cleanup.container.get_hsm_key_cleanup_service") as get_service:
         yield get_service.return_value
-
-
-@pytest.fixture
-def unconfigured_container() -> Iterator[None]:
-    inject.clear()
-    yield
-    inject.clear()
-    app.container.configure()
 
 
 @pytest.mark.usefixtures("unconfigured_container")
