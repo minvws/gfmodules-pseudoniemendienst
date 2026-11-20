@@ -121,7 +121,7 @@ class HsmKeyVersionService:
         from_dt = from_dt or now_utc()
         with self.__db.get_db_session(commit=True) as session:
             org = session.get_repository(OrganizationRepository).get_registered(
-                organization_external_id
+                organization_external_id, lock=True
             )
             # Make sure we have at least one hsm_key_version
             if not org.hsm_key_versions:
