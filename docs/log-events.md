@@ -50,12 +50,12 @@ Every event carries these on every stream, whenever the request context holds a 
 | `DECRYPT_PUBKEY_REJECTED` | 250405 | WARNING | `organization_identifier`, `key_algorithm`, `rejection_reason` |
 | `HSM_OPERATION_FAILED` | 250406 | ERROR | `operation_type`, `error_reason`, `retry_attempt` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
-| `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path`, `oauth_enabled`, `pseudonym_api_enabled` |
+| `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path`, `pseudonym_api_enabled` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
-| `SYS_MISSING_CORRELATION_ID` | 270407 | ERROR | `endpoint`, `method` |
-| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `datastore`, `error_type`, `retry_attempt`, `backoff_seconds` |
+| `SYS_MISSING_CORRELATION_ID` | 270428 | ERROR | `endpoint`, `method` |
+| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
 | `SYS_HSM_UNREACHABLE` | 270406 | CRITICAL | `error_reason`, `retry_attempt` |
 | `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated` |
 
@@ -90,5 +90,5 @@ Every event carries these on every stream, whenever the request context holds a 
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
-| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `datastore`, `error_type` |
+| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type` |
 | `SYS_HSM_UNREACHABLE` | 270406 | CRITICAL | `error_reason` |

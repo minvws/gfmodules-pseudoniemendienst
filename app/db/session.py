@@ -175,7 +175,6 @@ class DbSession:
                     Log.SYS_DB_CONNECTION_FAILED,
                     "Database connection lost: giving up after all retries",
                     fields={
-                        "datastore": "prs-database",
                         "error_type": type(error).__name__,
                         "retry_attempt": attempt,
                     },
@@ -189,7 +188,6 @@ class DbSession:
                 Log.SYS_DB_CONNECTION_FAILED,
                 "Database connection lost, retrying",
                 fields={
-                    "datastore": "prs-database",
                     "error_type": type(error).__name__,
                     "retry_attempt": attempt,
                     "backoff_seconds": backoff[0],
