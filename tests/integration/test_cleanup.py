@@ -1,8 +1,10 @@
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
+import inject
 import pytest
 
+import app.container
 from app import cleanup
 
 
@@ -12,12 +14,17 @@ def service() -> Iterator[MagicMock]:
         yield get_service.return_value
 
 
-def test_main_returns_zero_on_success(service: MagicMock) -> None:
-    service.cleanup_expired_keys.return_value = 3
+@pytest.fixture
+def unconfigured_container() -> Iterator[None]:
+    inject.clear()
+    yield
+    inject.clear()
+    app.container.configure()
 
+
+@pytest.mark.usefixtures("unconfigured_container")
+def test_main_configures_the_container_and_returns_zero_on_success() -> None:
     assert cleanup.main() == 0
-
-    service.cleanup_expired_keys.assert_called_once_with()
 
 
 def test_main_returns_one_on_failure(service: MagicMock) -> None:

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> int:
     application.application_init()
+    container.configure()
 
     service = container.get_hsm_key_cleanup_service()
     try:
