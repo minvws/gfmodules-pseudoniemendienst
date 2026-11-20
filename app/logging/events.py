@@ -27,14 +27,22 @@ class Log(_Base):
                 "represented_organization_identifier",
                 "recipient_organization_identifier",
                 "requested_operation",
+                "error_reason",
             ),
             _SIEM: (
                 "acting_organization_identifier",
                 "represented_organization_identifier",
                 "recipient_organization_identifier",
                 "requested_operation",
+                "error_reason",
             ),
         },
+    )
+    MISSING_AUTHORIZATION_HEADER = LogEvent(
+        "200404",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {_APP: ("error_reason",), _SIEM: ("error_reason",)},
     )
 
     # Pseudonym creation events (PRS-PSE), see
@@ -422,6 +430,15 @@ class Log(_Base):
         {
             _APP: ("organization_identifier", "key_algorithm", "rejection_reason"),
             _SIEM: ("organization_identifier", "key_algorithm", "rejection_reason"),
+        },
+    )
+    DECRYPT_PUBKEY_DELETED = LogEvent(
+        "250407",
+        logging.WARNING,
+        (_APP, _SIEM),
+        {
+            _APP: ("organization_identifier", "key_version"),
+            _SIEM: ("organization_identifier", "key_version"),
         },
     )
     HSM_OPERATION_FAILED = LogEvent(  # PRS-KEY-007

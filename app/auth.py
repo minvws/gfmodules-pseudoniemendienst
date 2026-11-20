@@ -1,12 +1,15 @@
 import logging
 from typing import Annotated
 
+import gfmodules.logging as gflog
 from fastapi import Depends, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
+from pydantic import ValidationError
 from starlette.requests import Request
 
 from app import container
 from app.exceptions.access import UnauthorizedRequestError
+from app.logging.events import Log
 from app.models.auth.context import AuthContext, AuthenticationClaims
 from app.models.auth.data import AuthorizationScope
 from app.models.auth.headers import AuthHeaders
@@ -23,6 +26,16 @@ bearer_auth = HTTPBearer(
 )
 
 
+def _header_errors(error: ValueError) -> str:
+    if not isinstance(error, ValidationError):
+        return type(error).__name__
+    fields = AuthHeaders.model_fields
+    return ", ".join(
+        f"{fields[str(detail['loc'][0])].alias}: {detail['type']}"
+        for detail in error.errors()
+    )
+
+
 def get_auth_ctx(
     request: Request,
     auth_headers_service: Annotated[
@@ -32,7 +45,12 @@ def get_auth_ctx(
     try:
         auth_headers = AuthHeaders.from_request(request)
     except ValueError as e:
-        logger.exception("Invalid Authorization Headers in request")
+        gflog.emit(
+            logger,
+            Log.MISSING_AUTHORIZATION_HEADER,
+            "invalid authorization headers in request",
+            fields={"error_reason": _header_errors(e)},
+        )
         raise UnauthorizedRequestError() from e
 
     validated_auth_headers = auth_headers_service.validate(auth_headers)
@@ -53,8 +71,18 @@ def get_auth_ctx(
 def assert_scope(ctx: AuthContext, required: AuthorizationScope) -> AuthContext:
     if required not in ctx.scope:
         granted = " ".join(s.value for s in ctx.scope)
-        logger.warning(
-            "scope %s missing for request, granted scopes: %s", required.value, granted
+        gflog.emit(
+            logger,
+            Log.AUTHORIZATION_DENIED,
+            f"scope {required.value} missing for request, granted scopes: {granted}",
+            fields={
+                "acting_organization_identifier": str(
+                    ctx.claims.client_organization_id
+                ),
+                "represented_organization_identifier": str(ctx.claims.organization_id),
+                "requested_operation": required.value,
+                "error_reason": "scope_missing",
+            },
         )
         raise UnauthorizedRequestError()
     return ctx

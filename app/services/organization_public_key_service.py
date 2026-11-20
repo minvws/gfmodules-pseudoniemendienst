@@ -263,5 +263,14 @@ class OrganizationPublicKeyService:
             deleted = session.get_repository(OrganizationPublicKeyRepository).delete(
                 key_id, org.id
             )
-            if not deleted:
+            if deleted is None:
                 raise PublicKeyNotFoundError()
+        gflog.emit(
+            logger,
+            Log.DECRYPT_PUBKEY_DELETED,
+            "decryption public key deleted",
+            fields={
+                "organization_identifier": organization_id.value,
+                "key_version": deleted.get("kid"),
+            },
+        )
