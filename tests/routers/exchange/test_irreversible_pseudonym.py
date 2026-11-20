@@ -109,6 +109,7 @@ def test_post_irreversible_pseudonym_should_return_jwe_with_reversible_pseudonym
         recipient_organization=f"oin:{org_with_irreversible_pseudonym_type.external_id.value}",
         recipient_scope="test_scope",
         version=1,
+        current_version=1,
     )
 
     mock_generate.return_value = IrreversiblePseudonym(
