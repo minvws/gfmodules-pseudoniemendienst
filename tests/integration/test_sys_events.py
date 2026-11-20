@@ -184,15 +184,12 @@ def test_db_rejections_are_logged_without_the_rejected_value(
         IntegrityError("INSERT", {"name": rejected}, UniqueViolation(rejected)),
     ]
 
-    def rejecting(error: DatabaseError) -> Callable[[], None]:
-        def operation() -> None:
-            raise error
-
-        return operation
+    def reject(error: DatabaseError) -> None:
+        raise error
 
     for error in rejections:
         with pytest.raises(DatabaseError):
-            db_session._retry(rejecting(error))
+            db_session._retry(reject, error)
 
     (schema,) = _events(records, Log.SYS_DB_SCHEMA_ERROR.event_id)
     assert (
