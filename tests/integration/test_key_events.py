@@ -92,6 +92,7 @@ def _auth_headers(valid_headers: dict[str, str], org_oin: Oin) -> dict[str, str]
         (Log.DECRYPT_PUBKEY_REJECTED, "250405", logging.WARNING),
         (Log.HSM_OPERATION_FAILED, "250406", logging.ERROR),
         (Log.DECRYPT_PUBKEY_DELETED, "250407", logging.WARNING),
+        (Log.KEY_CLEANUP_FAILED, "250408", logging.ERROR),
     ],
 )
 def test_key_events_match_logging_spec(
