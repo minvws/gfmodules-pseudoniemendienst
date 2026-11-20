@@ -1,4 +1,5 @@
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -113,18 +114,23 @@ def test_get_expired_versions_should_return_empty_list(
     assert result == []
 
 
-def test_increase_version_for_org_should_succeed(
+def test_concurrent_increase_version_for_org_should_number_versions_in_order(
     hsm_key_version_service: HsmKeyVersionService,
     persisted_organization: OrganizationEntity,
 ) -> None:
-    result = hsm_key_version_service.increase_version_for_org(
-        persisted_organization.external_id
-    )
-    assert result.version == 2
-    assert result.organization_id == persisted_organization.id
-    assert result.from_dt is not None
-    assert result.until_dt is None
-    assert result.removed_at is None
+    rotations = [persisted_organization.external_id] * 8
+
+    with ThreadPoolExecutor(max_workers=len(rotations)) as pool:
+        results = list(
+            pool.map(hsm_key_version_service.increase_version_for_org, rotations)
+        )
+
+    assert sorted(result.version for result in results) == list(range(2, 10))
+    for result in results:
+        assert result.organization_id == persisted_organization.id
+        assert result.from_dt is not None
+        assert result.until_dt is None
+        assert result.removed_at is None
 
 
 def test_increase_version_for_org_should_raise_when_org_not_registered(

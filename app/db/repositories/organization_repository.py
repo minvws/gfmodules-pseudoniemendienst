@@ -7,7 +7,9 @@ from app.models.oin import Oin
 
 
 class OrganizationRepository(RepositoryBase):
-    def get_one_by_external_id(self, external_id: Oin) -> OrganizationEntity | None:
+    def get_one_by_external_id(
+        self, external_id: Oin, lock: bool = False
+    ) -> OrganizationEntity | None:
         """
         Because of the unique index on (external_id and deleted_at is None)
         we can assume that there will at most one match
@@ -18,14 +20,18 @@ class OrganizationRepository(RepositoryBase):
                 OrganizationEntity.deleted_at.is_(None),
             )
         )
+        if lock:
+            stmt = stmt.with_for_update()
         return self.db_session.execute(stmt).scalar()
 
-    def get_registered(self, external_id: Oin) -> OrganizationEntity:
+    def get_registered(
+        self, external_id: Oin, lock: bool = False
+    ) -> OrganizationEntity:
         """
         The organization the caller acts for. The proxy verified its identity,
         so an organization that is missing here is one the PRS does not serve.
         """
-        org = self.get_one_by_external_id(external_id)
+        org = self.get_one_by_external_id(external_id, lock=lock)
         if org is None:
             raise OrganizationNotRegisteredError()
         return org
