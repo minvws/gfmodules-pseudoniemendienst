@@ -40,16 +40,19 @@ T = TypeVar("T")
 
 
 _VARCHAR_LIMIT = re.compile(r"character varying\((\d+)\)")
+_WRITTEN_TABLE = re.compile(r"^\s*(?:INSERT INTO|UPDATE)\s+(\S+)", re.IGNORECASE)
 
 
-def _longest_value(params: Any) -> int | None:
-    if isinstance(params, dict):
-        params = params.values()
-    elif not isinstance(params, (list, tuple)):
-        params = (params,)
-    return max(
-        (len(value) for value in params if isinstance(value, (str, bytes))),
-        default=None,
+def _too_long_param(params: Any, limit: int | None) -> tuple[str | None, int | None]:
+    if limit is None or not isinstance(params, dict):
+        return None, None
+    return next(
+        (
+            (name, len(value))
+            for name, value in params.items()
+            if isinstance(value, (str, bytes)) and len(value) > limit
+        ),
+        (None, None),
     )
 
 
@@ -58,15 +61,17 @@ def _present(fields: dict[str, Any]) -> dict[str, Any]:
 
 
 def _schema_error_fields(exc: DataError) -> dict[str, Any]:
-    diag = getattr(exc.orig, "diag", None)
-    limit = _VARCHAR_LIMIT.search(str(exc.orig))
+    limit_match = _VARCHAR_LIMIT.search(str(exc.orig))
+    limit = int(limit_match.group(1)) if limit_match else None
+    column, value_length = _too_long_param(exc.params, limit)
+    table = _WRITTEN_TABLE.match(exc.statement or "")
     return _present(
         {
             "exception_type": type(exc.orig).__name__,
-            "table": getattr(diag, "table_name", None),
-            "column": getattr(diag, "column_name", None),
-            "value_length": _longest_value(exc.params),
-            "column_limit": int(limit.group(1)) if limit else None,
+            "table": table.group(1) if table else None,
+            "column": column,
+            "value_length": value_length,
+            "column_limit": limit,
         }
     )
 

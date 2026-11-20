@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from gfmodules.logging.testing import capture_records
 from jwcrypto.jwk import JWK
 from requests.exceptions import ConnectionError
+from sqlalchemy import text
 from sqlalchemy.exc import DatabaseError, DataError, IntegrityError, OperationalError
 from starlette.testclient import TestClient
 
@@ -16,7 +17,7 @@ from app.db.models.organization import OrganizationEntity
 from app.db.session import DbSession
 from app.exceptions.pseudonym import PseudonymOperationError
 from app.logging.events import Log
-from app.models.oin import RecipientOrganizationOin
+from app.models.oin import Oin, RecipientOrganizationOin
 from app.models.requests.oprf import BlindRequest
 from app.services.oprf.oprf_service import OprfService
 from app.services.organization_public_key_service import OrganizationPublicKeyService
@@ -160,36 +161,23 @@ def test_db_retry_emits_connection_events(
 
 
 def test_db_rejections_are_logged_without_the_rejected_value(
-    record_logs: RecordLogs, db_session: DbSession
+    record_logs: RecordLogs, db_session: DbSession, valid_organization_id: Oin
 ) -> None:
     records = record_logs(DB_LOGGER)
     rejected = "x" * 300
+    db_session.execute(text("CREATE TEMP TABLE rejections (name VARCHAR(255))"))
+    too_long = text("INSERT INTO rejections (name) VALUES (:name)").bindparams(
+        name=rejected
+    )
 
-    class StringDataRightTruncation(Exception):
-        class diag:
-            table_name = "organization"
-            column_name = "name"
+    with pytest.raises(DataError):
+        db_session.execute(too_long)
+    db_session.rollback()
 
-    class UniqueViolation(Exception):
-        class diag:
-            table_name = "organization_public_key"
-            constraint_name = "uq_organization_public_key"
-
-    rejections: list[DatabaseError] = [
-        DataError(
-            "INSERT",
-            {"name": rejected},
-            StringDataRightTruncation("value too long for type character varying(255)"),
-        ),
-        IntegrityError("INSERT", {"name": rejected}, UniqueViolation(rejected)),
-    ]
-
-    def reject(error: DatabaseError) -> None:
-        raise error
-
-    for error in rejections:
-        with pytest.raises(DatabaseError):
-            db_session._retry(reject, error)
+    for name in ("first", rejected):
+        db_session.add(OrganizationEntity(external_id=valid_organization_id, name=name))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
 
     (schema,) = _events(records, Log.SYS_DB_SCHEMA_ERROR.event_id)
     assert (
@@ -198,13 +186,17 @@ def test_db_rejections_are_logged_without_the_rejected_value(
         schema.column,  # type: ignore[attr-defined]
         schema.value_length,  # type: ignore[attr-defined]
         schema.column_limit,  # type: ignore[attr-defined]
-    ) == ("StringDataRightTruncation", "organization", "name", 300, 255)
+    ) == ("StringDataRightTruncation", "rejections", "name", 300, 255)
     (operation,) = _events(records, Log.SYS_DB_OPERATION_FAILED.event_id)
     assert (
         operation.exception_type,  # type: ignore[attr-defined]
         operation.table,  # type: ignore[attr-defined]
         operation.constraint,  # type: ignore[attr-defined]
-    ) == ("UniqueViolation", "organization_public_key", "uq_organization_public_key")
+    ) == (
+        "UniqueViolation",
+        "organizations",
+        "idx_admin_organizations_unique_external_id",
+    )
     assert all(rejected not in str(vars(record)) for record in records)
 
 
