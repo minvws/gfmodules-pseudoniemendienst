@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import UUID, DateTime, ForeignKey, Integer
+from sqlalchemy import UUID, DateTime, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, Relationship, mapped_column
 
 from app.db.models.base import Base
@@ -11,7 +11,10 @@ from app.db.models.organization import OrganizationEntity
 
 class HsmKeyVersionEntity(Base):
     __tablename__ = "hsm_key_versions"
-    __table_args__ = ({"schema": "prs"},)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "version"),
+        {"schema": "prs"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
