@@ -117,7 +117,7 @@ Returns `200` with the updated key, `404` when the id does not exist for the cal
 Delete one registered key. Returns `200` with `{"message": "key deleted"}`, or `404` when the id does not exist for the calling organization.
 
 #### `POST /administration/key-versions`
-Create a new HSM key version for the calling organization. Version numbers are assigned by the PRS, one higher than the organization's highest version. The OPRF secret for a version is generated in the HSM on first use.
+Create a new HSM key version for the calling organization. Version numbers are assigned by the PRS, one higher than the organization's highest version. The keys for a version are generated in the HSM on first use.
 
 ```json
 {
@@ -156,6 +156,8 @@ Set or clear the end date of one key version. Once `until_dt` has passed, the ve
 `until_dt` must be later than now and include a timezone offset, or be `null` to clear the end date.
 
 Returns `200` with the updated version, `404` when the id does not exist for the calling organization, `409` when the version has already been removed.
+
+See [hsm-key-versions.md](hsm-key-versions.md) for the lifecycle of a key version and its edge cases.
 
 ## OPRF Services
 
