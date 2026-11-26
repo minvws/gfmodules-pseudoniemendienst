@@ -50,7 +50,7 @@ The claims are the same as in an unsigned token, plus `iss`:
 | `scope`         | The recipient scope the token was made for                                                                  |
 | `subject`       | The pseudonym: `pseudonym:eval:`, `pseudonym:reversible:` or `pseudonym:irreversible:` plus the value       |
 | `iat`, `exp`    | Issued at and expiry; tokens are valid for five minutes                                                     |
-| `keyVersion`    | The recipient's key version the pseudonym was made with (exchange endpoints)                                |
+| `keyVersion`    | The recipient's key version the pseudonym or evaluation was made with                                       |
 | `extraVersions` | During a key rotation, the pseudonym or evaluation per older key version (see [endpoints.md](endpoints.md)) |
 
 ## Why PS256

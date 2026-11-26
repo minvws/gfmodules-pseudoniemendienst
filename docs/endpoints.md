@@ -117,7 +117,7 @@ Returns `200` with the updated key, `404` when the id does not exist for the cal
 Delete one registered key. Returns `200` with `{"message": "key deleted"}`, or `404` when the id does not exist for the calling organization.
 
 #### `POST /administration/key-versions`
-Create a new HSM key version for the calling organization. Version numbers are assigned by the PRS, one higher than the organization's highest version. The OPRF secret for a version is generated in the HSM on first use.
+Create a new HSM key version for the calling organization. Version numbers are assigned by the PRS, one higher than the highest version of every registration of the organization's OIN, withdrawn ones included. The keys for a version are generated in the HSM on first use.
 
 ```json
 {
@@ -145,7 +145,7 @@ Returns `201`, or `409` when the organization has no key version yet to rotate f
 List all HSM key versions of the calling organization, including expired and removed ones, in the same shape as above.
 
 #### `PUT /administration/key-versions/{id}`
-Set or clear the end date of one key version. Once `until_dt` has passed, the version is no longer used for evaluation or reversal, and the periodic cleanup (`python -m app.cleanup`) destroys its secret in the HSM and sets `removed_at`.
+Set or clear the end date of one key version. Once `until_dt` has passed, the version is no longer used for evaluation or reversal, and the periodic cleanup (`python -m app.cleanup`) destroys its keys in the HSM and sets `removed_at`.
 
 ```json
 {
@@ -153,9 +153,11 @@ Set or clear the end date of one key version. Once `until_dt` has passed, the ve
 }
 ```
 
-`until_dt` must be later than now and include a timezone offset, or be `null` to clear the end date.
+`until_dt` must be later than now and than the version's `from_dt` and include a timezone offset, or be `null` to clear the end date.
 
-Returns `200` with the updated version, `404` when the id does not exist for the calling organization, `409` when the version has already been removed.
+Returns `200` with the updated version, `404` when the id does not exist for the calling organization, `409` when the version has expired or has been removed, and `422` when `until_dt` breaks these rules.
+
+See [hsm-key-versions.md](hsm-key-versions.md) for the lifecycle of a key version and its edge cases.
 
 ## OPRF Services
 
@@ -180,7 +182,7 @@ Response:
 }
 ```
 
-The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key registered for `recipientScope` (or the `*` wildcard key), and its `kid` header names that key. The decrypted payload carries the evaluation for the latest key version as `subject` in the form `pseudonym:eval:<base64>`, plus `aud` (the recipient), `scope`, `iat` and `exp` (five minutes). When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extraVersions` claim (`{"<version>": "<base64 eval>"}`).
+The JWE is encrypted with `RSA-OAEP` and `A256GCM` to the recipient key registered for `recipientScope` (or the `*` wildcard key), and its `kid` header names that key. The decrypted payload carries the evaluation for the latest key version as `subject` in the form `pseudonym:eval:<base64>`, plus `aud` (the recipient), `scope`, `iat`, `exp` (five minutes) and `keyVersion` (the version of `subject`). When multiple key versions are active (e.g. during key rotation), the older versions are included in an `extraVersions` claim (`{"<version>": "<base64 eval>"}`).
 
 Errors: `403` when the calling organization may not request OPRF pseudonyms, `404` when the recipient organization is unknown, may not receive OPRF pseudonyms, has no key registered for the scope, or has no active HSM key version, `400` when the blinded input is invalid, `502` when the HSM refuses the evaluation, `503` when the HSM cannot be reached, `504` when the HSM does not answer in time.
 
