@@ -1,26 +1,30 @@
 # Expired HSM key cleanup
 
-HSM key versions are stored in the `hsm_key_version` table with an optional
+HSM key versions are stored in the `prs.hsm_key_versions` table with an optional
 `until_dt` (end date). When a version's `until_dt` is in the past (or exactly now) it is no longer
 used for [OPRF evaluation](./oprf-eval-flow.md) or for reversing reversible pseudonyms, but the key still physically
 exists in the HSM. A standalone cleanup program removes those expired keys.
 
 ## What it does
 
-For every key version that has expired (`until_dt` set and at or before now) and is
-not yet marked `removed`, the program:
+For every key version that has expired (`until_dt` set and at or before now) and has
+no `removed_at` yet, the program:
 
 1. Destroys every key of that version that exists in the HSM via
    `POST {hsm_url}/hsm/{module}/{slot}/destroy`, by label: the OPRF secret
-   (`oin-<oin>-v<version>`, the label used during evaluation) and the reversible
-   pseudonym keys (`oin-<oin>-rp-v<version>-aes` and `oin-<oin>-rp-v<version>-hmac`).
+   (`oin-<oin>-oprf-v<version>`), the irreversible pseudonym key
+   (`oin-<oin>-irp-v<version>-hmac`) and the reversible pseudonym keys
+   (`oin-<oin>-rp-v<version>-aes` and `oin-<oin>-rp-v<version>-hmac`).
    Keys are created on first use, so a version may have only some of them;
    labels that do not exist are skipped.
-2. Marks the version as `removed` in the database.
+2. Sets `removed_at` on the version in the database.
 
 If the HSM call fails for a version, that version is left untouched so the next
-run retries it. When the HSM is not configured (`hsm.url` unset) the program
-does nothing and exits successfully.
+run retries it, possibly with some of its labels already gone. When the HSM is
+not configured (`hsm.url` unset) nothing is destroyed, but `removed_at` is still set.
+
+Versions of withdrawn organizations are included; see
+[Withdrawn organization](./hsm-key-versions.md#withdrawn-organization).
 
 ## Running it
 
