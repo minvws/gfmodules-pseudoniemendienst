@@ -145,7 +145,7 @@ Returns `201`, or `409` when the organization has no key version yet to rotate f
 List all HSM key versions of the calling organization, including expired and removed ones, in the same shape as above.
 
 #### `PUT /administration/key-versions/{id}`
-Set or clear the end date of one key version. Once `until_dt` has passed, the version is no longer used for evaluation or reversal, and the periodic cleanup (`python -m app.cleanup`) destroys its secret in the HSM and sets `removed_at`.
+Set or clear the end date of one key version. Once `until_dt` has passed, the version is no longer used for evaluation or reversal, and the periodic cleanup (`python -m app.cleanup`) destroys its keys in the HSM and sets `removed_at`.
 
 ```json
 {

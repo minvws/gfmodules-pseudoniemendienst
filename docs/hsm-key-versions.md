@@ -58,7 +58,7 @@ There is no `DELETE` route: only the cleanup sets `removed_at`. The administrati
 
 ### No active version
 
-Creating a pseudonym or an OPRF evaluation for the organization answers `404` with the unknown-recipient message, on purpose, so a caller cannot tell the two apart. It happens when the old version ends before a scheduled one starts, so end the old version only after the new `from_dt`. Recover with [procedure a](#a-organization-without-an-active-version).
+Creating a pseudonym or an OPRF evaluation for the organization answers `404` with the unknown-recipient message, on purpose, so a caller cannot tell the two apart. It happens when the old version ends before a scheduled one starts, so end the old version well after the new `from_dt`. The overlap is also the only time receivers can migrate what they stored: only then do exchanges carry the old value in `extraVersions` and can reversible pseudonyms be converted to the new version. Recover with [procedure a](#a-organization-without-an-active-version).
 
 ### Rotation without ending the old version
 
@@ -82,7 +82,7 @@ Two `POST` calls for one organization at the same moment can compute the same ve
 
 ### Organization without any version
 
-An organization that was not registered through beheer can lack version 0. `POST` then answers `409` and senders get `404`. Follow [procedure b](#b-organization-without-any-version).
+An organization registered through prs-beheer-api before v0.1.2, or inserted into the database directly, has no version: beheer creates the first one at registration only since v0.1.2. `POST` then answers `409` and senders get `404`. Follow [procedure b](#b-organization-without-any-version).
 
 ### Withdrawn organization
 
